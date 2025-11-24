@@ -1,0 +1,258 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Pharmaceutical Premium Palette */
+    --background: 0 0% 100%;        /* Pure white */
+    --foreground: 0 0% 15%;         /* Charcoal */
+    --off-white: 0 0% 98%;          /* Off-white */
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+
+    /* Pharmaceutical Color System */
+    --pharma-charcoal: 0 0% 15%;    /* Main text - charcoal */
+    --pharma-grey: 210 10% 50%;     /* Grey-blue */
+    --pharma-grey-light: 210 10% 85%;
+    --pharma-green: 155 60% 45%;    /* Deep green accent */
+    --pharma-green-dark: 155 50% 35%;
+    --pharma-blue: 210 60% 50%;     /* Grey-blue accent */
+    --pharma-blue-light: 210 50% 90%;
+    
+    /* Brand Colors - Deep Green Range */
+    --sage-dark: 150 12% 15%;
+    --sage-deeper: 150 10% 11%;
+    --sage-medium: 150 13% 17%;
+    --sage-forest: 150 12% 22%;
+    
+    /* Brand Colors - Teal/Blue Range */
+    --teal-midnight: 200 38% 10%;
+    --teal-deep: 200 36% 12%;
+    --teal-deeper: 200 40% 8%;
+    --teal-primary: 200 50% 15%;
+    --teal-darker: 200 35% 8%;
+
+    --primary: 155 60% 45%;         /* Deep green */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 60% 50%;       /* Grey-blue */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 155 55% 92%;
+    --accent-foreground: 155 60% 25%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 95%;
+    --ring: 155 60% 45%;
+
+    --radius: 0.75rem;
+
+    /* Custom design tokens - Brand Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--teal-primary)), hsl(var(--teal-darker)));
+    --gradient-sage-teal: linear-gradient(135deg, hsl(var(--sage-dark)), hsl(var(--teal-primary)));
+    --gradient-teal-midnight: linear-gradient(135deg, hsl(var(--teal-primary)), hsl(var(--teal-darker)));
+    --gradient-sage-forest: linear-gradient(135deg, hsl(var(--sage-dark)), hsl(var(--sage-forest)));
+    --gradient-hero: linear-gradient(180deg, rgba(31, 42, 37, 0.45), rgba(19, 48, 61, 0.45));
+    --gradient-accent: linear-gradient(135deg, hsl(45 85% 55%), hsl(45 75% 65%));
+    --gradient-warm: linear-gradient(135deg, hsl(45 85% 55%), hsl(20 75% 65%));
+    
+    /* Linear-inspired ultra-clean shadows */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+    --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 4px 6px -1px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.06);
+    --shadow-xl: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    --shadow-2xl: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
+    --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.05), 0 12px 24px rgba(0, 0, 0, 0.05);
+    --shadow-elegant: 0 0 0 1px rgba(0, 0, 0, 0.02), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+    
+    /* Linear-inspired ultra-smooth transitions */
+    --transition-base: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.35s cubic-bezier(0.34, 1.15, 0.64, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.3, 0.265, 1.3);
+    
+    /* Typography scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --font-size-4xl: 2.25rem;
+    --font-size-5xl: 3rem;
+    
+    /* Spacing scale for consistency */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 0.75rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+    --spacing-3xl: 4rem;
+  }
+
+  .dark {
+    --background: 150 20% 8%;
+    --foreground: 150 10% 95%;
+
+    --card: 150 18% 12%;
+    --card-foreground: 150 10% 95%;
+
+    --popover: 150 18% 12%;
+    --popover-foreground: 150 10% 95%;
+
+    --primary: 155 60% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 45 80% 50%;
+    --secondary-foreground: 150 15% 15%;
+
+    --muted: 150 15% 18%;
+    --muted-foreground: 150 10% 60%;
+
+    --accent: 155 40% 20%;
+    --accent-foreground: 155 60% 45%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 20%;
+    --input: 150 15% 20%;
+    --ring: 155 60% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased font-body;
+    letter-spacing: -0.01em;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-pharma;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+  
+  h2 {
+    @apply text-3xl md:text-4xl lg:text-5xl;
+  }
+  
+  h3 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  p {
+    line-height: 1.6;
+  }
+}
+
+/* Linear-inspired ultra-clean utilities */
+@layer utilities {
+  .hover-lift {
+    @apply transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-200 ease-out hover:scale-[1.01];
+  }
+  
+  .hover-border {
+    @apply transition-colors duration-200 ease-out hover:border-foreground/20;
+  }
+  
+  .smooth-transition {
+    transition: var(--transition-smooth);
+  }
+  
+  .spring-transition {
+    transition: var(--transition-spring);
+  }
+  
+  /* Linear-style card */
+  .card-linear {
+    @apply bg-background rounded-xl border border-border/40 transition-all duration-200;
+  }
+  
+  .card-linear:hover {
+    box-shadow: var(--shadow-card);
+    @apply border-border/60 translate-y-[-1px];
+  }
+  
+  /* Clean button style */
+  .btn-linear {
+    @apply px-5 py-2.5 rounded-lg font-medium transition-all duration-150;
+    box-shadow: var(--shadow-xs);
+  }
+  
+  .btn-linear:hover {
+    box-shadow: var(--shadow-sm);
+  }
+  
+  /* Subtle shadow utilities */
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  
+  /* Linear-style surface */
+  .surface {
+    @apply bg-background/50 backdrop-blur-sm border border-border/30 rounded-xl;
+  }
+}
+
+/* Mapbox custom styles with warmer feel */
+.mapboxgl-popup-content {
+  background: linear-gradient(135deg, hsl(var(--sage-dark)), hsl(var(--teal-primary)));
+  color: white;
+  padding: 16px 20px;
+  border-radius: 16px;
+  font-weight: 500;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: hsl(var(--teal-primary)) !important;
+}
+
+.mapboxgl-popup-close-button {
+  color: white;
+  font-size: 20px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.1);
+}
