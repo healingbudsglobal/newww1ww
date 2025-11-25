@@ -13,7 +13,7 @@ const Contact = () => {
       <main className="pt-28 md:pt-32">
         {/* Hero Section - Linear style */}
         <section className="bg-background py-16 md:py-20">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <ScrollAnimation>
               <div className="max-w-5xl">
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
@@ -28,7 +28,7 @@ const Contact = () => {
         </section>
 
         {/* Hero Image */}
-        <section className="container mx-auto px-3 sm:px-4 lg:px-6 pb-16 md:pb-20">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 pb-16 md:pb-20">
           <ScrollAnimation variant="scale" duration={0.8}>
             <div className="relative h-[300px] md:h-[400px] overflow-hidden rounded-xl border border-border/30">
               <img 
@@ -43,7 +43,7 @@ const Contact = () => {
 
         {/* Contact Information - Linear style */}
         <section className="py-20 md:py-32 bg-background">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16">
               {/* Contact Details */}
               <ScrollAnimation>

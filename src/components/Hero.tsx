@@ -39,7 +39,7 @@ const Hero = () => {
       {/* Video Background with Parallax */}
       <motion.div 
         style={{ y: videoY }}
-        className="absolute left-2 right-2 sm:left-4 sm:right-4 top-24 sm:top-32 md:top-40 bottom-4 rounded-2xl sm:rounded-3xl overflow-hidden z-0 shadow-2xl"
+        className="absolute left-2 right-2 top-24 sm:top-28 md:top-32 bottom-4 rounded-2xl sm:rounded-3xl overflow-hidden z-0 shadow-2xl"
       >
         <video 
           ref={videoRef}
@@ -57,7 +57,7 @@ const Hero = () => {
       
       <motion.div 
         style={{ y: contentY, opacity }}
-        className="container mx-auto px-3 sm:px-6 lg:px-8 relative z-10 py-16 sm:py-24 md:py-32"
+        className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-16 sm:py-24 md:py-32"
       >
         <div className="max-w-5xl text-left relative">
           <motion.h1 

@@ -7,7 +7,7 @@ const Footer = () => {
   
   return (
     <footer id="contact" className="text-white" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="py-10 sm:py-12 border-b border-white/10">
           <div className="grid sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12">

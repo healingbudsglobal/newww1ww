@@ -101,7 +101,7 @@ const Conditions = () => {
         <main className="pt-28 md:pt-32">
           {/* Hero Section */}
           <section className="bg-background py-16 md:py-20">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-5xl">
                   <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
@@ -120,7 +120,7 @@ const Conditions = () => {
 
           {/* Search and Filter Section */}
           <section className="py-12 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-4xl mx-auto space-y-6">
                   {/* Search Bar */}
@@ -158,7 +158,7 @@ const Conditions = () => {
 
           {/* Conditions Grid */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
                 {filteredConditions.map((condition, index) => (
                   <ScrollAnimation key={condition.id} delay={index * 0.05} variant="scale">
@@ -198,7 +198,7 @@ const Conditions = () => {
 
           {/* CTA Section */}
           <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-6 tracking-tight">

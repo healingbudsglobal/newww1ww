@@ -28,7 +28,7 @@ const International = () => {
       {/* Subtle background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/10 pointer-events-none" />
       
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="w-full max-w-7xl mx-auto">
           {/* Decorative gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />

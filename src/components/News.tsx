@@ -33,7 +33,7 @@ const newsItems = [
 const News = () => {
   return (
     <section id="news" className="bg-background py-12 sm:py-16 md:py-20">
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <ScrollAnimation>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12">
             <h2 className="font-pharma text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground tracking-tight">

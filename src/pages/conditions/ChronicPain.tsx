@@ -37,7 +37,7 @@ const ChronicPain = () => {
             style={{ backgroundColor: 'hsl(var(--section-color))' }}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6 relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
               <ScrollAnimation>
                 <div className="max-w-4xl">
                   <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight leading-[1.1]">
@@ -53,7 +53,7 @@ const ChronicPain = () => {
 
           {/* Breadcrumbs */}
           <section className="py-6 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Link to="/" className="hover:text-primary transition-colors">Home</Link>
                 <ChevronRight className="w-4 h-4" />
@@ -66,7 +66,7 @@ const ChronicPain = () => {
 
           {/* Main Content with Sidebar */}
           <section className="py-20 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid lg:grid-cols-4 gap-12 max-w-7xl mx-auto">
                 {/* Sidebar - Table of Contents */}
                 <aside className="lg:col-span-1">
@@ -249,7 +249,7 @@ const ChronicPain = () => {
 
           {/* CTA Section */}
           <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white mb-6 tracking-tight">

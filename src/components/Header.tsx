@@ -29,12 +29,12 @@ const Header = () => {
     <>
       <header 
         className={cn(
-          "fixed top-4 left-4 right-4 z-50 backdrop-blur-xl rounded-xl transition-all duration-200 border border-white/10",
+          "fixed top-2 left-2 right-2 z-50 backdrop-blur-xl rounded-xl transition-all duration-200 border border-white/10",
           scrolled ? "shadow-card" : "shadow-sm"
         )}
         style={{ backgroundColor: 'rgba(42, 61, 58, 0.95)' }}
       >
-        <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 md:h-28">
           <Link to="/" className="flex items-center flex-shrink-0">
             <img 

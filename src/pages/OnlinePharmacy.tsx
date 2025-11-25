@@ -38,7 +38,7 @@ const OnlinePharmacy = () => {
               style={{ y, opacity }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background" />
-            <div className="relative container mx-auto px-3 sm:px-4 lg:px-6 h-full flex flex-col justify-center">
+            <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-center">
               <ScrollAnimation>
                 <h1 className="text-5xl md:text-6xl font-semibold text-foreground mb-4">
                   Online Medical Cannabis Pharmacy
@@ -52,7 +52,7 @@ const OnlinePharmacy = () => {
 
           {/* Intro Section */}
           <section className="py-16 md:py-20 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-3xl md:text-4xl font-semibold text-foreground leading-tight">
@@ -78,7 +78,7 @@ const OnlinePharmacy = () => {
 
           {/* Why Choose Our Pharmacy Section */}
           <section className="py-16 md:py-20" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
                 <ScrollAnimation>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 md:mb-12">
@@ -227,7 +227,7 @@ const OnlinePharmacy = () => {
 
           {/* How It Works Section */}
           <section className="py-16 md:py-20 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-3 md:mb-4">How it works</h2>
                 <p className="text-base md:text-lg text-muted-foreground/80 max-w-3xl mb-12 md:mb-16">
@@ -298,7 +298,7 @@ const OnlinePharmacy = () => {
 
           {/* Newsletter Section */}
           <section className="py-16 md:py-20" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 md:mb-4">Stay in the loop</h2>

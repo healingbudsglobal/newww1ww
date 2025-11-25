@@ -32,7 +32,7 @@ const ManufactureDistribution = () => {
               style={{ y, opacity }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background" />
-            <div className="relative container mx-auto px-3 sm:px-4 lg:px-6 h-full flex flex-col justify-center">
+            <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-center">
               <ScrollAnimation>
                 <h1 className="text-5xl md:text-6xl font-semibold text-foreground mb-4">
                   Manufacture & Distribution
@@ -46,7 +46,7 @@ const ManufactureDistribution = () => {
 
           {/* Intro Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid md:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-4xl font-semibold text-foreground leading-tight mb-6">
@@ -67,7 +67,7 @@ const ManufactureDistribution = () => {
 
           {/* Manufacturing Excellence Section */}
           <section className="py-20 md:py-32 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-4xl font-semibold text-foreground mb-12">Manufacturing Excellence</h2>
@@ -128,7 +128,7 @@ const ManufactureDistribution = () => {
 
           {/* Why Partner Section */}
           <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-4xl font-semibold text-white mb-8">
@@ -144,7 +144,7 @@ const ManufactureDistribution = () => {
 
           {/* International Presence Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <h2 className="text-4xl font-semibold text-foreground mb-4">
                   We are international
@@ -197,7 +197,7 @@ const ManufactureDistribution = () => {
 
           {/* Extraction Section */}
           <section className="py-20 md:py-32 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-4xl font-semibold text-foreground mb-6">Advanced Extraction</h2>
@@ -237,7 +237,7 @@ const ManufactureDistribution = () => {
 
           {/* Distribution Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-4xl font-semibold text-foreground mb-6">

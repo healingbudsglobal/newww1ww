@@ -35,7 +35,7 @@ const CultivatingProcessing = () => {
         <main className="pt-28 md:pt-32">
           {/* Hero Section - Linear style */}
           <section className="bg-background py-16 md:py-20">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="max-w-5xl">
                   <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
@@ -50,7 +50,7 @@ const CultivatingProcessing = () => {
           </section>
 
           {/* Hero Image with Parallax - Linear style */}
-          <section className="container mx-auto px-3 sm:px-4 lg:px-6 pb-16 md:pb-20">
+          <section className="container mx-auto px-4 sm:px-6 lg:px-8 pb-16 md:pb-20">
             <ScrollAnimation variant="scale" duration={0.8}>
               <div ref={heroRef} className="relative h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-2xl border border-border/30">
                 <motion.img 
@@ -66,7 +66,7 @@ const CultivatingProcessing = () => {
 
           {/* Intro Section - Linear style */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid md:grid-cols-2 gap-16 md:gap-20 lg:gap-24 items-start max-w-7xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-foreground leading-[1.2] tracking-tight">
@@ -89,7 +89,7 @@ const CultivatingProcessing = () => {
 
           {/* Why Partner With Us Section - Linear style */}
           <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-16 md:mb-20">
@@ -236,7 +236,7 @@ const CultivatingProcessing = () => {
 
           {/* Where We Cultivate Section - Linear style */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <h2 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-foreground text-center mb-16 md:mb-20 tracking-tight">
                   Our global cultivation network
@@ -314,7 +314,7 @@ const CultivatingProcessing = () => {
 
           {/* Processing Section */}
           <section className="py-16 md:py-24 bg-muted/20">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 md:mb-6">Post-harvest excellence</h2>
                 <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mb-12 md:mb-16 leading-relaxed">
@@ -382,7 +382,7 @@ const CultivatingProcessing = () => {
 
           {/* Newsletter Section */}
           <section className="py-16 md:py-24" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
                 <ScrollAnimation>
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 md:mb-6">Stay informed</h2>

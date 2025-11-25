@@ -16,8 +16,8 @@ const Cultivation = () => {
   const imageY = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
   
   return (
-    <section className="bg-background py-12 sm:py-16 md:py-20 px-4">
-      <div className="max-w-[1920px] mx-auto">
+    <section className="bg-background py-12 sm:py-16 md:py-20 px-2">
+      <div className="max-w-[1920px] mx-auto px-2">
         <ScrollAnimation>
           <div ref={imageRef} className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl group">
           <motion.img 

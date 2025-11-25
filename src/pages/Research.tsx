@@ -14,7 +14,7 @@ const Research = () => {
       <main className="pt-28 md:pt-32">
         {/* Hero Section - Linear style */}
         <section className="bg-background py-16 md:py-20">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <ScrollAnimation>
               <div className="max-w-5xl">
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
@@ -29,7 +29,7 @@ const Research = () => {
         </section>
 
         {/* Hero Image */}
-        <section className="container mx-auto px-3 sm:px-4 lg:px-6 pb-16 md:pb-20">
+        <section className="container mx-auto px-4 sm:px-6 lg:px-8 pb-16 md:pb-20">
           <div className="relative h-[400px] md:h-[500px] overflow-hidden rounded-xl border border-border/30">
             <img 
               src={researchLabImage} 
@@ -42,7 +42,7 @@ const Research = () => {
 
         {/* Main Content - Linear style */}
         <section className="py-20 md:py-32 bg-background">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <ScrollAnimation>
               <div className="max-w-4xl mx-auto">
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-foreground mb-6 tracking-tight">
@@ -92,7 +92,7 @@ const Research = () => {
 
         {/* Research Areas - Linear style */}
         <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-4xl md:text-5xl font-semibold text-white text-center mb-16 md:mb-20 tracking-tight">
               Our Research Focus Areas
             </h2>
@@ -121,7 +121,7 @@ const Research = () => {
 
         {/* CTA - Linear style */}
         <section className="py-20 md:py-32 bg-background">
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6 text-center">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-foreground mb-6 tracking-tight">
               Interested in our research?
             </h2>

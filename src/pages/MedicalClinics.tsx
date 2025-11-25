@@ -31,7 +31,7 @@ const MedicalClinics = () => {
               style={{ y, opacity }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/60 to-background" />
-            <div className="relative container mx-auto px-3 sm:px-4 lg:px-6 h-full flex flex-col justify-center">
+            <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-center">
               <ScrollAnimation>
                 <h1 className="text-5xl md:text-6xl font-semibold text-foreground mb-4">
                   Medical Cannabis Clinics
@@ -45,7 +45,7 @@ const MedicalClinics = () => {
 
           {/* We Bring People Together Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid md:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
                 <ScrollAnimation>
                   <div className="card-linear h-[400px] flex items-center justify-center">
@@ -69,7 +69,7 @@ const MedicalClinics = () => {
 
           {/* Our Services Section */}
           <section className="py-20 md:py-32" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <ScrollAnimation>
                 <div className="flex justify-between items-center mb-12 max-w-6xl mx-auto">
                   <h2 className="text-4xl font-semibold text-white">Our Services</h2>
@@ -121,7 +121,7 @@ const MedicalClinics = () => {
 
           {/* Regional Clinics Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-6xl mx-auto space-y-20">
                 {/* South Africa */}
                 <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -200,7 +200,7 @@ const MedicalClinics = () => {
 
           {/* Testimonial Section */}
           <section className="py-20 md:py-32 bg-muted/30">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
                 <ScrollAnimation>
                   <blockquote className="text-3xl font-semibold text-foreground mb-8 text-center">
@@ -220,7 +220,7 @@ const MedicalClinics = () => {
 
           {/* CTA Section */}
           <section className="py-20 md:py-32 bg-background">
-            <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
                 <div className="grid md:grid-cols-2 gap-8 items-center">
                   <ScrollAnimation>
