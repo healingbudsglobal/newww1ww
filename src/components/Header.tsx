@@ -23,7 +23,7 @@ const Header = () => {
 
   const isActive = (path: string) => location.pathname === path;
   
-  const isWhatWeDoActive = ['/what-we-do', '/cultivating-processing', '/manufacture-distribution', '/medical-devices', '/medical-clinics', '/online-pharmacy'].includes(location.pathname);
+  const isWhatWeDoActive = ['/what-we-do', '/cultivating-processing', '/manufacture-distribution', '/conditions', '/medical-clinics', '/online-pharmacy'].includes(location.pathname) || location.pathname.startsWith('/conditions/');
 
   return (
     <>
@@ -87,12 +87,12 @@ const Header = () => {
                   <div className="text-sm text-muted-foreground">Global supply chain excellence</div>
                 </Link>
                 <Link
-                  to="/medical-devices"
+                  to="/conditions"
                   className="block px-4 py-3 text-foreground hover:bg-muted transition-colors border-b border-border"
                   onClick={() => setWhatWeDoOpen(false)}
                 >
-                  <div className="font-medium">Medical Devices</div>
-                  <div className="text-sm text-muted-foreground">Advanced delivery systems</div>
+                  <div className="font-medium">Conditions</div>
+                  <div className="text-sm text-muted-foreground">Treatable conditions with medical cannabis</div>
                 </Link>
                 <Link
                   to="/medical-clinics"
@@ -229,11 +229,11 @@ const Header = () => {
                   Manufacture & Distribution
                 </Link>
                 <Link 
-                  to="/medical-devices" 
+                  to="/conditions" 
                   className="block text-sm text-white/80 hover:text-white py-1.5 transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Medical Devices
+                  Conditions
                 </Link>
                 <Link 
                   to="/medical-clinics" 

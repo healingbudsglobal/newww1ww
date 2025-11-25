@@ -8,7 +8,8 @@ import Index from "./pages/Index";
 import WhatWeDo from "./pages/WhatWeDo";
 import CultivatingProcessing from "./pages/CultivatingProcessing";
 import ManufactureDistribution from "./pages/ManufactureDistribution";
-import MedicalDevices from "./pages/MedicalDevices";
+import Conditions from "./pages/Conditions";
+import ConditionRouter from "./pages/conditions/ConditionRouter";
 import MedicalClinics from "./pages/MedicalClinics";
 import OnlinePharmacy from "./pages/OnlinePharmacy";
 import Research from "./pages/Research";
@@ -28,7 +29,8 @@ const AnimatedRoutes = () => {
         <Route path="/what-we-do" element={<WhatWeDo />} />
           <Route path="/cultivating-processing" element={<CultivatingProcessing />} />
           <Route path="/manufacture-distribution" element={<ManufactureDistribution />} />
-          <Route path="/medical-devices" element={<MedicalDevices />} />
+          <Route path="/conditions" element={<Conditions />} />
+          <Route path="/conditions/:conditionId" element={<ConditionRouter />} />
           <Route path="/medical-clinics" element={<MedicalClinics />} />
           <Route path="/online-pharmacy" element={<OnlinePharmacy />} />
         <Route path="/research" element={<Research />} />
