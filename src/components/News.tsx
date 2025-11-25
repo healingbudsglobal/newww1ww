@@ -71,15 +71,15 @@ const News = () => {
               <div className="p-6">
                 <Badge 
                   variant="outline" 
-                  className="font-body mb-3 border-secondary/60 text-secondary bg-secondary/10 rounded-full px-3 py-1"
+                  className="font-geist mb-3 border-secondary/60 text-secondary bg-secondary/10 rounded-full px-3 py-1"
                 >
                   {item.category}
                 </Badge>
-                <h3 className="font-pharma text-xl font-semibold text-foreground mb-2 leading-tight group-hover:text-teal-primary transition-colors tracking-tight">
+                <h3 className="font-geist text-xl font-semibold text-foreground mb-2 leading-tight group-hover:text-teal-primary transition-colors tracking-tight">
                   {item.title}
                 </h3>
                 {item.description && (
-                  <p className="font-body text-muted-foreground text-sm line-clamp-3 leading-relaxed">
+                  <p className="font-geist text-muted-foreground text-sm line-clamp-3 leading-relaxed">
                     {item.description}
                 </p>
               )}

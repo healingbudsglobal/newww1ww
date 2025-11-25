@@ -48,7 +48,7 @@ const ValueProps = () => {
               <h3 className="font-pharma text-xl sm:text-2xl font-semibold text-white mb-4 tracking-tight">
                 {value.title}
               </h3>
-              <p className="font-body text-white/80 leading-relaxed text-sm sm:text-base">
+              <p className="font-geist text-white/80 leading-relaxed text-sm sm:text-base">
                 {value.description}
               </p>
               </div>

@@ -99,10 +99,10 @@ const International = () => {
                           />
                         </div>
                         <div className="text-left">
-                          <h3 className="text-lg font-bold font-pharma text-foreground mb-0.5 group-hover:text-primary transition-colors duration-300">
+                          <h3 className="text-lg font-bold font-geist text-foreground mb-0.5 group-hover:text-primary transition-colors duration-300">
                             {country.name}
                           </h3>
-                          <p className="text-xs text-muted-foreground font-body font-medium uppercase tracking-wider">
+                          <p className="text-xs text-muted-foreground font-geist font-medium uppercase tracking-wider">
                             Stage {country.order}
                           </p>
                         </div>
@@ -115,19 +115,19 @@ const International = () => {
                       </Badge>
                     </div>
                     
-                    <p className="text-sm text-muted-foreground font-body leading-relaxed mb-5 min-h-[60px]">
+                    <p className="text-sm text-muted-foreground font-geist leading-relaxed mb-5 min-h-[60px]">
                       {country.description}
                     </p>
 
                     <div className="flex flex-wrap gap-3 text-xs">
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-foreground transition-all duration-300 group-hover:bg-muted group-hover:shadow-md">
                         <Building2 className="w-4 h-4 text-primary" />
-                        <span className="font-body font-semibold">{country.locations.length} Locations</span>
+                        <span className="font-geist font-semibold">{country.locations.length} Locations</span>
                       </div>
                       {country.status === 'LIVE' && (
                         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-500/15 to-emerald-600/15 text-emerald-700 border border-emerald-300/50 shadow-sm transition-all duration-300 group-hover:shadow-md group-hover:scale-105">
                           <TrendingUp className="w-4 h-4" />
-                          <span className="font-body font-bold">Active</span>
+                          <span className="font-geist font-bold">Active</span>
                         </div>
                       )}
                     </div>
@@ -156,15 +156,15 @@ const International = () => {
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div className="group flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-card to-card/80 border border-border/30 shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300">
                     <div className="w-5 h-5 rounded-full shadow-md group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#2C5F4F' }} />
-                    <span className="text-sm text-foreground font-body font-semibold">Operations & Sales</span>
+                    <span className="text-sm text-foreground font-geist font-semibold">Operations & Sales</span>
                   </div>
                   <div className="group flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-card to-card/80 border border-border/30 shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300">
                     <div className="w-5 h-5 rounded-full shadow-md group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#13303D' }} />
-                    <span className="text-sm text-foreground font-body font-semibold">Export Sales Only</span>
+                    <span className="text-sm text-foreground font-geist font-semibold">Export Sales Only</span>
                   </div>
                   <div className="group flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-card to-card/80 border border-border/30 shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300">
                     <div className="w-5 h-5 rounded-full shadow-md group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#6B7280' }} />
-                    <span className="text-sm text-foreground font-body font-semibold">Operations Only</span>
+                    <span className="text-sm text-foreground font-geist font-semibold">Operations Only</span>
                   </div>
                 </div>
               </div>

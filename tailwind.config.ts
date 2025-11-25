@@ -15,7 +15,9 @@ export default {
     extend: {
       fontFamily: {
         'pharma': ['Archivo Narrow', 'Arial Narrow', 'sans-serif'],
-        'body': ['Helvetica', 'Arial', 'sans-serif'],
+        'body': ['Geist', 'Inter', 'Helvetica', 'Arial', 'sans-serif'],
+        'geist': ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        'geist-mono': ['Geist Mono', 'Courier New', 'monospace'],
         'decorative': ['Cinzel', 'serif'],
         'inter': ['Inter', 'sans-serif'],
       },
