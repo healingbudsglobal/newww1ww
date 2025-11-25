@@ -26,7 +26,7 @@ const International = () => {
   return (
     <section className="bg-background py-16 sm:py-20 md:py-24">
       <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="w-full max-w-7xl mx-auto">
+        <div className="w-full max-w-7xl mx-auto bg-primary/5 rounded-3xl p-8 sm:p-10 md:p-12 border border-primary/10">
           <ScrollAnimation>
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold font-pharma text-foreground mb-4 tracking-tight">
