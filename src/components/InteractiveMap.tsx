@@ -318,7 +318,13 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             onClick={() => setActiveLayer('operations-sales')}
             className="justify-start text-xs font-pharma"
           >
-            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: 'hsl(164, 80%, 38%)' }} />
+            <div 
+              className="w-3 h-3 rounded-full mr-2 border-2" 
+              style={{ 
+                backgroundColor: activeLayer === 'operations-sales' ? 'white' : 'hsl(164, 80%, 38%)',
+                borderColor: activeLayer === 'operations-sales' ? 'white' : 'hsl(164, 80%, 38%)'
+              }} 
+            />
             Operations & Sales
           </Button>
           <Button
@@ -327,7 +333,13 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             onClick={() => setActiveLayer('export-only')}
             className="justify-start text-xs font-pharma"
           >
-            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: 'hsl(178, 48%, 33%)' }} />
+            <div 
+              className="w-3 h-3 rounded-full mr-2 border-2" 
+              style={{ 
+                backgroundColor: activeLayer === 'export-only' ? 'white' : 'hsl(178, 48%, 33%)',
+                borderColor: activeLayer === 'export-only' ? 'white' : 'hsl(178, 48%, 33%)'
+              }} 
+            />
             Export Only
           </Button>
           <Button
@@ -336,7 +348,13 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             onClick={() => setActiveLayer('operations-only')}
             className="justify-start text-xs font-pharma"
           >
-            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: 'hsl(171, 12%, 66%)' }} />
+            <div 
+              className="w-3 h-3 rounded-full mr-2 border-2" 
+              style={{ 
+                backgroundColor: activeLayer === 'operations-only' ? 'white' : 'hsl(171, 12%, 66%)',
+                borderColor: activeLayer === 'operations-only' ? 'white' : 'hsl(171, 12%, 66%)'
+              }} 
+            />
             Operations Only
           </Button>
         </div>
