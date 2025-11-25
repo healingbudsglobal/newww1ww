@@ -49,7 +49,7 @@ const Header = () => {
         className={cn(
           "fixed top-2 left-2 right-2 z-50 backdrop-blur-xl rounded-xl transition-all duration-500 ease-out border",
           scrolled 
-            ? "shadow-2xl border-white/20 scale-[0.99]" 
+            ? "shadow-2xl border-white/20 scale-[0.90]" 
             : "shadow-sm border-white/10"
         )}
         style={{ 
