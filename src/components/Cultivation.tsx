@@ -24,20 +24,20 @@ const Cultivation = () => {
             style={{ y: imageY }}
             src={cultivationImage} 
             alt="Indoor cannabis cultivation facility with advanced lighting" 
-            className="w-full h-[300px] sm:h-[400px] md:h-[500px] object-cover transition-transform duration-700 group-hover:scale-105"
+            className="w-full h-[450px] sm:h-[400px] md:h-[500px] object-cover object-center transition-transform duration-700 group-hover:scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/60 to-transparent sm:from-background/80 sm:via-background/40" />
           
-          <div className="absolute inset-0 flex flex-col justify-center px-6 sm:px-8 md:px-16">
-            <h2 className="font-pharma text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground mb-4 sm:mb-6 max-w-2xl drop-shadow-sm tracking-tight">
+          <div className="absolute inset-0 flex flex-col justify-center px-4 sm:px-8 md:px-16">
+            <h2 className="font-pharma text-2xl sm:text-4xl md:text-5xl font-semibold text-foreground mb-3 sm:mb-6 max-w-2xl drop-shadow-sm tracking-tight leading-tight">
               Production & Processing Excellence
             </h2>
-            <p className="font-body text-foreground/90 text-sm sm:text-base md:text-lg leading-relaxed max-w-2xl mb-6 sm:mb-8 drop-shadow-sm">
+            <p className="font-body text-foreground/90 text-xs sm:text-base md:text-lg leading-relaxed max-w-2xl mb-4 sm:mb-8 drop-shadow-sm">
               Our state-of-the-art facilities across Canada and Portugal span more than 30,000 square meters dedicated to pharmaceutical-grade cannabis production. From seed selection through harvesting and processing, we maintain rigorous oversight at every production stage. Each batch undergoes comprehensive testing, precise trimming, controlled drying and curing, and careful packaging to ensure consistent quality that meets stringent third-party standards.
             </p>
             <Link 
               to="/what-we-do" 
-              className="font-body text-primary hover:text-primary/80 font-semibold text-base sm:text-lg transition-all inline-flex items-center gap-2 group/link"
+              className="font-body text-primary hover:text-primary/80 font-semibold text-sm sm:text-lg transition-all inline-flex items-center gap-2 group/link"
             >
               Discover our production standards 
               <span className="transition-transform group-hover/link:translate-x-1">→</span>
