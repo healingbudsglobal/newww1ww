@@ -8,73 +8,84 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Calm Medical Palette - Light & Serene */
-    --background: 160 25% 97%;      /* Soft mint-white */
-    --foreground: 200 15% 25%;      /* Soft deep teal text */
-    --off-white: 160 20% 99%;       /* Ultra-light mint */
+    /* Brand Color Palette */
+    --primary-green: 178 48% 21%;       /* #1C4F4D - Primary Green */
+    --secondary-green: 178 48% 33%;     /* #2C7D7A - Secondary Green */
+    --accent-green: 164 48% 53%;        /* #4DBFA1 - Accent Light Green */
+    --text-light: 0 0% 98%;             /* #F9F9F9 - Text Color */
+    --light-gray: 171 12% 66%;          /* #A0B3B0 - Light Gray */
+    --subtle-dark: 176 39% 17%;         /* #1A3C3A - Subtle Dark */
+
+    /* Application Colors */
+    --background: 0 0% 98%;             /* Light background */
+    --foreground: 176 39% 17%;          /* Dark text */
+    --off-white: 160 20% 99%;
 
     --card: 0 0% 100%;
-    --card-foreground: 200 15% 25%;
+    --card-foreground: 176 39% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 200 15% 25%;
+    --popover-foreground: 176 39% 17%;
 
-    /* Medical Color System - Calm & Clinical */
-    --pharma-charcoal: 200 12% 30%;    /* Soft teal-charcoal */
-    --pharma-grey: 180 8% 60%;         /* Calm grey */
-    --pharma-grey-light: 180 10% 92%;
-    --pharma-green: 160 45% 55%;       /* Calm medical green */
-    --pharma-green-dark: 160 40% 45%;
-    --pharma-blue: 200 45% 60%;        /* Soft medical blue */
-    --pharma-blue-light: 200 40% 94%;
-    
-    /* Brand Colors - Soft Green Range */
-    --sage-dark: 155 20% 65%;          /* Light sage */
-    --sage-deeper: 155 18% 58%;
-    --sage-medium: 155 22% 72%;
-    --sage-forest: 155 25% 50%;
-    
-    /* Brand Colors - Calm Teal Range */
-    --teal-midnight: 200 45% 45%;      /* Deep calm teal */
-    --teal-deep: 200 40% 52%;
-    --teal-deeper: 200 50% 38%;
-    --teal-primary: 200 50% 48%;       /* Medical teal */
-    --teal-darker: 200 48% 40%;
-    --navbar-teal: 180 52% 22%;        /* Dark teal-green from reference */
-    --section-color: 180 52% 22%;      /* Colored sections background */
+    /* Primary & Secondary using brand colors */
+    --primary: 164 48% 53%;             /* Accent Light Green */
+    --primary-foreground: 0 0% 98%;
 
-    --primary: 160 45% 55%;            /* Calm medical green */
-    --primary-foreground: 0 0% 100%;
+    --secondary: 178 48% 33%;           /* Secondary Green */
+    --secondary-foreground: 0 0% 98%;
 
-    --secondary: 200 45% 60%;          /* Soft medical blue */
-    --secondary-foreground: 0 0% 100%;
+    --muted: 171 12% 94%;
+    --muted-foreground: 171 12% 46%;
 
-    --muted: 160 15% 95%;
-    --muted-foreground: 180 8% 50%;
-
-    --accent: 160 40% 90%;
-    --accent-foreground: 160 45% 35%;
+    --accent: 164 48% 88%;
+    --accent-foreground: 176 39% 17%;
 
     --destructive: 0 70% 65%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 160 10% 88%;
-    --input: 160 12% 96%;
-    --ring: 160 45% 55%;
+    --border: 171 12% 88%;
+    --input: 171 12% 96%;
+    --ring: 164 48% 53%;
 
     --radius: 0.75rem;
 
-    /* Custom design tokens - Calm Medical Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--teal-primary)), hsl(var(--teal-deep)));
-    --gradient-sage-teal: linear-gradient(135deg, hsl(var(--sage-medium)), hsl(var(--teal-primary)));
-    --gradient-teal-midnight: linear-gradient(135deg, hsl(var(--teal-primary)), hsl(var(--teal-midnight)));
-    --gradient-sage-forest: linear-gradient(135deg, hsl(var(--sage-medium)), hsl(var(--sage-forest)));
-    --gradient-hero: linear-gradient(180deg, rgba(200, 220, 215, 0.6), rgba(180, 210, 220, 0.5));
-    --gradient-accent: linear-gradient(135deg, hsl(160 50% 75%), hsl(200 45% 70%));
-    --gradient-warm: linear-gradient(135deg, hsl(160 50% 80%), hsl(180 40% 75%));
+    /* Semantic tokens for sections */
+    --navbar-teal: 178 48% 21%;         /* Primary Green for navbar */
+    --section-color: 178 48% 21%;       /* Primary Green for colored sections */
     
-    /* Sage to Teal Radial Gradient - Soft sage green to calm teal */
-    --gradient-sage-radial: radial-gradient(ellipse at center top, hsl(160 30% 92%) 0%, hsl(180 25% 85%) 25%, hsl(200 35% 70%) 60%, hsl(200 40% 55%) 100%);
+    /* Legacy teal tokens (mapped to new palette) */
+    --teal-midnight: 178 48% 21%;
+    --teal-deep: 178 48% 33%;
+    --teal-deeper: 176 39% 17%;
+    --teal-primary: 164 48% 53%;
+    --teal-darker: 176 39% 17%;
+    
+    /* Sage tokens (mapped to grays) */
+    --sage-dark: 171 12% 66%;
+    --sage-deeper: 171 12% 60%;
+    --sage-medium: 171 12% 75%;
+    --sage-forest: 171 12% 50%;
+    
+    /* Pharma colors (mapped to brand) */
+    --pharma-charcoal: 176 39% 25%;
+    --pharma-grey: 171 12% 60%;
+    --pharma-grey-light: 171 12% 92%;
+    --pharma-green: 164 48% 53%;
+    --pharma-green-dark: 178 48% 33%;
+    --pharma-blue: 178 48% 33%;
+    --pharma-blue-light: 171 12% 94%;
+
+    /* Custom design tokens - Brand Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(164 48% 53%), hsl(178 48% 33%));
+    --gradient-sage-teal: linear-gradient(135deg, hsl(171 12% 75%), hsl(164 48% 53%));
+    --gradient-teal-midnight: linear-gradient(135deg, hsl(178 48% 33%), hsl(178 48% 21%));
+    --gradient-sage-forest: linear-gradient(135deg, hsl(171 12% 75%), hsl(171 12% 50%));
+    --gradient-hero: linear-gradient(180deg, rgba(77, 191, 161, 0.2), rgba(44, 125, 122, 0.15));
+    --gradient-accent: linear-gradient(135deg, hsl(164 48% 75%), hsl(178 48% 45%));
+    --gradient-warm: linear-gradient(135deg, hsl(164 48% 80%), hsl(171 12% 75%));
+    
+    /* Radial Gradient */
+    --gradient-sage-radial: radial-gradient(ellipse at center top, hsl(171 12% 92%) 0%, hsl(171 12% 85%) 25%, hsl(178 48% 40%) 60%, hsl(178 48% 33%) 100%);
     
     /* Linear-inspired ultra-clean shadows */
     --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
