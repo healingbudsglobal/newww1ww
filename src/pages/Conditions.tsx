@@ -6,6 +6,7 @@ import BackToTop from "@/components/BackToTop";
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import conditionAnxiety from "@/assets/condition-anxiety.jpg";
 import conditionChronicPain from "@/assets/condition-chronic-pain.jpg";
 import conditionArthritis from "@/assets/condition-arthritis.jpg";
@@ -171,30 +172,45 @@ const Conditions = () => {
           {/* Conditions Grid */}
           <section className="py-20 md:py-32 bg-background">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
-                {filteredConditions.map((condition, index) => (
-                  <ScrollAnimation key={condition.id} delay={index * 0.05} variant="scale">
-                    <Link
-                      to={`/conditions/${condition.id}`}
-                      className="group block bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-border/30"
+              <motion.div 
+                layout
+                className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
+              >
+                <AnimatePresence mode="popLayout">
+                  {filteredConditions.map((condition) => (
+                    <motion.div
+                      key={condition.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ 
+                        duration: 0.3,
+                        layout: { duration: 0.3 }
+                      }}
                     >
-                      <div className="h-48 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10">
-                        <img
-                          src={condition.image}
-                          alt={condition.name}
-                          className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                      <div className="p-5">
-                        <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                          {condition.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">{condition.category}</p>
-                      </div>
-                    </Link>
-                  </ScrollAnimation>
-                ))}
-              </div>
+                      <Link
+                        to={`/conditions/${condition.id}`}
+                        className="group block bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-border/30"
+                      >
+                        <div className="h-48 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10">
+                          <img
+                            src={condition.image}
+                            alt={condition.name}
+                            className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
+                        <div className="p-5">
+                          <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                            {condition.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">{condition.category}</p>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
 
               {filteredConditions.length === 0 && (
                 <ScrollAnimation>
