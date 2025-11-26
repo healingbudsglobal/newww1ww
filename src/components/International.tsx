@@ -39,7 +39,7 @@ const International = () => {
                 Global Presence
               </h2>
               <p className="text-lg sm:text-xl text-white/80 font-body max-w-2xl mx-auto leading-relaxed drop-shadow-md">
-                Strategic expansion across five countries, building a comprehensive medical cannabis network
+                Strategic expansion across three countries, building a comprehensive medical cannabis network
               </p>
             </div>
           </ScrollAnimation>

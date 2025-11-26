@@ -63,30 +63,6 @@ const countries: Record<string, Country> = {
       { name: 'Manchester', coordinates: [-2.2426, 53.4808], type: 'export-only' },
     ],
   },
-  germany: {
-    name: 'Germany',
-    center: [10.4515, 51.1657],
-    zoom: 6,
-    status: 'UPCOMING',
-    order: 4,
-    description: 'European medical cannabis market leader',
-    locations: [
-      { name: 'Berlin', coordinates: [13.4050, 52.5200], type: 'operations-sales' },
-      { name: 'Frankfurt', coordinates: [8.6821, 50.1109], type: 'export-only' },
-    ],
-  },
-  usa: {
-    name: 'United States',
-    center: [-95.7129, 37.0902],
-    zoom: 4,
-    status: 'UPCOMING',
-    order: 5,
-    description: 'North American market expansion',
-    locations: [
-      { name: 'California', coordinates: [-119.4179, 36.7783], type: 'operations-sales' },
-      { name: 'Colorado', coordinates: [-105.7821, 39.5501], type: 'operations-only' },
-    ],
-  },
 };
 
 type LayerFilter = 'all' | 'operations-sales' | 'export-only' | 'operations-only';
