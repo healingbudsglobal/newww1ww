@@ -63,6 +63,8 @@ export default {
           'primary-green': "hsl(var(--primary-green))",
           'secondary-green': "hsl(var(--secondary-green))",
           'accent-green': "hsl(var(--accent-green))",
+          'lime-green': "hsl(var(--lime-green))",
+          'deep-teal': "hsl(var(--deep-teal))",
           'text-light': "hsl(var(--text-light))",
           'light-gray': "hsl(var(--light-gray))",
           'subtle-dark': "hsl(var(--subtle-dark))",

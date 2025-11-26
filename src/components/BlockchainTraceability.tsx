@@ -138,9 +138,9 @@ const BlockchainTraceability = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-primary/20 text-primary border-primary/40';
+        return 'bg-brand-lime-green/20 text-brand-lime-green border-brand-lime-green/40';
       case 'active':
-        return 'bg-secondary/20 text-secondary border-secondary/40';
+        return 'bg-brand-deep-teal/20 text-brand-deep-teal border-brand-deep-teal/40';
       case 'pending':
         return 'bg-muted text-muted-foreground border-border';
       default:
@@ -159,7 +159,7 @@ const BlockchainTraceability = () => {
             BLOCKCHAIN TECHNOLOGY
           </Badge>
           <h2 className="text-4xl md:text-5xl font-semibold text-foreground mb-6">
-            Seed-to-Sale <span className="text-primary">Traceability</span>
+            Seed-to-Sale <span className="text-brand-deep-teal">Traceability</span>
           </h2>
           <p className="text-lg text-muted-foreground/80 leading-relaxed">
             Every product journey is immutably recorded on the blockchain with genome sequencing verification, eliminating counterfeits and ensuring complete transparency.
@@ -186,16 +186,16 @@ const BlockchainTraceability = () => {
                   }`}
                 >
                   {/* Content Card */}
-                  <div
-                    className={`flex-1 card-linear p-6 cursor-pointer transition-all hover-lift ${
-                      selectedStage === stage.id ? 'ring-2 ring-primary shadow-xl' : ''
-                    }`}
-                    onClick={() => setSelectedStage(selectedStage === stage.id ? null : stage.id)}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                        <IconComponent className="w-6 h-6 text-white" strokeWidth={2} />
-                      </div>
+                    <div
+                      className={`flex-1 card-linear p-6 cursor-pointer transition-all hover-lift ${
+                        selectedStage === stage.id ? 'ring-2 ring-brand-deep-teal shadow-xl' : ''
+                      }`}
+                      onClick={() => setSelectedStage(selectedStage === stage.id ? null : stage.id)}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-brand-lime-green to-brand-deep-teal rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                          <IconComponent className="w-6 h-6 text-white" strokeWidth={2} />
+                        </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-lg text-foreground">{stage.title}</h3>
@@ -220,14 +220,14 @@ const BlockchainTraceability = () => {
                     <div
                       className={`w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold transition-all ${
                         stage.status === 'completed'
-                          ? 'bg-primary border-primary/20 text-primary-foreground shadow-lg'
+                          ? 'bg-brand-lime-green border-brand-lime-green/20 text-white shadow-lg'
                           : stage.status === 'active'
-                          ? 'bg-secondary border-secondary/20 text-secondary-foreground animate-pulse shadow-lg'
+                          ? 'bg-brand-deep-teal border-brand-deep-teal/20 text-white animate-pulse shadow-lg'
                           : 'bg-background border-border text-muted-foreground'
                       }`}
                     >
                       {stage.status === 'completed' && <CheckCircle className="w-6 h-6" />}
-                      {stage.status === 'active' && <div className="w-3 h-3 rounded-full bg-secondary-foreground" />}
+                      {stage.status === 'active' && <div className="w-3 h-3 rounded-full bg-white" />}
                       {stage.status === 'pending' && <div className="w-3 h-3 rounded-full border-2 border-muted-foreground" />}
                     </div>
                   </div>
@@ -250,10 +250,10 @@ const BlockchainTraceability = () => {
               transition={{ duration: 0.3 }}
               className="max-w-6xl mx-auto"
             >
-              <div className="card-linear p-8 bg-gradient-to-br from-primary/5 to-secondary/5">
+              <div className="card-linear p-8 bg-gradient-to-br from-brand-lime-green/5 to-brand-deep-teal/5">
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-14 h-14 bg-gradient-to-br from-brand-lime-green to-brand-deep-teal rounded-xl flex items-center justify-center shadow-lg">
                       <stage.Icon className="w-7 h-7 text-white" strokeWidth={2} />
                     </div>
                     <div>
@@ -334,7 +334,7 @@ const BlockchainTraceability = () => {
         {/* Technology Explanation */}
         <div className="mt-16 grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           <div className="card-linear p-7 hover-lift group">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
+            <div className="w-16 h-16 bg-gradient-to-br from-brand-lime-green to-brand-deep-teal rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
               <Lock className="w-8 h-8 text-white" strokeWidth={2} />
             </div>
             <h3 className="font-semibold text-lg text-foreground mb-2">Genome Encryption</h3>
@@ -344,7 +344,7 @@ const BlockchainTraceability = () => {
           </div>
 
           <div className="card-linear p-7 hover-lift group">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
+            <div className="w-16 h-16 bg-gradient-to-br from-brand-lime-green to-brand-deep-teal rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
               <Shield className="w-8 h-8 text-white" strokeWidth={2} />
             </div>
             <h3 className="font-semibold text-lg text-foreground mb-2">Anti-Spoofing Protection</h3>
@@ -354,7 +354,7 @@ const BlockchainTraceability = () => {
           </div>
 
           <div className="card-linear p-7 hover-lift group">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
+            <div className="w-16 h-16 bg-gradient-to-br from-brand-lime-green to-brand-deep-teal rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110">
               <Eye className="w-8 h-8 text-white" strokeWidth={2} />
             </div>
             <h3 className="font-semibold text-lg text-foreground mb-2">Full Transparency</h3>

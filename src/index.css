@@ -12,6 +12,8 @@ All colors MUST be HSL.
     --primary-green: 178 48% 21%;       /* #1C4F4D - Primary Green */
     --secondary-green: 178 48% 33%;     /* #2C7D7A - Secondary Green */
     --accent-green: 164 48% 53%;        /* #4DBFA1 - Accent Light Green */
+    --lime-green: 84 81% 44%;           /* #84CC16 - Lime Green */
+    --deep-teal: 180 84% 32%;           /* #0D9488 - Deep Teal */
     --text-light: 0 0% 98%;             /* #F9F9F9 - Text Color */
     --light-gray: 171 12% 66%;          /* #A0B3B0 - Light Gray */
     --subtle-dark: 176 39% 17%;         /* #1A3C3A - Subtle Dark */
