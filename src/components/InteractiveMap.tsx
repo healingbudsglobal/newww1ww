@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Button } from './ui/button';
-import { Sparkles, ChevronDown } from 'lucide-react';
+import { Sparkles, ChevronDown, Play, Pause, Filter } from 'lucide-react';
+import { Badge } from './ui/badge';
 
 type LocationType = 'operations-sales' | 'export-only' | 'operations-only';
 
@@ -146,6 +147,11 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeLayer, setActiveLayer] = useState<LayerFilter>('all');
   const [isCardExpanded, setIsCardExpanded] = useState(false);
+  const [selectedCertifications, setSelectedCertifications] = useState<string[]>([]);
+  const [showCertFilter, setShowCertFilter] = useState(false);
+  const [isAutoTourActive, setIsAutoTourActive] = useState(false);
+  const [currentTourIndex, setCurrentTourIndex] = useState(0);
+  const tourIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -224,8 +230,90 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
       markers.current.forEach(marker => marker.remove());
       markers.current = [];
       map.current?.remove();
+      if (tourIntervalRef.current) {
+        clearInterval(tourIntervalRef.current);
+      }
     };
   }, []);
+
+  // Auto-tour functionality
+  useEffect(() => {
+    if (!isAutoTourActive || !isLoaded) {
+      if (tourIntervalRef.current) {
+        clearInterval(tourIntervalRef.current);
+        tourIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Collect all locations from all countries
+    const allLocations: Array<{ location: Location; country: Country }> = [];
+    Object.values(countries).forEach(country => {
+      country.locations.forEach(location => {
+        allLocations.push({ location, country });
+      });
+    });
+
+    if (allLocations.length === 0) return;
+
+    // Start tour
+    const cycleTour = () => {
+      setCurrentTourIndex(prev => {
+        const nextIndex = (prev + 1) % allLocations.length;
+        const { location, country } = allLocations[nextIndex];
+        
+        if (map.current) {
+          map.current.flyTo({
+            center: location.coordinates,
+            zoom: 7,
+            duration: 2000,
+            curve: 1.2,
+            essential: true,
+          });
+        }
+        
+        return nextIndex;
+      });
+    };
+
+    // Initial location
+    const { location } = allLocations[currentTourIndex];
+    if (map.current) {
+      map.current.flyTo({
+        center: location.coordinates,
+        zoom: 7,
+        duration: 2000,
+        curve: 1.2,
+        essential: true,
+      });
+    }
+
+    tourIntervalRef.current = setInterval(cycleTour, 4000);
+
+    return () => {
+      if (tourIntervalRef.current) {
+        clearInterval(tourIntervalRef.current);
+        tourIntervalRef.current = null;
+      }
+    };
+  }, [isAutoTourActive, isLoaded, currentTourIndex]);
+
+  const toggleAutoTour = () => {
+    setIsAutoTourActive(!isAutoTourActive);
+    if (isAutoTourActive) {
+      setCurrentTourIndex(0);
+    }
+  };
+
+  const availableCertifications = ['GMP', 'EU-GMP', 'ISO 9001', 'ISO 22000', 'Organic Certified'];
+
+  const toggleCertification = (cert: string) => {
+    setSelectedCertifications(prev => 
+      prev.includes(cert) 
+        ? prev.filter(c => c !== cert)
+        : [...prev, cert]
+    );
+  };
 
   useEffect(() => {
     if (!map.current || !isLoaded) return;
@@ -262,6 +350,16 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
         // Filter by active layer
         if (activeLayer !== 'all' && location.type !== activeLayer) return;
 
+        // Filter by certifications
+        if (selectedCertifications.length > 0) {
+          const hasCertification = selectedCertifications.some(cert => 
+            location.certifications?.some(locationCert => 
+              locationCert.includes(cert) || cert.includes(locationCert)
+            )
+          );
+          if (!hasCertification) return;
+        }
+
         const el = document.createElement('div');
         el.className = 'marker';
         el.style.width = '32px';
@@ -288,28 +386,67 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
         
         el.style.opacity = '0';
         el.style.transform = 'scale(0)';
+
+        // Quick stats tooltip
+        const quickTooltip = new maplibregl.Popup({ 
+          offset: 15,
+          className: 'map-quick-tooltip',
+          closeButton: false,
+          maxWidth: '220px',
+          closeOnClick: false,
+        })
+          .setHTML(`
+            <div style="padding: 8px 12px; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: rgba(0, 0, 0, 0.9); backdrop-blur-md; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+              <div style="font-weight: 700; font-size: 12px; margin-bottom: 4px; color: ${colorMap[location.type]}; letter-spacing: -0.2px;">${location.name}</div>
+              <div style="font-size: 10px; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px;">${countryData.name}</div>
+              ${location.cultivationArea ? `
+                <div style="display: flex; justify-content: space-between; font-size: 9px; margin-bottom: 3px;">
+                  <span style="color: rgba(255, 255, 255, 0.6);">Area:</span>
+                  <span style="color: white; font-weight: 600;">${location.cultivationArea}</span>
+                </div>
+              ` : ''}
+              ${location.productionCapacity ? `
+                <div style="display: flex; justify-content: space-between; font-size: 9px; margin-bottom: 3px;">
+                  <span style="color: rgba(255, 255, 255, 0.6);">Capacity:</span>
+                  <span style="color: white; font-weight: 600;">${location.productionCapacity}</span>
+                </div>
+              ` : ''}
+              ${location.certifications && location.certifications.length > 0 ? `
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                  <div style="font-size: 8px; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Certifications</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 3px;">
+                    ${location.certifications.slice(0, 3).map(cert => 
+                      `<span style="display: inline-block; background: ${colorMap[location.type]}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 600;">${cert}</span>`
+                    ).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `);
         
         el.addEventListener('mouseenter', () => {
           el.style.transform = 'scale(1.4) translateY(-4px)';
           el.style.boxShadow = `0 0 40px ${colorMap[location.type]}, 0 12px 32px rgba(0,0,0,0.3), 0 0 0 4px white`;
           el.style.zIndex = '1000';
-          popup.addTo(map.current!);
+          quickTooltip.addTo(map.current!);
           
           // Smooth fly to the hovered marker
-          map.current?.flyTo({
-            center: location.coordinates,
-            zoom: Math.max(map.current.getZoom(), 6),
-            duration: 800,
-            curve: 1.2,
-            essential: true,
-          });
+          if (!isAutoTourActive) {
+            map.current?.flyTo({
+              center: location.coordinates,
+              zoom: Math.max(map.current.getZoom(), 6),
+              duration: 800,
+              curve: 1.2,
+              essential: true,
+            });
+          }
         });
         
         el.addEventListener('mouseleave', () => {
           el.style.transform = 'scale(1)';
           el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1), 0 0 0 3px white';
           el.style.zIndex = 'auto';
-          popup.remove();
+          quickTooltip.remove();
         });
         
         el.addEventListener('click', () => {
@@ -411,11 +548,13 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
           .setLngLat(location.coordinates)
           .setPopup(popup)
           .addTo(map.current!);
+        
+        marker.getElement().dataset.tooltip = 'true';
 
         markers.current.push(marker);
       });
     });
-  }, [selectedCountry, isLoaded, activeLayer]);
+  }, [selectedCountry, isLoaded, activeLayer, selectedCertifications, isAutoTourActive]);
 
   return (
     <div className="relative w-full h-full">
@@ -492,6 +631,27 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
         </div>
       </div>
 
+      {/* Auto-Tour Control */}
+      <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-30">
+        <Button
+          size="lg"
+          onClick={toggleAutoTour}
+          className="gap-2 font-semibold shadow-2xl hover:shadow-[0_0_30px_rgba(77,191,161,0.4)] transition-all duration-300"
+        >
+          {isAutoTourActive ? (
+            <>
+              <Pause className="w-5 h-5" />
+              <span className="hidden sm:inline">Stop Tour</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-5 h-5" />
+              <span className="hidden sm:inline">Auto Tour</span>
+            </>
+          )}
+        </Button>
+      </div>
+
       {/* Layer Toggle Controls */}
       <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 bg-background backdrop-blur-md rounded-2xl shadow-2xl border border-border/60 p-3">
         <div className="flex flex-col gap-2">
@@ -554,6 +714,48 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             <span className="hidden sm:inline">Operations Only</span>
             <span className="sm:hidden">Operations</span>
           </Button>
+          
+          {/* Certification Filter Toggle */}
+          <div className="mt-3 pt-3 border-t border-border/40">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowCertFilter(!showCertFilter)}
+              className="justify-between text-sm h-9 w-full"
+            >
+              <span className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5" />
+                Certifications
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCertFilter ? 'rotate-180' : ''}`} />
+            </Button>
+            
+            {/* Certification Badges */}
+            <div className={`overflow-hidden transition-all duration-300 ${showCertFilter ? 'max-h-64 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+              <div className="flex flex-col gap-1.5 px-2">
+                {availableCertifications.map(cert => (
+                  <Badge
+                    key={cert}
+                    variant={selectedCertifications.includes(cert) ? 'default' : 'outline'}
+                    className="cursor-pointer justify-center text-xs py-1.5 transition-all hover:scale-105"
+                    onClick={() => toggleCertification(cert)}
+                  >
+                    {cert}
+                  </Badge>
+                ))}
+                {selectedCertifications.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSelectedCertifications([])}
+                    className="text-xs h-7 mt-1"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
