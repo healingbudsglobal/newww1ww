@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { newsArticles } from "@/data/newsArticles";
 
 const TheWire = () => {
+  const { t } = useTranslation("theWire");
   const featuredArticle = newsArticles.find((a) => a.featured);
   const otherArticles = newsArticles.filter((a) => !a.featured);
 
@@ -23,11 +25,10 @@ const TheWire = () => {
             <ScrollAnimation>
               <div className="text-center mb-12">
                 <h1 className="font-pharma text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-4">
-                  The Wire
+                  {t("hero.title")}
                 </h1>
                 <p className="font-geist text-lg text-muted-foreground max-w-2xl mx-auto">
-                  Inside news, updates, and insights from the forefront of
-                  regulated cannabis innovation and blockchain technology.
+                  {t("hero.subtitle")}
                 </p>
               </div>
             </ScrollAnimation>
@@ -46,7 +47,7 @@ const TheWire = () => {
                         />
                         <div className="absolute top-4 left-4">
                           <Badge className="bg-primary text-primary-foreground rounded-full px-4 py-1 font-semibold">
-                            Featured
+                            {t("featured")}
                           </Badge>
                         </div>
                       </div>
@@ -73,7 +74,7 @@ const TheWire = () => {
                             {featuredArticle.date}
                           </span>
                           <Button variant="link" className="p-0 text-primary font-semibold">
-                            Read Article →
+                            {t("readArticle")}
                           </Button>
                         </div>
                       </div>
@@ -88,7 +89,7 @@ const TheWire = () => {
           <section className="container mx-auto px-4 sm:px-6 lg:px-8">
             <ScrollAnimation>
               <h2 className="font-pharma text-2xl sm:text-3xl font-semibold text-foreground mb-8">
-                Latest Updates
+                {t("latestUpdates")}
               </h2>
             </ScrollAnimation>
 
@@ -130,7 +131,7 @@ const TheWire = () => {
                             variant="link"
                             className="p-0 text-primary font-semibold text-sm"
                           >
-                            Read More →
+                            {t("readMore")}
                           </Button>
                         </div>
                       </div>

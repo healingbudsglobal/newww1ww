@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
@@ -10,6 +11,7 @@ import { newsArticles } from "@/data/newsArticles";
 import ScrollAnimation from "@/components/ScrollAnimation";
 
 const NewsArticle = () => {
+  const { t } = useTranslation("theWire");
   const { articleId } = useParams();
   const navigate = useNavigate();
   const article = newsArticles.find((a) => a.id === articleId);
@@ -21,12 +23,12 @@ const NewsArticle = () => {
           <Header />
           <main className="pt-32 pb-20">
             <div className="container mx-auto px-4 text-center">
-              <h1 className="font-pharma text-4xl mb-4">Article Not Found</h1>
+              <h1 className="font-pharma text-4xl mb-4">{t("articleNotFound.title")}</h1>
               <p className="text-muted-foreground mb-8">
-                The article you're looking for doesn't exist.
+                {t("articleNotFound.description")}
               </p>
               <Button onClick={() => navigate("/the-wire")}>
-                Back to The Wire
+                {t("articleNotFound.backButton")}
               </Button>
             </div>
           </main>
@@ -48,7 +50,7 @@ const NewsArticle = () => {
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-geist"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to The Wire
+              {t("backToWire")}
             </Link>
           </div>
 
@@ -120,7 +122,7 @@ const NewsArticle = () => {
                     className="rounded-full gap-2"
                     onClick={() => window.open(article.externalLink, "_blank")}
                   >
-                    Read Original Article
+                    {t("readOriginal")}
                     <ExternalLink className="w-4 h-4" />
                   </Button>
                 </div>
@@ -130,7 +132,7 @@ const NewsArticle = () => {
               <ScrollAnimation delay={0.4}>
                 <div className="mt-16">
                   <h3 className="font-pharma text-2xl font-semibold mb-6">
-                    More from The Wire
+                    {t("moreFromWire")}
                   </h3>
                   <div className="grid sm:grid-cols-2 gap-6">
                     {newsArticles

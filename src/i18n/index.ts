@@ -10,6 +10,7 @@ import enConditions from './locales/en/conditions.json';
 import enWhatWeDo from './locales/en/whatWeDo.json';
 import enAboutUs from './locales/en/aboutUs.json';
 import enClinics from './locales/en/clinics.json';
+import enTheWire from './locales/en/theWire.json';
 
 import ptCommon from './locales/pt/common.json';
 import ptHome from './locales/pt/home.json';
@@ -20,6 +21,7 @@ import ptConditions from './locales/pt/conditions.json';
 import ptWhatWeDo from './locales/pt/whatWeDo.json';
 import ptAboutUs from './locales/pt/aboutUs.json';
 import ptClinics from './locales/pt/clinics.json';
+import ptTheWire from './locales/pt/theWire.json';
 
 const resources = {
   en: {
@@ -32,6 +34,7 @@ const resources = {
     whatWeDo: enWhatWeDo,
     aboutUs: enAboutUs,
     clinics: enClinics,
+    theWire: enTheWire,
   },
   pt: {
     common: ptCommon,
@@ -43,6 +46,7 @@ const resources = {
     whatWeDo: ptWhatWeDo,
     aboutUs: ptAboutUs,
     clinics: ptClinics,
+    theWire: ptTheWire,
   },
 };
 
@@ -77,7 +81,7 @@ i18n
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'home', 'auth', 'research', 'contact', 'conditions', 'whatWeDo', 'aboutUs', 'clinics'],
+    ns: ['common', 'home', 'auth', 'research', 'contact', 'conditions', 'whatWeDo', 'aboutUs', 'clinics', 'theWire'],
     interpolation: {
       escapeValue: false,
     },
