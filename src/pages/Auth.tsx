@@ -10,7 +10,7 @@ import { z } from "zod";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
-import { Leaf, Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from "lucide-react";
+import { Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from "lucide-react";
 import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 
 const loginSchema = z.object({
@@ -182,11 +182,13 @@ const Auth = () => {
           <div className="container mx-auto px-4 max-w-md">
             <div className="bg-background/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
               {/* Header */}
-              <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-8 text-center">
+                <div className="bg-gradient-to-r from-primary/20 to-secondary/20 p-8 text-center">
                 <div className="flex justify-center mb-4">
-                  <div className="bg-primary/20 p-3 rounded-full">
-                    <Leaf className="w-8 h-8 text-primary" />
-                  </div>
+                  <img 
+                    src={hbLogoWhite} 
+                    alt="Healing Buds" 
+                    className="h-16 w-auto"
+                  />
                 </div>
                 <h1 className="font-display text-2xl font-bold text-foreground mb-2">
                   {isLogin ? "Welcome Back" : "Create Account"}
