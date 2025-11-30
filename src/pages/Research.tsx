@@ -217,26 +217,46 @@ const Research = () => {
                       </h3>
                     </ScrollAnimation>
                     
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {conditions.map((condition) => (
-                        <ScrollAnimation key={condition.id}>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                      {conditions.map((condition, index) => (
+                        <ScrollAnimation key={condition.id} delay={index * 0.05}>
                           <Link
                             to={`/conditions/${condition.id}`}
-                            className="group block bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-border/30"
+                            className="group relative block h-[280px] rounded-2xl overflow-hidden"
                           >
-                            <div className="h-48 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10">
-                              <img
-                                src={condition.image}
-                                alt={condition.name}
-                                className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
-                              />
+                            {/* Background Image */}
+                            <img
+                              src={condition.image}
+                              alt={condition.name}
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            />
+                            
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                            
+                            {/* Hover Overlay */}
+                            <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            
+                            {/* Content */}
+                            <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                              <div className="transform transition-transform duration-300 group-hover:translate-y-[-4px]">
+                                <span className="inline-block px-3 py-1 text-xs font-medium bg-white/10 backdrop-blur-sm text-white/90 rounded-full mb-3 border border-white/10">
+                                  {category}
+                                </span>
+                                <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">
+                                  {condition.name}
+                                </h3>
+                                <div className="flex items-center text-white/70 text-sm font-medium group-hover:text-white transition-colors">
+                                  <span>Learn more</span>
+                                  <svg className="w-4 h-4 ml-1 transform transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </div>
+                              </div>
                             </div>
-                            <div className="p-5">
-                              <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                {condition.name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">{category}</p>
-                            </div>
+                            
+                            {/* Border glow on hover */}
+                            <div className="absolute inset-0 rounded-2xl ring-1 ring-white/10 group-hover:ring-primary/50 transition-all duration-300" />
                           </Link>
                         </ScrollAnimation>
                       ))}
