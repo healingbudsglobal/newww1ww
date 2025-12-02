@@ -58,28 +58,29 @@ const resources = {
   },
 };
 
-// Detect language based on geolocation
-const detectLanguageFromGeo = async (): Promise<string> => {
+// Detect language based on domain
+const detectLanguageFromDomain = (): string => {
   const storedLang = localStorage.getItem('i18nextLng');
   if (storedLang) {
     return storedLang;
   }
 
-  try {
-    const response = await fetch('https://ipapi.co/json/');
-    const data = await response.json();
-    const lang = data.country_code === 'PT' ? 'pt' : 'en';
-    localStorage.setItem('i18nextLng', lang);
-    return lang;
-  } catch (error) {
-    console.log('Geolocation detection failed, defaulting to English');
+  const hostname = window.location.hostname;
+  
+  // Check domain extension
+  if (hostname.endsWith('.pt')) {
+    return 'pt';
+  } else if (hostname.endsWith('.co.uk') || hostname.endsWith('.co.za')) {
     return 'en';
   }
+  
+  // Default to English for all other domains
+  return 'en';
 };
 
-// Initialize with stored language or default
+// Initialize with stored language or domain-based default
 const getInitialLanguage = (): string => {
-  return localStorage.getItem('i18nextLng') || 'en';
+  return detectLanguageFromDomain();
 };
 
 i18n
@@ -95,11 +96,10 @@ i18n
     },
   });
 
-// Run geolocation detection after init (only on first visit)
+// Set initial language based on domain if not manually changed
 if (!localStorage.getItem('i18nextLng')) {
-  detectLanguageFromGeo().then((lang) => {
-    i18n.changeLanguage(lang);
-  });
+  const domainLang = detectLanguageFromDomain();
+  localStorage.setItem('i18nextLng', domainLang);
 }
 
 export default i18n;
