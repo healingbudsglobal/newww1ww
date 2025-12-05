@@ -52,21 +52,22 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="lg:hidden fixed bottom-0 left-0 right-0 z-50 pb-safe"
+            className="lg:hidden fixed bottom-0 left-0 right-0 z-50"
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 8px), 8px)' }}
           >
-            <div className="mx-2 mb-2 rounded-2xl bg-[hsl(178,48%,21%)]/95 backdrop-blur-xl border border-white/20 shadow-2xl">
-              <div className="px-4 py-3">
+            <div className="mx-3 mb-1 rounded-2xl bg-[hsl(178,48%,21%)]/95 backdrop-blur-xl border border-white/20 shadow-2xl">
+              <div className="px-4 py-3.5">
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setEligibilityDialogOpen(true)}
-                    className="flex-1 font-body font-semibold px-5 py-3 rounded-full transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/30 via-white/20 to-white/10 border border-white/40 hover:border-white/60 text-white hover:bg-white/30 text-sm"
+                    className="flex-1 font-body font-semibold px-5 py-3.5 rounded-2xl transition-all duration-300 active:scale-[0.97] shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/30 via-white/20 to-white/10 border border-white/40 hover:border-white/60 text-white hover:from-white/40 hover:via-white/30 hover:to-white/20 text-sm"
                   >
                     {t('nav.checkEligibility')}
                   </button>
                   {user ? (
                     <button 
                       onClick={handleLogout}
-                      className="flex-1 font-body font-semibold px-5 py-3 rounded-full transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 hover:border-white/50 text-white hover:bg-white/25 flex items-center justify-center gap-2 text-sm"
+                      className="flex-1 font-body font-semibold px-5 py-3.5 rounded-2xl transition-all duration-300 active:scale-[0.97] shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 hover:border-white/50 text-white hover:from-white/30 hover:via-white/25 hover:to-white/20 flex items-center justify-center gap-2 text-sm"
                     >
                       <LogOut className="w-4 h-4" />
                       {t('nav.signOut')}
@@ -74,7 +75,7 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
                   ) : (
                     <Link 
                       to="/auth"
-                      className="flex-1 font-body font-semibold px-5 py-3 rounded-full transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 hover:border-white/50 text-white hover:bg-white/25 text-center text-sm"
+                      className="flex-1 font-body font-semibold px-5 py-3.5 rounded-2xl transition-all duration-300 active:scale-[0.97] shadow-lg hover:shadow-xl backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 hover:border-white/50 text-white hover:from-white/30 hover:via-white/25 hover:to-white/20 text-center text-sm"
                     >
                       {t('nav.patientLogin')}
                     </Link>

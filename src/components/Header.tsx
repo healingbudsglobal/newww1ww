@@ -342,159 +342,170 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
         {/* Mobile Navigation - Full Height Slide-in */}
         <AnimatePresence>
           {mobileMenuOpen && (
-            <motion.nav 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="lg:hidden overflow-hidden border-t border-white/10"
-            >
-              <div className="flex flex-col py-4 px-4 max-h-[calc(100vh-140px)] overflow-y-auto">
-                {/* Navigation Links */}
-                <div className="flex flex-col space-y-1">
-                  {/* What We Do Section */}
-                  <div className="space-y-1">
-                    <div className={cn(
-                      "font-semibold text-sm py-2 px-3 rounded-lg",
-                      isWhatWeDoActive ? "text-white bg-white/10" : "text-white/90"
-                    )}>
-                      {t('nav.whatWeDo')}
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[-1]"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <motion.nav 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="lg:hidden overflow-hidden border-t border-white/10"
+              >
+                <div className="flex flex-col py-6 px-5 max-h-[calc(100vh-140px)] overflow-y-auto">
+                  {/* Navigation Links */}
+                  <div className="flex flex-col space-y-2">
+                    {/* What We Do Section */}
+                    <div className="space-y-2">
+                      <div className={cn(
+                        "font-semibold text-sm py-3 px-4 rounded-xl",
+                        isWhatWeDoActive ? "text-white bg-white/10" : "text-white/90"
+                      )}>
+                        {t('nav.whatWeDo')}
+                      </div>
+                      <div className="pl-4 space-y-1 border-l-2 border-white/20 ml-4">
+                        <Link 
+                          to="/cultivating-processing" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.cultivating')}
+                        </Link>
+                        <Link 
+                          to="/manufacture-distribution" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.manufacture')}
+                        </Link>
+                        <Link 
+                          to="/medical-clinics" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.clinics')}
+                        </Link>
+                        <Link 
+                          to="/online-pharmacy" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.pharmacy')}
+                        </Link>
+                      </div>
                     </div>
-                    <div className="pl-4 space-y-1 border-l-2 border-white/20 ml-3">
-                      <Link 
-                        to="/cultivating-processing" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.cultivating')}
-                      </Link>
-                      <Link 
-                        to="/manufacture-distribution" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.manufacture')}
-                      </Link>
-                      <Link 
-                        to="/medical-clinics" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.clinics')}
-                      </Link>
-                      <Link 
-                        to="/online-pharmacy" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.pharmacy')}
-                      </Link>
-                    </div>
-                  </div>
 
-                  <Link 
-                    to="/research" 
-                    className={cn(
-                      "text-sm transition-all duration-200 py-2 px-3 rounded-lg",
-                      isActive("/research") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
-                    )}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {t('nav.research')}
-                  </Link>
-
-                  <Link 
-                    to="/the-wire" 
-                    className={cn(
-                      "text-sm transition-all duration-200 py-2 px-3 rounded-lg",
-                      isActive("/the-wire") || location.pathname.startsWith("/the-wire/") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
-                    )}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {t('nav.theWire')}
-                  </Link>
-
-                  {/* About Us Section */}
-                  <div className="space-y-1">
-                    <div className={cn(
-                      "font-semibold text-sm py-2 px-3 rounded-lg",
-                      isAboutUsActive ? "text-white bg-white/10" : "text-white/90"
-                    )}>
-                      {t('nav.aboutUs')}
-                    </div>
-                    <div className="pl-4 space-y-1 border-l-2 border-white/20 ml-3">
-                      <Link 
-                        to="/about-us" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.aboutHealing')}
-                      </Link>
-                      <Link 
-                        to="/blockchain-technology" 
-                        className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-2 px-3 rounded-lg transition-all"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {t('dropdown.blockchain')}
-                      </Link>
-                    </div>
-                  </div>
-
-                  <Link 
-                    to="/contact" 
-                    className={cn(
-                      "text-sm transition-all duration-200 py-2 px-3 rounded-lg",
-                      isActive("/contact") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
-                    )}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {t('nav.contactUs')}
-                  </Link>
-                </div>
-
-                {/* Divider */}
-                <div className="my-4 border-t border-white/10" />
-
-                {/* Mobile CTAs inside menu */}
-                <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setEligibilityDialogOpen(true);
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full font-body font-semibold px-5 py-3.5 rounded-full transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/30 via-white/20 to-white/10 border border-white/40 text-white text-sm"
-                  >
-                    {t('nav.checkEligibility')}
-                  </button>
-                  {user ? (
-                    <button
-                      onClick={handleLogout}
-                      className="w-full font-body font-semibold px-5 py-3.5 rounded-full transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 text-white text-sm flex items-center justify-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {t('nav.signOut')}
-                    </button>
-                  ) : (
-                    <Link
-                      to="/auth"
+                    <Link 
+                      to="/research" 
+                      className={cn(
+                        "text-sm transition-all duration-200 py-3 px-4 rounded-xl",
+                        isActive("/research") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
+                      )}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block w-full text-center font-body font-semibold px-5 py-3.5 rounded-full transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 text-white text-sm"
                     >
-                      {t('nav.patientLogin')}
+                      {t('nav.research')}
                     </Link>
-                  )}
-                </div>
 
-                {/* Divider */}
-                <div className="my-4 border-t border-white/10" />
+                    <Link 
+                      to="/the-wire" 
+                      className={cn(
+                        "text-sm transition-all duration-200 py-3 px-4 rounded-xl",
+                        isActive("/the-wire") || location.pathname.startsWith("/the-wire/") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
+                      )}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {t('nav.theWire')}
+                    </Link>
 
-                {/* Bottom Section: Language & Theme */}
-                <div className="flex items-center justify-between px-2">
-                  <LanguageSwitcher scrolled={scrolled} />
-                  <ThemeToggle variant="button" className="flex-1 ml-2" />
+                    {/* About Us Section */}
+                    <div className="space-y-2">
+                      <div className={cn(
+                        "font-semibold text-sm py-3 px-4 rounded-xl",
+                        isAboutUsActive ? "text-white bg-white/10" : "text-white/90"
+                      )}>
+                        {t('nav.aboutUs')}
+                      </div>
+                      <div className="pl-4 space-y-1 border-l-2 border-white/20 ml-4">
+                        <Link 
+                          to="/about-us" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.aboutHealing')}
+                        </Link>
+                        <Link 
+                          to="/blockchain-technology" 
+                          className="block text-sm text-white/70 hover:text-white hover:bg-white/5 py-3 px-4 rounded-xl transition-all"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {t('dropdown.blockchain')}
+                        </Link>
+                      </div>
+                    </div>
+
+                    <Link 
+                      to="/contact" 
+                      className={cn(
+                        "text-sm transition-all duration-200 py-3 px-4 rounded-xl",
+                        isActive("/contact") ? "text-white font-semibold bg-white/10" : "text-white/70 hover:text-white hover:bg-white/5"
+                      )}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {t('nav.contactUs')}
+                    </Link>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="my-6 border-t border-white/10" />
+
+                  {/* Mobile CTAs inside menu */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => {
+                        setEligibilityDialogOpen(true);
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full font-body font-semibold px-6 py-4 rounded-2xl transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/30 via-white/20 to-white/10 border border-white/40 text-white text-sm hover:from-white/40 hover:via-white/30 hover:to-white/20"
+                    >
+                      {t('nav.checkEligibility')}
+                    </button>
+                    {user ? (
+                      <button
+                        onClick={handleLogout}
+                        className="w-full font-body font-semibold px-6 py-4 rounded-2xl transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 text-white text-sm flex items-center justify-center gap-2 hover:from-white/30 hover:via-white/25 hover:to-white/20"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        {t('nav.signOut')}
+                      </button>
+                    ) : (
+                      <Link
+                        to="/auth"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block w-full text-center font-body font-semibold px-6 py-4 rounded-2xl transition-all duration-300 active:scale-95 shadow-lg backdrop-blur-2xl bg-gradient-to-br from-white/20 via-white/15 to-white/10 border border-white/30 text-white text-sm hover:from-white/30 hover:via-white/25 hover:to-white/20"
+                      >
+                        {t('nav.patientLogin')}
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="my-6 border-t border-white/10" />
+
+                  {/* Bottom Section: Language & Theme */}
+                  <div className="flex items-center justify-between gap-4 px-2">
+                    <LanguageSwitcher scrolled={scrolled} />
+                    <ThemeToggle variant="button" className="flex-1" />
+                  </div>
                 </div>
-              </div>
-            </motion.nav>
+              </motion.nav>
+            </>
           )}
         </AnimatePresence>
         </div>

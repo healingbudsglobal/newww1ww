@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import ScrollAnimation from "@/components/ScrollAnimation";
 import BackToTop from "@/components/BackToTop";
+import MobileBottomActions from "@/components/MobileBottomActions";
 import { Microscope, FileText, Award, Users, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ const Research = () => {
   const { t } = useTranslation('research');
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const categoryKeys = ["all", "painManagement", "mentalHealth", "neurological", "sleepDisorders"];
 
@@ -80,8 +82,8 @@ const Research = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background">
-        <Header />
+      <div className="min-h-screen bg-background pb-24 lg:pb-0">
+        <Header onMenuStateChange={setMenuOpen} />
       <main className="pt-28 md:pt-32">
         {/* Hero Section - Linear style */}
         <section className="bg-background py-16 md:py-20">
@@ -307,6 +309,7 @@ const Research = () => {
       </main>
       <Footer />
       <BackToTop />
+      <MobileBottomActions menuOpen={menuOpen} />
       </div>
     </PageTransition>
   );

@@ -1,6 +1,6 @@
 import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 import { Link } from "react-router-dom";
-import { Mail, MapPin } from "lucide-react";
+import { Mail, MapPin, Leaf } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const Footer = () => {
@@ -8,65 +8,78 @@ const Footer = () => {
   const { t } = useTranslation('common');
   
   return (
-    <footer id="contact" className="text-white" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <footer id="contact" className="text-white relative overflow-hidden" style={{ backgroundColor: 'hsl(var(--section-color))' }}>
+      {/* Botanical decoration */}
+      <div className="absolute top-0 right-0 opacity-5 pointer-events-none">
+        <svg width="400" height="400" viewBox="0 0 400 400" fill="none">
+          <path d="M200 50 Q250 100 200 150 Q150 100 200 50" stroke="currentColor" strokeWidth="1" fill="none" className="text-white"/>
+          <path d="M200 100 Q270 170 200 240 Q130 170 200 100" stroke="currentColor" strokeWidth="1" fill="none" className="text-white"/>
+          <path d="M200 150 Q290 240 200 330 Q110 240 200 150" stroke="currentColor" strokeWidth="1" fill="none" className="text-white"/>
+          <path d="M200 50 L200 350" stroke="currentColor" strokeWidth="1" className="text-white"/>
+        </svg>
+      </div>
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Main Footer Content */}
-        <div className="py-10 sm:py-12 border-b border-white/10">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12">
+        <div className="py-12 sm:py-16 border-b border-white/10">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-16">
             
             {/* Brand Column */}
             <div className="lg:col-span-4">
-              <Link to="/" className="inline-block mb-4">
+              <Link to="/" className="inline-block mb-5 group">
                 <img 
                   src={hbLogoWhite} 
                   alt="Healing Buds Logo" 
-                  className="h-8 w-auto object-contain hover:opacity-80 transition-opacity"
+                  className="h-10 w-auto object-contain group-hover:opacity-80 transition-opacity"
                 />
               </Link>
-              <p className="font-body text-white/60 text-sm leading-relaxed mb-4">
+              <p className="font-body text-white/70 text-sm leading-relaxed mb-6">
                 {t('footer.tagline')}
               </p>
-              <div className="flex items-start gap-2 text-white/60 text-xs mb-2">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className="font-body">
-                  Avenida D. João II, 98 A<br />
-                  1990-100 Lisboa, Portugal
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-white/60 text-xs">
-                <Mail className="w-4 h-4 flex-shrink-0" />
-                <a href="mailto:info@healingbuds.com" className="font-body hover:text-white transition-colors">
-                  info@healingbuds.com
-                </a>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 text-white/60 text-sm group">
+                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                  <span className="font-body">
+                    Avenida D. João II, 98 A<br />
+                    1990-100 Lisboa, Portugal
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-white/60 text-sm group">
+                  <Mail className="w-4 h-4 flex-shrink-0 group-hover:text-primary transition-colors" />
+                  <a href="mailto:info@healingbuds.com" className="font-body hover:text-white transition-colors">
+                    info@healingbuds.com
+                  </a>
+                </div>
               </div>
             </div>
 
             {/* Navigation Columns */}
-            <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
+            <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-10">
               
               {/* Company */}
               <div>
-                <h4 className="font-pharma font-semibold text-sm uppercase tracking-wider mb-4 text-white/90">
+                <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
+                  <Leaf className="w-3.5 h-3.5 text-primary" />
                   {t('footer.company')}
                 </h4>
-                <ul className="space-y-2.5">
+                <ul className="space-y-3">
                   <li>
-                    <Link to="/about-us" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/about-us" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.aboutUs')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/what-we-do" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/what-we-do" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.ourStandards')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/research" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/research" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.research')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/the-wire" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/the-wire" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.theWire')}
                     </Link>
                   </li>
@@ -75,22 +88,23 @@ const Footer = () => {
 
               {/* Resources */}
               <div>
-                <h4 className="font-pharma font-semibold text-sm uppercase tracking-wider mb-4 text-white/90">
+                <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
+                  <Leaf className="w-3.5 h-3.5 text-primary" />
                   {t('footer.resources')}
                 </h4>
-                <ul className="space-y-2.5">
+                <ul className="space-y-3">
                   <li>
-                    <Link to="/contact" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/contact" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.patientAccess')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/conditions" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/conditions" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.conditionsTreated')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/franchise-opportunity" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/franchise-opportunity" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.franchiseOpportunities')}
                     </Link>
                   </li>
@@ -99,22 +113,23 @@ const Footer = () => {
 
               {/* Legal */}
               <div>
-                <h4 className="font-pharma font-semibold text-sm uppercase tracking-wider mb-4 text-white/90">
+                <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
+                  <Leaf className="w-3.5 h-3.5 text-primary" />
                   {t('footer.legal')}
                 </h4>
-                <ul className="space-y-2.5">
+                <ul className="space-y-3">
                   <li>
-                    <Link to="/privacy-policy" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/privacy-policy" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.privacyPolicy')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/terms-of-service" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/terms-of-service" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.termsOfService')}
                     </Link>
                   </li>
                   <li>
-                    <Link to="/contact" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block">
+                    <Link to="/contact" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       {t('footer.compliance')}
                     </Link>
                   </li>
@@ -126,7 +141,7 @@ const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="py-6">
+        <div className="py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="font-body text-white/50 text-xs">
               {t('footer.copyright', { year: currentYear })}
