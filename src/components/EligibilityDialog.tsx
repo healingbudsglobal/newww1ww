@@ -15,13 +15,14 @@ import { CalendarIcon, CheckCircle2, AlertCircle, Leaf } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useGeoLocation } from '@/hooks/useGeoLocation';
 
 // Validation schemas for each step
 const step1Schema = z.object({
   firstName: z.string().trim().min(2, 'First name must be at least 2 characters').max(50, 'First name must be less than 50 characters'),
   lastName: z.string().trim().min(2, 'Last name must be at least 2 characters').max(50, 'Last name must be less than 50 characters'),
   email: z.string().trim().email('Invalid email address').max(255, 'Email must be less than 255 characters'),
-  phone: z.string().trim().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
+  phone: z.string().trim().min(10, 'Phone number must be at least 10 digits').max(20, 'Phone number must be less than 20 characters'),
   dateOfBirth: z.date().refine((date) => {
     const age = new Date().getFullYear() - date.getFullYear();
     return age >= 18;
@@ -71,6 +72,7 @@ const EligibilityDialog = ({ open, onOpenChange }: EligibilityDialogProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<Step1Data & Step2Data & Step3Data & Step4Data>>({});
   const [isEligible, setIsEligible] = useState<boolean | null>(null);
+  const geoLocation = useGeoLocation();
 
   // Step 1 form
   const step1Form = useForm<Step1Data>({
@@ -254,11 +256,13 @@ const EligibilityDialog = ({ open, onOpenChange }: EligibilityDialogProps) => {
               </div>
 
               <div className="space-y-2.5">
-                <Label htmlFor="phone" className="text-foreground/90">Phone Number *</Label>
+                <Label htmlFor="phone" className="text-foreground/90">
+                  Phone Number * <span className="text-xs text-muted-foreground font-normal">({geoLocation.countryName})</span>
+                </Label>
                 <Input
                   id="phone"
                   type="tel"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder={geoLocation.phonePlaceholder}
                   {...step1Form.register('phone')}
                 />
                 {step1Form.formState.errors.phone && (
