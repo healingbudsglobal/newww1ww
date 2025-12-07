@@ -32,14 +32,14 @@ const LanguageSwitcher = ({ scrolled }: LanguageSwitcherProps) => {
     >
       <button
         className={cn(
-          "flex items-center gap-1.5 font-medium transition-all duration-300 ease-out rounded-md hover:scale-105",
-          scrolled ? "text-sm px-2 py-1.5" : "text-sm px-2.5 py-1.5",
+          "flex items-center gap-1 font-medium transition-all duration-300 ease-out rounded-md hover:scale-105 flex-shrink-0",
+          scrolled ? "text-xs xl:text-sm p-1.5" : "text-xs xl:text-sm p-1.5 xl:p-2",
           "text-white/70 hover:text-white hover:bg-white/5"
         )}
         aria-label="Change language"
       >
-        <Globe className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentLang.flag}</span>
+        <Globe className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+        <span className="text-[10px] xl:text-xs font-semibold uppercase">{currentLang.code}</span>
       </button>
 
       <div

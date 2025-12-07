@@ -102,10 +102,10 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
           transition: 'background-color 0.5s ease-out, transform 0.5s ease-out'
         }}
       >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
           <div className={cn(
             "flex items-center justify-between transition-all duration-500 ease-out",
-            scrolled ? "h-16 md:h-20" : "h-20 md:h-28"
+            scrolled ? "h-16 md:h-18" : "h-18 md:h-24"
           )}>
             <Link to="/" className="flex items-center flex-shrink-0 group">
             <img 
@@ -113,15 +113,15 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               alt="Healing Buds Logo" 
               className={cn(
                 "w-auto object-contain transition-all duration-500 ease-out group-hover:scale-105",
-                scrolled ? "h-10 sm:h-12 md:h-16" : "h-12 sm:h-16 md:h-20"
+                scrolled ? "h-8 sm:h-10 md:h-12" : "h-10 sm:h-12 md:h-14"
               )}
             />
           </Link>
           
           {/* Desktop Navigation */}
           <nav className={cn(
-            "hidden lg:flex items-center transition-all duration-500 ease-out",
-            scrolled ? "space-x-4" : "space-x-6"
+            "hidden lg:flex items-center flex-1 justify-end overflow-hidden transition-all duration-500 ease-out",
+            scrolled ? "gap-2 xl:gap-3" : "gap-3 xl:gap-4"
           )}>
             <div 
               className="relative"
@@ -130,15 +130,15 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             >
                 <button 
                 className={cn(
-                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105",
-                  scrolled ? "text-sm px-2.5 py-1.5" : "text-sm px-3 py-1.5",
+                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap",
+                  scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                   isWhatWeDoActive
                     ? "text-white bg-white/10" 
                     : "text-white/70 hover:text-white hover:bg-white/5"
                 )}
               >
                 {t('nav.whatWeDo')}
-                <ChevronDown className={cn("w-4 h-4 transition-transform duration-150", whatWeDoOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150", whatWeDoOpen && "rotate-180")} />
               </button>
               
               {/* Dropdown Menu - Linear style */}
@@ -185,8 +185,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             <Link 
               to="/research" 
               className={cn(
-                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105",
-                scrolled ? "text-sm px-2.5 py-1.5" : "text-sm px-3 py-1.5",
+                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105 whitespace-nowrap",
+                scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                 isActive("/research") 
                   ? "text-white bg-white/10" 
                   : "text-white/70 hover:text-white hover:bg-white/5"
@@ -197,8 +197,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             <Link 
               to="/the-wire" 
               className={cn(
-                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105",
-                scrolled ? "text-sm px-2.5 py-1.5" : "text-sm px-3 py-1.5",
+                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105 whitespace-nowrap",
+                scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                 isActive("/the-wire") || location.pathname.startsWith("/the-wire/")
                   ? "text-white bg-white/10" 
                   : "text-white/70 hover:text-white hover:bg-white/5"
@@ -213,15 +213,15 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             >
               <button 
                 className={cn(
-                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105",
-                  scrolled ? "text-sm px-2.5 py-1.5" : "text-sm px-3 py-1.5",
+                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap",
+                  scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                   isAboutUsActive
                     ? "text-white bg-white/10" 
                     : "text-white/70 hover:text-white hover:bg-white/5"
                 )}
               >
                 {t('nav.aboutUs')}
-                <ChevronDown className={cn("w-4 h-4 transition-transform duration-150", aboutUsOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150", aboutUsOpen && "rotate-180")} />
               </button>
               
               {/* Dropdown Menu */}
@@ -252,8 +252,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             <Link 
               to="/contact" 
               className={cn(
-                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105",
-                scrolled ? "text-sm px-2.5 py-1.5" : "text-sm px-3 py-1.5",
+                "font-body font-medium transition-all duration-300 ease-out rounded-md hover:scale-105 whitespace-nowrap",
+                scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                 isActive("/contact") 
                   ? "text-white bg-white/10" 
                   : "text-white/70 hover:text-white hover:bg-white/5"
@@ -269,48 +269,51 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             <ThemeToggle />
 
             {/* Desktop Action Buttons */}
-            <div className="flex items-center gap-3 ml-4">
+            <div className="flex items-center gap-2 ml-2 flex-shrink-0">
               <button
                 onClick={() => setEligibilityDialogOpen(true)}
                 className={cn(
-                  "font-body font-semibold px-6 py-2.5 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-2xl relative z-10",
+                  "font-body font-semibold px-3 xl:px-5 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-xl relative z-10 whitespace-nowrap",
                   "backdrop-blur-2xl bg-gradient-to-br from-white/35 via-white/25 to-white/15",
                   "dark:from-white/25 dark:via-white/15 dark:to-white/10",
                   "border border-white/50 shadow-lg hover:border-white/70",
                   "text-white hover:bg-white/35",
-                  scrolled ? "text-sm" : "text-sm"
+                  scrolled ? "text-xs xl:text-sm" : "text-xs xl:text-sm"
                 )}
               >
-                {t('nav.checkEligibility')}
+                <span className="hidden xl:inline">{t('nav.checkEligibility')}</span>
+                <span className="xl:hidden">Eligibility</span>
               </button>
               {user ? (
                 <button
                   onClick={handleLogout}
                   className={cn(
-                    "font-body font-semibold px-6 py-2.5 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-2xl relative z-10",
+                    "font-body font-semibold px-3 xl:px-5 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-xl relative z-10 whitespace-nowrap",
                     "backdrop-blur-2xl bg-gradient-to-br from-white/25 via-white/18 to-white/12",
                     "dark:from-white/20 dark:via-white/12 dark:to-white/8",
                     "border border-white/40 shadow-lg hover:border-white/60",
-                    "text-white hover:bg-white/30 flex items-center gap-2",
-                    scrolled ? "text-sm" : "text-sm"
+                    "text-white hover:bg-white/30 flex items-center gap-1.5",
+                    scrolled ? "text-xs xl:text-sm" : "text-xs xl:text-sm"
                   )}
                 >
-                  <LogOut className="w-4 h-4" />
-                  {t('nav.signOut')}
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">{t('nav.signOut')}</span>
+                  <span className="xl:hidden">Sign Out</span>
                 </button>
               ) : (
                 <Link
                   to="/auth"
                   className={cn(
-                    "font-body font-semibold px-6 py-2.5 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-2xl relative z-10",
+                    "font-body font-semibold px-3 xl:px-5 py-2 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-xl relative z-10 whitespace-nowrap",
                     "backdrop-blur-2xl bg-gradient-to-br from-white/25 via-white/18 to-white/12",
                     "dark:from-white/20 dark:via-white/12 dark:to-white/8",
                     "border border-white/40 shadow-lg hover:border-white/60",
                     "text-white hover:bg-white/30",
-                    scrolled ? "text-sm" : "text-sm"
+                    scrolled ? "text-xs xl:text-sm" : "text-xs xl:text-sm"
                   )}
                 >
-                  {t('nav.patientLogin')}
+                  <span className="hidden xl:inline">{t('nav.patientLogin')}</span>
+                  <span className="xl:hidden">Login</span>
                 </Link>
               )}
             </div>

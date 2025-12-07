@@ -43,16 +43,16 @@ const ThemeToggle = ({ className, variant = "icon" }: ThemeToggleProps) => {
     <button
       onClick={toggleTheme}
       className={cn(
-        "p-2 rounded-full transition-all duration-300 hover:scale-110",
+        "p-1.5 xl:p-2 rounded-full transition-all duration-300 hover:scale-110 flex-shrink-0",
         "text-white/70 hover:text-white hover:bg-white/10",
         className
       )}
       aria-label="Toggle theme"
     >
       {theme === "dark" ? (
-        <Sun className="w-4 h-4" />
+        <Sun className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
       ) : (
-        <Moon className="w-4 h-4" />
+        <Moon className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
       )}
     </button>
   );
