@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import WhatWeDo from "./pages/WhatWeDo";
 import TheWire from "./pages/TheWire";
 import NewsArticle from "./pages/NewsArticle";
-import ScottFranchiseStory from "./pages/ScottFranchiseStory";
+
 import CultivatingProcessing from "./pages/CultivatingProcessing";
 import ManufactureDistribution from "./pages/ManufactureDistribution";
 import Conditions from "./pages/Conditions";
@@ -48,7 +48,7 @@ const AnimatedRoutes = () => {
         <Route path="/blockchain-technology" element={<BlockchainTechnology />} />
         <Route path="/the-wire" element={<TheWire />} />
         <Route path="/the-wire/:articleId" element={<NewsArticle />} />
-        <Route path="/franchise-opportunity" element={<ScottFranchiseStory />} />
+        
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />

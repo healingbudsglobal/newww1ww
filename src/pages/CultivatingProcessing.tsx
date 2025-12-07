@@ -15,7 +15,7 @@ import productionFacility from "@/assets/production-facility-hq.jpg";
 import researchLab from "@/assets/research-lab-hq.jpg";
 
 const CultivatingProcessing = () => {
-  const [activeTab, setActiveTab] = useState<"portugal" | "canada">("portugal");
+  const [activeTab, setActiveTab] = useState<"southafrica" | "uk">("southafrica");
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -250,9 +250,9 @@ const CultivatingProcessing = () => {
               <ScrollAnimation variant="fade" delay={0.1}>
                 <div className="flex justify-center gap-1 mb-12 md:mb-16">
                   <button
-                    onClick={() => setActiveTab("portugal")}
+                    onClick={() => setActiveTab("southafrica")}
                     className={`px-6 md:px-8 py-2.5 font-medium transition-all duration-200 rounded-lg ${
-                      activeTab === "portugal"
+                      activeTab === "southafrica"
                         ? "text-foreground bg-foreground/5"
                         : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                     }`}
@@ -260,9 +260,9 @@ const CultivatingProcessing = () => {
                     South Africa
                   </button>
                   <button
-                    onClick={() => setActiveTab("canada")}
+                    onClick={() => setActiveTab("uk")}
                     className={`px-6 md:px-8 py-2.5 font-medium transition-all duration-200 rounded-lg ${
-                      activeTab === "canada"
+                      activeTab === "uk"
                         ? "text-foreground bg-foreground/5"
                         : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                     }`}
@@ -273,7 +273,7 @@ const CultivatingProcessing = () => {
               </ScrollAnimation>
 
               {/* Content - Linear style */}
-              {activeTab === "portugal" && (
+              {activeTab === "southafrica" && (
                 <ScrollAnimation>
                   <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center max-w-6xl mx-auto">
                     <div className="order-2 md:order-1 space-y-6">
@@ -293,7 +293,7 @@ const CultivatingProcessing = () => {
                 </ScrollAnimation>
               )}
 
-              {activeTab === "canada" && (
+              {activeTab === "uk" && (
                 <ScrollAnimation>
                   <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center max-w-6xl mx-auto">
                     <div className="order-2 md:order-1 space-y-6">

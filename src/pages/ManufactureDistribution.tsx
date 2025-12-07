@@ -56,7 +56,7 @@ const ManufactureDistribution = () => {
                     Production & Processing Excellence
                   </h2>
                   <p className="text-lg text-muted-foreground/80 leading-relaxed">
-                    With our production partner Dr Green's state-of-the-art global facilities spanning more than 30,000 square metres dedicated to pharmaceutical-grade cannabis production alongside fully EU GMP approved facilities, this allows us to consistently break barriers delivering excellence.
+                    With our production partner Dr Green's state-of-the-art global facilities spanning more than 18,000 square metres dedicated to pharmaceutical-grade cannabis production alongside fully EU GMP approved facilities, this allows us to consistently break barriers delivering excellence.
                   </p>
                 </ScrollAnimation>
                 <ScrollAnimation delay={0.2}>
