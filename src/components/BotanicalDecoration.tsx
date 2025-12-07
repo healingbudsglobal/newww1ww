@@ -1,12 +1,143 @@
 import { cn } from "@/lib/utils";
 
 interface BotanicalDecorationProps {
-  variant?: 'leaf' | 'branch' | 'corner' | 'divider';
+  variant?: 'leaf' | 'branch' | 'corner' | 'divider' | 'organic-wave' | 'cannabis-leaf';
   className?: string;
 }
 
 // Reusable botanical decoration component for consistent brand visuals
+// Replaces generic wave shapes with organic, cannabis-inspired motifs
 export const BotanicalDecoration = ({ variant = 'leaf', className }: BotanicalDecorationProps) => {
+  // Organic wave - replaces generic wave decorations
+  if (variant === 'organic-wave') {
+    return (
+      <svg 
+        className={cn("text-primary", className)}
+        viewBox="0 0 400 80"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="none"
+      >
+        {/* Organic curved line inspired by cannabis leaf curves */}
+        <path 
+          d="M0 40 C 50 20, 80 60, 130 35 S 180 55, 230 40 S 280 20, 330 45 S 370 30, 400 40" 
+          stroke="currentColor" 
+          strokeWidth="1.5" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.3"
+        />
+        <path 
+          d="M0 50 C 60 35, 90 65, 140 45 S 190 60, 240 48 S 290 35, 340 52 S 380 40, 400 50" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.2"
+        />
+        {/* Subtle leaf accents along the wave */}
+        <path 
+          d="M80 38 Q 75 28, 85 25" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.25"
+        />
+        <path 
+          d="M200 42 Q 195 32, 205 28" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.25"
+        />
+        <path 
+          d="M320 48 Q 315 38, 325 35" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.25"
+        />
+        {/* Small decorative dots */}
+        <circle cx="85" cy="25" r="2" fill="currentColor" opacity="0.2" />
+        <circle cx="205" cy="28" r="2" fill="currentColor" opacity="0.2" />
+        <circle cx="325" cy="35" r="2" fill="currentColor" opacity="0.2" />
+      </svg>
+    );
+  }
+
+  // Cannabis leaf silhouette - elegant brand motif
+  if (variant === 'cannabis-leaf') {
+    return (
+      <svg 
+        className={cn("text-primary", className)}
+        viewBox="0 0 100 120"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Stylized cannabis leaf - elegant and subtle */}
+        {/* Main stem */}
+        <path 
+          d="M50 115 L50 60" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round"
+          opacity="0.4"
+        />
+        {/* Center leaflet */}
+        <path 
+          d="M50 60 Q 50 35, 50 15 Q 48 25, 45 35 Q 48 40, 50 45 Q 52 40, 55 35 Q 52 25, 50 15" 
+          stroke="currentColor" 
+          strokeWidth="1.5" 
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          opacity="0.35"
+        />
+        {/* Left leaflets */}
+        <path 
+          d="M50 65 Q 35 55, 15 40 Q 28 52, 40 58 Q 32 48, 20 35" 
+          stroke="currentColor" 
+          strokeWidth="1.2" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.3"
+        />
+        <path 
+          d="M50 75 Q 40 68, 25 60 Q 35 65, 42 70" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.25"
+        />
+        {/* Right leaflets */}
+        <path 
+          d="M50 65 Q 65 55, 85 40 Q 72 52, 60 58 Q 68 48, 80 35" 
+          stroke="currentColor" 
+          strokeWidth="1.2" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.3"
+        />
+        <path 
+          d="M50 75 Q 60 68, 75 60 Q 65 65, 58 70" 
+          stroke="currentColor" 
+          strokeWidth="1" 
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.25"
+        />
+        {/* Subtle details */}
+        <circle cx="50" cy="15" r="2" fill="currentColor" opacity="0.3" />
+        <circle cx="15" cy="40" r="1.5" fill="currentColor" opacity="0.2" />
+        <circle cx="85" cy="40" r="1.5" fill="currentColor" opacity="0.2" />
+      </svg>
+    );
+  }
+
   if (variant === 'leaf') {
     return (
       <svg 

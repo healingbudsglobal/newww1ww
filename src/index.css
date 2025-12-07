@@ -248,17 +248,34 @@ All colors MUST be HSL.
   
   /* Linear-style card */
   .card-linear {
-    @apply bg-background rounded-xl border border-border/40 transition-all duration-200;
+    @apply bg-card rounded-xl border border-border/50 transition-all duration-200;
   }
   
   .card-linear:hover {
     box-shadow: var(--shadow-card);
-    @apply border-border/60 translate-y-[-1px];
+    @apply border-border/70 translate-y-[-1px];
+  }
+  
+  /* Themed card for dark mode support */
+  .card-themed {
+    @apply bg-card rounded-xl border border-border/60 shadow-sm transition-all duration-200;
+  }
+  
+  .dark .card-themed {
+    @apply border-border/40 bg-card/95 shadow-lg;
+  }
+  
+  .card-themed:hover {
+    @apply shadow-md border-border/80 -translate-y-0.5;
+  }
+  
+  .dark .card-themed:hover {
+    @apply border-border/50 shadow-xl;
   }
   
   /* Clean button styles with accent green */
   .btn-primary {
-    @apply px-5 py-2.5 rounded-xl font-medium transition-all duration-300 bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97];
+    @apply px-5 py-2.5 rounded-xl font-medium transition-all duration-300 bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.97];
   }
   
   .btn-secondary {
@@ -329,6 +346,50 @@ All colors MUST be HSL.
   /* Premium micro-interaction */
   .interactive-scale {
     @apply transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  /* Typography consistency utilities */
+  .heading-primary {
+    @apply text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight;
+    line-height: 1.1;
+  }
+  
+  .heading-secondary {
+    @apply text-3xl md:text-4xl font-semibold tracking-tight;
+    line-height: 1.15;
+  }
+  
+  .heading-tertiary {
+    @apply text-2xl md:text-3xl font-semibold tracking-tight;
+    line-height: 1.2;
+  }
+  
+  .body-large {
+    @apply text-lg md:text-xl;
+    line-height: 1.7;
+  }
+  
+  .body-base {
+    @apply text-base md:text-lg;
+    line-height: 1.7;
+  }
+  
+  /* Consistent section spacing */
+  .section-padding {
+    @apply py-16 md:py-20 lg:py-24;
+  }
+  
+  .section-padding-sm {
+    @apply py-12 md:py-16 lg:py-20;
+  }
+  
+  /* Card spacing consistency */
+  .card-spacing {
+    @apply p-6 md:p-8;
+  }
+  
+  .card-spacing-sm {
+    @apply p-4 md:p-6;
   }
 }
 
