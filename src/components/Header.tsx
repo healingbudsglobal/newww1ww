@@ -81,14 +81,16 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
 
   return (
     <>
-      {/* Scroll Progress Bar */}
-      <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-primary origin-left z-[60]"
-        style={{ 
-          scaleX,
-          transformOrigin: "0%"
-        }}
-      />
+      {/* Scroll Progress Bar with Background Track */}
+      <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[60]">
+        <motion.div
+          className="h-full bg-gradient-to-r from-primary via-secondary to-primary origin-left"
+          style={{ 
+            scaleX,
+            transformOrigin: "0%"
+          }}
+        />
+      </div>
       
       <header 
         className={cn(
