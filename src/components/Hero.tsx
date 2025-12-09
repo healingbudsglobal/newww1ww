@@ -4,6 +4,8 @@ import heroVideoBg from "@/assets/hero-video-bg.jpg";
 import { ChevronDown } from "lucide-react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import ParticleField from "./ParticleField";
+import MagneticButton from "./MagneticButton";
 
 const Hero = () => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -26,7 +28,6 @@ const Hero = () => {
     if (videoRef.current) {
       videoRef.current.play().catch(error => {
         console.log("Video autoplay failed:", error);
-        // If video can't autoplay, show the static image
         setVideoEnded(true);
       });
     }
@@ -43,6 +44,25 @@ const Hero = () => {
     });
   };
 
+  // Text reveal animation variants
+  const textRevealVariants = {
+    hidden: { opacity: 0, y: 60, skewY: 2 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      skewY: 0,
+      transition: {
+        duration: 0.8,
+        delay: i * 0.15,
+        ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
+      },
+    }),
+  };
+
+  // Letter by letter animation for main title
+  const welcomeText = t('hero.welcome');
+  const brandText = t('hero.healingBuds');
+
   return (
     <section 
       ref={containerRef} 
@@ -53,13 +73,16 @@ const Hero = () => {
         style={{ y: videoY }}
         className="absolute left-2 right-2 top-24 sm:top-28 md:top-32 bottom-4 rounded-2xl sm:rounded-3xl overflow-hidden z-0 shadow-2xl"
       >
+        {/* Particle overlay */}
+        <ParticleField particleCount={40} className="z-10" />
+        
         {/* Static image that shows after video ends or as fallback */}
         <motion.img
           src={heroVideoBg}
           alt=""
-          initial={{ opacity: 0 }}
-          animate={{ opacity: videoEnded ? 1 : 0 }}
-          transition={{ duration: 1.5, ease: "easeInOut" }}
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={{ opacity: videoEnded ? 1 : 0, scale: videoEnded ? 1 : 1.1 }}
+          transition={{ duration: 2, ease: "easeOut" }}
           className="absolute inset-0 w-full h-full object-cover"
         />
         
@@ -78,8 +101,25 @@ const Hero = () => {
           <source src="/hero-video.mp4" type="video/mp4" />
         </motion.video>
         
-        {/* Enhanced gradient overlay for better text contrast */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1F2A25]/60 to-[#13303D]/55" />
+        {/* Enhanced gradient overlay with animated glow */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1F2A25]/70 via-[#13303D]/60 to-[#1F2A25]/50" />
+        
+        {/* Animated glow spots */}
+        <motion.div
+          className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full"
+          style={{
+            background: 'radial-gradient(circle at center, hsla(164, 48%, 53%, 0.2) 0%, transparent 60%)',
+          }}
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
       </motion.div>
       
       <motion.div 
@@ -87,31 +127,70 @@ const Hero = () => {
         className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-16 sm:py-24 md:py-32"
       >
         <div className="max-w-5xl text-left relative">
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
-            className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white mb-6 sm:mb-8 leading-[1.1] tracking-tight drop-shadow-lg"
-          >
-            {t('hero.welcome')}{" "}
-            <span className="block mt-3">{t('hero.healingBuds')}</span>
-          </motion.h1>
+          {/* Welcome text with reveal animation */}
+          <div className="overflow-hidden">
+            <motion.h1 
+              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white mb-2 leading-[1.1] tracking-tight drop-shadow-lg"
+            >
+              <motion.span
+                initial="hidden"
+                animate="visible"
+                custom={0}
+                variants={textRevealVariants}
+                className="inline-block"
+              >
+                {welcomeText}
+              </motion.span>
+            </motion.h1>
+          </div>
+          
+          {/* Brand name with staggered letter animation */}
+          <div className="overflow-hidden mb-6 sm:mb-8">
+            <motion.h1 
+              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white leading-[1.1] tracking-tight drop-shadow-lg"
+            >
+              <motion.span
+                initial="hidden"
+                animate="visible"
+                custom={1}
+                variants={textRevealVariants}
+                className="inline-block"
+              >
+                {brandText.split('').map((letter, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.5,
+                      delay: 0.3 + i * 0.03,
+                      ease: [0.25, 0.4, 0.25, 1],
+                    }}
+                    className="inline-block"
+                    style={{ display: letter === ' ' ? 'inline' : 'inline-block' }}
+                  >
+                    {letter === ' ' ? '\u00A0' : letter}
+                  </motion.span>
+                ))}
+              </motion.span>
+            </motion.h1>
+          </div>
           
           {/* Transparent logo overlay with parallax */}
           <motion.img 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 0.15, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
+            animate={{ opacity: 0.15, scale: 1, rotate: 0 }}
             style={{ y: logoY, scale: logoScale }}
-            transition={{ duration: 1, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
+            transition={{ duration: 1.2, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
             src={hbLogoSquare} 
             alt="" 
             className="hidden md:block absolute right-0 md:right-8 lg:right-20 top-1/2 -translate-y-1/2 w-[280px] md:w-[340px] lg:w-[420px] h-auto pointer-events-none origin-center"
           />
           
           <motion.p 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
+            transition={{ duration: 0.8, delay: 0.8, ease: [0.25, 0.4, 0.25, 1] }}
             className="font-body text-lg sm:text-xl md:text-2xl text-white/90 mb-8 max-w-2xl font-light leading-relaxed drop-shadow-md"
           >
             {t('hero.tagline')}
@@ -119,17 +198,27 @@ const Hero = () => {
         </div>
       </motion.div>
 
-      {/* Scroll Indicator */}
-      <motion.button
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 1, ease: [0.25, 0.4, 0.25, 1] }}
+      {/* Scroll Indicator with magnetic effect */}
+      <MagneticButton
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20"
+        magneticStrength={0.4}
         onClick={scrollToContent}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 text-white/80 hover:text-white transition-all duration-300 animate-bounce cursor-pointer"
-        aria-label="Scroll to content"
       >
-        <ChevronDown className="w-8 h-8" />
-      </motion.button>
+        <motion.button
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 1.2, ease: [0.25, 0.4, 0.25, 1] }}
+          className="text-white/80 hover:text-white transition-all duration-300 cursor-pointer p-4"
+          aria-label="Scroll to content"
+        >
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown className="w-8 h-8" />
+          </motion.div>
+        </motion.button>
+      </MagneticButton>
     </section>
   );
 };

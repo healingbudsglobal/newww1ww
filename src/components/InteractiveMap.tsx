@@ -297,10 +297,11 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
         if (map.current) {
           map.current.flyTo({
             center: location.coordinates,
-            zoom: 7,
+            zoom: 9, // Closer zoom for auto-tour
             duration: 2000,
             curve: 1.2,
             essential: true,
+            padding: { top: 60, bottom: 60, left: 40, right: 40 },
           });
         }
         
@@ -313,10 +314,11 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
     if (map.current) {
       map.current.flyTo({
         center: location.coordinates,
-        zoom: 7,
+        zoom: 9, // Closer zoom for auto-tour
         duration: 2000,
         curve: 1.2,
         essential: true,
+        padding: { top: 60, bottom: 60, left: 40, right: 40 },
       });
     }
 
@@ -353,12 +355,14 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
     const country = selectedCountry ? countries[selectedCountry] : null;
     
     if (country) {
+      // Zoom closer to country when selected
       map.current.flyTo({
         center: country.center,
-        zoom: country.zoom,
-        duration: 1500,
+        zoom: country.zoom + 2, // Zoom 2 levels closer for better detail
+        duration: 1800,
         essential: true,
         curve: 1.42,
+        padding: { top: 80, bottom: 80, left: 40, right: 40 },
       });
     } else {
       map.current.flyTo({
@@ -479,14 +483,15 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             el.style.zIndex = '1000';
             quickTooltip.addTo(map.current!);
             
-            // Smooth fly to the hovered marker
+            // Smooth fly to the hovered marker - zoom closer
             if (!isAutoTourActive) {
               map.current?.flyTo({
                 center: location.coordinates,
-                zoom: Math.max(map.current.getZoom(), 6),
-                duration: 800,
+                zoom: Math.max(map.current.getZoom(), 9), // Zoom to at least level 9
+                duration: 1000,
                 curve: 1.2,
                 essential: true,
+                padding: { top: 60, bottom: 60, left: 40, right: 40 },
               });
             }
           });
@@ -578,13 +583,14 @@ const InteractiveMap = ({ selectedCountry, onCountrySelect }: InteractiveMapProp
             `)
             .addTo(map.current!);
 
-          // Fly to location with smooth animation (shorter duration on mobile)
+          // Fly to location with smooth animation - zoom closer and center properly
           map.current?.flyTo({
             center: location.coordinates,
-            zoom: isMobileDevice ? 7 : 8,
-            duration: isMobileDevice ? 1000 : 1500,
+            zoom: isMobileDevice ? 9 : 11, // Much closer zoom for better detail
+            duration: isMobileDevice ? 1200 : 1800,
             curve: 1.42,
             essential: true,
+            padding: { top: 100, bottom: 100, left: 50, right: 50 },
           });
 
           // Optional: Still trigger country selection callback

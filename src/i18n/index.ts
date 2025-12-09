@@ -60,21 +60,25 @@ const resources = {
 
 // Detect language based on domain
 const detectLanguageFromDomain = (): string => {
+  // First check if user has manually selected a language
   const storedLang = localStorage.getItem('i18nextLng');
-  if (storedLang) {
+  if (storedLang && (storedLang === 'en' || storedLang === 'pt')) {
     return storedLang;
   }
 
   const hostname = window.location.hostname;
   
-  // Check domain extension
-  if (hostname.endsWith('.pt')) {
+  // Portugal domains get Portuguese
+  if (hostname.endsWith('.pt') || hostname.includes('.pt.')) {
     return 'pt';
-  } else if (hostname.endsWith('.co.uk') || hostname.endsWith('.co.za')) {
+  }
+  
+  // UK and South Africa domains get English
+  if (hostname.endsWith('.co.uk') || hostname.endsWith('.co.za') || hostname.includes('.uk') || hostname.includes('.za')) {
     return 'en';
   }
   
-  // Default to English for all other domains
+  // Default to English for all other domains (including .com, localhost, etc.)
   return 'en';
 };
 
