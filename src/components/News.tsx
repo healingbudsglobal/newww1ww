@@ -1,49 +1,99 @@
 import { Link } from "react-router-dom";
-import ScrollAnimation from "@/components/ScrollAnimation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { newsArticles } from "@/data/newsArticles";
+import { motion } from "framer-motion";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const headerVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.7,
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 60, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
+    },
+  },
+};
 
 const News = () => {
   // Show only 3 articles on homepage
   const displayedArticles = newsArticles.slice(0, 3);
 
   return (
-    <section id="news" className="bg-background py-12 sm:py-16 md:py-20">
+    <motion.section 
+      id="news" 
+      className="bg-background py-12 sm:py-16 md:py-20"
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={containerVariants}
+    >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <ScrollAnimation>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12">
-            <div>
-              <h2 className="font-pharma text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground tracking-tight">
-                The Wire
-              </h2>
-              <p className="font-geist text-muted-foreground mt-2">
-                Inside news & updates
-              </p>
-            </div>
-            <Link to="/the-wire">
-              <Button
-                variant="outline"
-                size="lg"
-                className="font-body rounded-full text-sm sm:text-base"
-              >
-                View all updates
-              </Button>
-            </Link>
+        <motion.div 
+          className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12"
+          variants={headerVariants}
+        >
+          <div>
+            <h2 className="font-pharma text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground tracking-tight">
+              The Wire
+            </h2>
+            <p className="font-geist text-muted-foreground mt-2">
+              Inside news & updates
+            </p>
           </div>
-        </ScrollAnimation>
+          <Link to="/the-wire">
+            <Button
+              variant="outline"
+              size="lg"
+              className="font-body rounded-full text-sm sm:text-base"
+            >
+              View all updates
+            </Button>
+          </Link>
+        </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {displayedArticles.map((item, index) => (
-            <ScrollAnimation key={item.id} delay={index * 0.1}>
+            <motion.div 
+              key={item.id}
+              variants={cardVariants}
+              whileHover={{ y: -12, transition: { duration: 0.3, ease: "easeOut" } }}
+            >
               <Link to={`/the-wire/${item.id}`}>
-                <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-border/50 rounded-2xl cursor-pointer hover:-translate-y-2 h-full flex flex-col">
+                <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-border/50 rounded-2xl cursor-pointer h-full flex flex-col">
                   <div className="relative h-56 overflow-hidden">
-                    <img
+                    <motion.img
                       src={item.image}
                       alt={item.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 group-hover:brightness-110"
+                      className="w-full h-full object-cover"
+                      whileHover={{ scale: 1.1 }}
+                      transition={{ duration: 0.5 }}
                     />
                     {item.featured && (
                       <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/90 to-sage-dark/40 flex items-center justify-center">
@@ -90,11 +140,11 @@ const News = () => {
                   </div>
                 </Card>
               </Link>
-            </ScrollAnimation>
+            </motion.div>
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 

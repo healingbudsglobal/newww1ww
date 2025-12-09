@@ -77,6 +77,42 @@ const BotanicalMotif = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const textVariants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.7,
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
+    },
+  },
+};
+
+const imageVariants = {
+  hidden: { opacity: 0, scale: 0.95, x: 30 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    x: 0,
+    transition: {
+      duration: 0.8,
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
+    },
+  },
+};
+
 const AboutHero = () => {
   const imageRef = useRef<HTMLDivElement>(null);
   
@@ -88,42 +124,59 @@ const AboutHero = () => {
   const imageY = useTransform(scrollYProgress, [0, 1], ["-20%", "20%"]);
   
   return (
-    <section 
+    <motion.section 
       className="py-16 sm:py-20 md:py-24 bg-background relative"
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-80px" }}
+      variants={containerVariants}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-          <ScrollAnimation>
-            <div>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground mb-6 tracking-tight leading-tight">
-                Healing Buds: Advancing Global Cannabis Innovation
-              </h2>
-              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-                Committed to excellence in every product we create and championing worldwide cannabis acceptance through quality and integrity.
-              </p>
-            </div>
-          </ScrollAnimation>
+          <motion.div variants={textVariants}>
+            <motion.h2 
+              className="text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground mb-6 tracking-tight leading-tight"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+            >
+              Healing Buds: Advancing Global Cannabis Innovation
+            </motion.h2>
+            <motion.p 
+              className="text-base sm:text-lg text-muted-foreground leading-relaxed"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              Committed to excellence in every product we create and championing worldwide cannabis acceptance through quality and integrity.
+            </motion.p>
+          </motion.div>
           
-          <ScrollAnimation delay={0.2}>
-            <div ref={imageRef} className="relative overflow-hidden rounded-2xl shadow-elegant">
-              <motion.img 
-                style={{ y: imageY }}
-                src={aboutHero} 
-                alt="Cannabis cultivation facility with rows of plants" 
-                className="rounded-2xl w-full h-auto scale-110"
-              />
-              {/* Botanical decorative elements */}
-              <BotanicalMotif 
-                className="absolute -top-2 -right-2 w-20 h-20 sm:w-24 sm:h-24 text-primary opacity-60 rotate-45" 
-              />
-              <BotanicalMotif 
-                className="absolute -bottom-2 -left-2 w-20 h-20 sm:w-24 sm:h-24 text-primary opacity-60 -rotate-45 scale-x-[-1]" 
-              />
-            </div>
-          </ScrollAnimation>
+          <motion.div 
+            ref={imageRef} 
+            className="relative overflow-hidden rounded-2xl shadow-elegant"
+            variants={imageVariants}
+            style={{ position: 'relative' }}
+          >
+            <motion.img 
+              style={{ y: imageY }}
+              src={aboutHero} 
+              alt="Cannabis cultivation facility with rows of plants" 
+              className="rounded-2xl w-full h-auto scale-110"
+            />
+            {/* Botanical decorative elements */}
+            <BotanicalMotif 
+              className="absolute -top-2 -right-2 w-20 h-20 sm:w-24 sm:h-24 text-primary opacity-60 rotate-45" 
+            />
+            <BotanicalMotif 
+              className="absolute -bottom-2 -left-2 w-20 h-20 sm:w-24 sm:h-24 text-primary opacity-60 -rotate-45 scale-x-[-1]" 
+            />
+          </motion.div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
