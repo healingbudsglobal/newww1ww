@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Menu, X, LogOut } from "lucide-react";
 import hbLogoWhite from "@/assets/hb-logo-white-new.png";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import EligibilityDialog from "./EligibilityDialog";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
@@ -30,6 +30,11 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const location = useLocation();
   const { t } = useTranslation('common');
   
+  // Refs for click-outside detection
+  const whatWeDoRef = useRef<HTMLDivElement>(null);
+  const aboutUsRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  
   // Scroll progress tracking
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
@@ -37,6 +42,29 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
     damping: 30,
     restDelta: 0.001
   });
+
+  // Click outside handler
+  const handleClickOutside = useCallback((event: MouseEvent | TouchEvent) => {
+    const target = event.target as Node;
+    
+    // Close desktop dropdowns when clicking outside
+    if (whatWeDoRef.current && !whatWeDoRef.current.contains(target)) {
+      setWhatWeDoOpen(false);
+    }
+    if (aboutUsRef.current && !aboutUsRef.current.contains(target)) {
+      setAboutUsOpen(false);
+    }
+  }, []);
+
+  // Add click-outside listener
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [handleClickOutside]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -89,6 +117,13 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
     }
   }, [mobileMenuOpen]);
 
+  // Close dropdowns on route change
+  useEffect(() => {
+    setWhatWeDoOpen(false);
+    setAboutUsOpen(false);
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <>
       {/* Scroll Progress Bar with Background Track */}
@@ -103,6 +138,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
       </div>
       
       <header 
+        ref={headerRef}
         className={cn(
           "fixed top-2 left-2 right-2 z-50 backdrop-blur-xl rounded-xl transition-all duration-500 ease-out border",
           scrolled 
@@ -136,15 +172,20 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             scrolled ? "gap-2 xl:gap-3" : "gap-3 xl:gap-4"
           )}>
             <div 
+              ref={whatWeDoRef}
               className="relative group"
               onMouseEnter={() => setWhatWeDoOpen(true)}
               onMouseLeave={() => setWhatWeDoOpen(false)}
             >
               <button 
                 type="button"
-                onClick={() => setWhatWeDoOpen(!whatWeDoOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWhatWeDoOpen(!whatWeDoOpen);
+                  setAboutUsOpen(false);
+                }}
                 className={cn(
-                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap cursor-pointer",
+                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap cursor-pointer select-none",
                   scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                   isWhatWeDoActive
                     ? "text-white bg-white/10" 
@@ -152,48 +193,54 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                 )}
               >
                 {t('nav.whatWeDo')}
-                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150", whatWeDoOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150 pointer-events-none", whatWeDoOpen && "rotate-180")} />
               </button>
               
               {/* Dropdown Menu - Linear style */}
-              {whatWeDoOpen && (
-                <div 
-                  className="absolute top-full left-0 mt-2 w-72 bg-card rounded-xl shadow-card border border-border/40 overflow-hidden z-[100] animate-fade-in"
-                >
-                <Link
-                  to="/cultivating-processing"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
-                  onClick={() => setWhatWeDoOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.cultivating')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.cultivatingDesc')}</div>
-                </Link>
-                <Link
-                  to="/manufacture-distribution"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
-                  onClick={() => setWhatWeDoOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.manufacture')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.manufactureDesc')}</div>
-                </Link>
-                <Link
-                  to="/medical-clinics"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
-                  onClick={() => setWhatWeDoOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.clinics')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.clinicsDesc')}</div>
-                </Link>
-                <Link
-                  to="/online-pharmacy"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors"
-                  onClick={() => setWhatWeDoOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.pharmacy')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.pharmacyDesc')}</div>
-                </Link>
-              </div>
-              )}
+              <AnimatePresence>
+                {whatWeDoOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-2 w-72 bg-card rounded-xl shadow-card border border-border/40 overflow-hidden z-[100]"
+                  >
+                    <Link
+                      to="/cultivating-processing"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
+                      onClick={() => setWhatWeDoOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.cultivating')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.cultivatingDesc')}</div>
+                    </Link>
+                    <Link
+                      to="/manufacture-distribution"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
+                      onClick={() => setWhatWeDoOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.manufacture')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.manufactureDesc')}</div>
+                    </Link>
+                    <Link
+                      to="/medical-clinics"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
+                      onClick={() => setWhatWeDoOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.clinics')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.clinicsDesc')}</div>
+                    </Link>
+                    <Link
+                      to="/online-pharmacy"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors"
+                      onClick={() => setWhatWeDoOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.pharmacy')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.pharmacyDesc')}</div>
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <Link 
               to="/research" 
@@ -220,15 +267,20 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               {t('nav.theWire')}
             </Link>
             <div 
+              ref={aboutUsRef}
               className="relative group"
               onMouseEnter={() => setAboutUsOpen(true)}
               onMouseLeave={() => setAboutUsOpen(false)}
             >
               <button 
                 type="button"
-                onClick={() => setAboutUsOpen(!aboutUsOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAboutUsOpen(!aboutUsOpen);
+                  setWhatWeDoOpen(false);
+                }}
                 className={cn(
-                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap cursor-pointer",
+                  "font-body flex items-center gap-1 font-medium transition-all duration-300 ease-out relative rounded-md hover:scale-105 whitespace-nowrap cursor-pointer select-none",
                   scrolled ? "text-xs xl:text-sm px-2 py-1" : "text-xs xl:text-sm px-2 xl:px-3 py-1.5",
                   isAboutUsActive
                     ? "text-white bg-white/10" 
@@ -236,32 +288,38 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                 )}
               >
                 {t('nav.aboutUs')}
-                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150", aboutUsOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3 h-3 xl:w-4 xl:h-4 transition-transform duration-150 pointer-events-none", aboutUsOpen && "rotate-180")} />
               </button>
               
               {/* Dropdown Menu */}
-              {aboutUsOpen && (
-                <div 
-                  className="absolute top-full left-0 mt-2 w-72 bg-card rounded-xl shadow-card border border-border/40 overflow-hidden z-[100] animate-fade-in"
-                >
-                <Link
-                  to="/about-us"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
-                  onClick={() => setAboutUsOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.aboutHealing')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.aboutHealingDesc')}</div>
-                </Link>
-                <Link
-                  to="/blockchain-technology"
-                  className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors"
-                  onClick={() => setAboutUsOpen(false)}
-                >
-                  <div className="font-medium">{t('dropdown.blockchain')}</div>
-                  <div className="text-sm text-muted-foreground">{t('dropdown.blockchainDesc')}</div>
-                </Link>
-              </div>
-              )}
+              <AnimatePresence>
+                {aboutUsOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-2 w-72 bg-card rounded-xl shadow-card border border-border/40 overflow-hidden z-[100]"
+                  >
+                    <Link
+                      to="/about-us"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors border-b border-border"
+                      onClick={() => setAboutUsOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.aboutHealing')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.aboutHealingDesc')}</div>
+                    </Link>
+                    <Link
+                      to="/blockchain-technology"
+                      className="block px-4 py-3 text-card-foreground hover:bg-muted transition-colors"
+                      onClick={() => setAboutUsOpen(false)}
+                    >
+                      <div className="font-medium">{t('dropdown.blockchain')}</div>
+                      <div className="text-sm text-muted-foreground">{t('dropdown.blockchainDesc')}</div>
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <Link 
               to="/contact" 
