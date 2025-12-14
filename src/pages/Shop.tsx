@@ -83,8 +83,7 @@ export default function Shop() {
               className="max-w-3xl mx-auto text-center"
             >
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-3 sm:mb-4">
-                {t('title').replace('Shop', '')}
-                <span className="text-primary"> Dispensary</span>
+                <span className="text-primary">Strains</span>
               </h1>
               <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 px-2">
                 {t('subtitle')}

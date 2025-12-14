@@ -28,9 +28,9 @@ const Checkout = () => {
 
     try {
       // In a real implementation, this would:
-      // 1. Create an order via the Dr Green API
-      // 2. Initiate payment via Stripe
-      // 3. Update order status on successful payment
+      // 1. Create an order via Dr Green API (POST /api/drgreen/dapp/orders)
+      // 2. Create payment via Dr Green API (POST /api/drgreen/dapp/payments)
+      // 3. Track payment status via Dr Green API (GET /api/drgreen/dapp/payments/:paymentId)
       
       // Simulating order creation for now
       await new Promise(resolve => setTimeout(resolve, 2000));

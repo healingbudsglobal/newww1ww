@@ -84,8 +84,8 @@ export function RestrictedRegionGate({ children, countryCode }: RestrictedRegion
                 <LogIn className="mr-2 h-4 w-4" />
                 Sign In
               </Button>
-              <Button variant="outline" onClick={() => navigate('/auth?mode=signup')} className="w-full">
-                Create Account
+              <Button variant="outline" onClick={() => navigate('/shop/register')} className="w-full">
+                Check Eligibility
               </Button>
             </div>
           </CardContent>
