@@ -128,9 +128,9 @@ const Hero = () => {
       >
         <div className="max-w-5xl text-left relative">
           {/* Welcome text with reveal animation */}
-          <div className="overflow-hidden">
+          <div className="pb-2">
             <motion.h1 
-              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white mb-2 leading-[1.1] tracking-tight drop-shadow-lg"
+              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white mb-2 leading-[1.15] tracking-tight drop-shadow-lg"
             >
               <motion.span
                 initial="hidden"
@@ -145,9 +145,9 @@ const Hero = () => {
           </div>
           
           {/* Brand name with staggered letter animation */}
-          <div className="overflow-hidden mb-6 sm:mb-8">
+          <div className="pb-4 mb-6 sm:mb-8">
             <motion.h1 
-              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white leading-[1.1] tracking-tight drop-shadow-lg"
+              className="font-pharma text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white leading-[1.15] tracking-tight drop-shadow-lg"
             >
               <motion.span
                 initial="hidden"
