@@ -127,7 +127,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   return (
     <>
       {/* Scroll Progress Bar with Background Track */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[60]">
+      <div className="fixed top-0 left-0 right-0 sm:top-2 sm:left-2 sm:right-2 h-1 bg-primary/20 z-[60] sm:rounded-t-xl">
         <motion.div
           className="h-full bg-gradient-to-r from-primary via-secondary to-primary origin-left"
           style={{ 
@@ -140,9 +140,9 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
       <header 
         ref={headerRef}
         className={cn(
-          "fixed top-2 left-2 right-2 z-50 backdrop-blur-xl rounded-xl transition-all duration-500 ease-out border",
+          "fixed top-0 left-0 right-0 sm:top-2 sm:left-2 sm:right-2 z-50 backdrop-blur-xl rounded-none sm:rounded-xl transition-all duration-500 ease-out border-b sm:border",
           scrolled 
-            ? "shadow-2xl border-white/20 scale-[0.99]" 
+            ? "shadow-2xl border-white/20 sm:scale-[0.99]" 
             : "shadow-sm border-white/10"
         )}
         style={{ 

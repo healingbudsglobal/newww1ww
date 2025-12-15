@@ -71,7 +71,7 @@ const Hero = () => {
       {/* Video Background with Parallax */}
       <motion.div 
         style={{ y: videoY }}
-        className="absolute left-2 right-2 top-24 sm:top-28 md:top-32 bottom-4 rounded-2xl sm:rounded-3xl overflow-hidden z-0 shadow-2xl"
+        className="absolute left-0 right-0 top-20 sm:left-2 sm:right-2 sm:top-28 md:top-32 bottom-4 rounded-b-2xl sm:rounded-2xl md:rounded-3xl overflow-hidden z-0 shadow-2xl"
       >
         {/* Particle overlay */}
         <ParticleField particleCount={40} className="z-10" />
