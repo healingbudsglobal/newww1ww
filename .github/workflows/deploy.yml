@@ -44,10 +44,10 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: /public_html/
+          server-dir: /public_html/healingbuds.co.za/
           dangerous-clean-slate: true
 
       - name: Deployment Complete
         run: |
           echo "✅ Deployment successful!"
-          echo "Site is live at: https://healingbuds.pt"
+          echo "Site is live at: https://healingbuds.co.za"

@@ -22,7 +22,7 @@ $sshUser = "healingu"
 $remotePath = "public_html/"
 
 Write-Host "SSH Key: $sshKeyPath"
-Write-Host "Target: $sshUser@$sshHost:$sshPort"
+Write-Host "Target: $sshUser@e$sshPort"
 
 # Check if rsync exists
 $rsyncExists = Get-Command rsync -ErrorAction SilentlyContinue

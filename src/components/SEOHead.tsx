@@ -21,7 +21,7 @@ const SEOHead = ({
   twitterCard = 'summary_large_image',
   structuredData,
 }: SEOHeadProps) => {
-  const baseUrl = 'https://healingbuds.pt';
+  const baseUrl = 'https://healingbuds.co.za';
   const fullCanonical = canonical ? `${baseUrl}${canonical}` : baseUrl;
   const fullOgImage = ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`;
 
@@ -38,7 +38,7 @@ const SEOHead = ({
     ],
     contactPoint: {
       '@type': 'ContactPoint',
-      email: 'info@healingbuds.pt',
+      email: 'info@healingbuds.co.za',
       contactType: 'customer service',
     },
   };
@@ -62,7 +62,7 @@ const SEOHead = ({
       <meta property="og:description" content={description} />
       <meta property="og:image" content={fullOgImage} />
       <meta property="og:site_name" content="Healing Buds" />
-      <meta property="og:locale" content="pt_PT" />
+      <meta property="og:locale" content="en_ZA" />
 
       {/* Twitter */}
       <meta name="twitter:card" content={twitterCard} />

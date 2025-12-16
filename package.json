@@ -1,5 +1,9 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "sun712",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/healingbuds/sun712.git"
+  },
   "private": true,
   "version": "0.0.0",
   "type": "module",
