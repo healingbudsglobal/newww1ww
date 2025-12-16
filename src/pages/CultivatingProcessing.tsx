@@ -39,35 +39,74 @@ const CultivatingProcessing = () => {
       <div className="min-h-screen bg-background pb-24 lg:pb-0">
         <Header onMenuStateChange={setMenuOpen} />
         <main className="pt-28 md:pt-32">
-          {/* Hero Section - Linear style */}
+          {/* Hero Section with Staggered Animation */}
           <section className="bg-background py-16 md:py-20">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              <ScrollAnimation>
-                <div className="max-w-5xl">
-                  <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]">
-                    Cultivating & Processing
-                  </h1>
-                  <p className="text-xl md:text-2xl text-muted-foreground/80 max-w-3xl font-light">
-                    Excellence in cultivation from South Africa to the world.
-                  </p>
-                </div>
-              </ScrollAnimation>
+              <motion.div 
+                className="max-w-5xl"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: [0.25, 0.4, 0.25, 1] }}
+              >
+                <motion.h1 
+                  className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 tracking-tight leading-[1.1]"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.1 }}
+                >
+                  Cultivating & Processing
+                </motion.h1>
+                <motion.p 
+                  className="text-xl md:text-2xl text-muted-foreground/80 max-w-3xl font-light"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                >
+                  Excellence in cultivation from South Africa to the world.
+                </motion.p>
+              </motion.div>
             </div>
           </section>
 
-          {/* Hero Image with Parallax - Linear style */}
+          {/* Hero Image with Parallax & Edge Fade */}
           <section className="container mx-auto px-4 sm:px-6 lg:px-8 pb-16 md:pb-20">
-            <ScrollAnimation variant="scale" duration={0.8}>
-              <div ref={heroRef} className="relative h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-2xl border border-border/30">
-                <motion.img 
-                  src={cultivationImage}
-                  alt="Cannabis cultivation facility" 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ y, opacity }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/10 to-transparent" />
-              </div>
-            </ScrollAnimation>
+            <motion.div 
+              ref={heroRef}
+              className="relative h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden rounded-2xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            >
+              <motion.img 
+                src={cultivationImage}
+                alt="Cannabis cultivation facility" 
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ y, opacity }}
+              />
+              {/* Animated edge fade vignette */}
+              <motion.div 
+                className="absolute inset-0 pointer-events-none z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1.2, delay: 0.5 }}
+                style={{
+                  background: `
+                    radial-gradient(ellipse 120% 80% at 50% 50%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.7) 100%),
+                    linear-gradient(to bottom, transparent 60%, hsl(var(--background) / 0.5) 100%)
+                  `
+                }}
+              />
+              {/* Subtle animated glow on edges */}
+              <motion.div 
+                className="absolute inset-0 pointer-events-none z-10 rounded-2xl"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  boxShadow: 'inset 0 0 60px 20px hsl(var(--background) / 0.4)'
+                }}
+              />
+            </motion.div>
           </section>
 
           {/* Intro Section - Linear style */}
