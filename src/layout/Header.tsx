@@ -166,21 +166,21 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             {/* ZONE 2: Center - Navigation (flexible, adapts to available space) */}
             <NavigationMenu scrolled={scrolled} />
             
-            {/* ZONE 3: Right - Actions (fixed width container, never overlaps nav) */}
-            <div className="hidden xl:flex items-center gap-2 2xl:gap-3 justify-self-end flex-shrink-0">
+            {/* ZONE 3: Right - Actions (uses 2xl breakpoint to prevent overlap with nav) */}
+            <div className="hidden 2xl:flex items-center gap-2 justify-self-end flex-shrink-0">
               <LanguageSwitcher scrolled={scrolled} />
               <ThemeToggle />
 
               {/* Action Buttons - explicit constraints prevent collapse */}
-              <div className="flex items-center gap-1.5 xl:gap-2 flex-shrink-0 ml-2">
+              <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                 <button
                   onClick={() => setEligibilityDialogOpen(true)}
                   className={cn(
-                    "font-body font-bold px-4 py-2 rounded-full transition-all duration-300",
+                    "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
                     "hover:scale-105 hover:shadow-xl whitespace-nowrap",
                     "bg-white text-[#2A3D3A] hover:bg-white/95",
                     "border-2 border-white shadow-lg",
-                    "text-xs 2xl:text-sm",
+                    "text-xs",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
                   )}
                 >
@@ -191,41 +191,40 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                     <Link
                       to="/dashboard"
                       className={cn(
-                        "font-body font-bold px-4 py-2 rounded-full transition-all duration-300",
+                        "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
                         "hover:scale-105 hover:shadow-xl whitespace-nowrap",
                         "bg-primary text-white hover:bg-primary/90",
-                        "border-2 border-primary shadow-lg flex items-center gap-1.5",
-                        "text-xs 2xl:text-sm",
+                        "border-2 border-primary shadow-lg flex items-center gap-1",
+                        "text-xs",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
                       )}
                     >
-                      <LayoutDashboard className="w-4 h-4" />
-                      Patient Portal
+                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      Portal
                     </Link>
                     <button
                       onClick={handleLogout}
                       className={cn(
-                        "font-body font-bold px-4 py-2 rounded-full transition-all duration-300",
-                        "hover:scale-105 hover:shadow-xl whitespace-nowrap",
+                        "font-body font-bold p-1.5 rounded-full transition-all duration-300",
+                        "hover:scale-105 hover:shadow-xl",
                         "bg-transparent text-white hover:bg-white/20",
-                        "border-2 border-white/60 shadow-lg flex items-center gap-1.5",
-                        "text-xs 2xl:text-sm",
+                        "border-2 border-white/60 shadow-lg flex items-center justify-center",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
                       )}
+                      title={t('nav.signOut')}
                     >
                       <LogOut className="w-4 h-4" />
-                      {t('nav.signOut')}
                     </button>
                   </>
                 ) : (
                   <Link
                     to="/auth"
                     className={cn(
-                      "font-body font-bold px-4 py-2 rounded-full transition-all duration-300",
+                      "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
                       "hover:scale-105 hover:shadow-xl whitespace-nowrap",
                       "bg-transparent text-white hover:bg-white/20",
                       "border-2 border-white/60 shadow-lg",
-                      "text-xs 2xl:text-sm",
+                      "text-xs",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
                     )}
                   >
@@ -235,27 +234,27 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               </div>
             </div>
 
-            {/* Mobile Menu Button & Theme Toggle */}
-            <div className="xl:hidden flex items-center gap-3 justify-self-end">
+            {/* Mobile/Tablet Menu Button & Theme Toggle - shows below 2xl */}
+            <div className="2xl:hidden flex items-center gap-2 justify-self-end">
               <ThemeToggle />
               <button
                 type="button"
                 className={cn(
-                  "text-white p-3 rounded-xl transition-all duration-300",
+                  "text-white p-2.5 rounded-xl transition-all duration-300",
                   "hover:scale-110 active:scale-95 touch-manipulation",
-                  "min-h-[48px] min-w-[48px] flex items-center justify-center",
+                  "min-h-[44px] min-w-[44px] flex items-center justify-center",
                   "hover:bg-white/10 active:bg-white/20",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-                  scrolled && "p-2.5"
+                  scrolled && "p-2"
                 )}
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={mobileMenuOpen}
               >
                 {mobileMenuOpen ? (
-                  <X className={cn("transition-all duration-300", scrolled ? "w-6 h-6" : "w-7 h-7")} />
+                  <X className={cn("transition-all duration-300", scrolled ? "w-5 h-5" : "w-6 h-6")} />
                 ) : (
-                  <Menu className={cn("transition-all duration-300", scrolled ? "w-6 h-6" : "w-7 h-7")} />
+                  <Menu className={cn("transition-all duration-300", scrolled ? "w-5 h-5" : "w-6 h-6")} />
                 )}
               </button>
             </div>
