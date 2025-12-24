@@ -111,7 +111,7 @@ export function ProductGrid() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search cultivars..."
+            placeholder="Search strains..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-background/50 backdrop-blur-sm"
@@ -181,7 +181,7 @@ export function ProductGrid() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 mr-2">
           <Leaf className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-muted-foreground">Cultivar Type:</span>
+          <span className="text-sm font-medium text-muted-foreground">Strain Type:</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {categories.map((category) => (

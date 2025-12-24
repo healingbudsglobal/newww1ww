@@ -54,7 +54,7 @@ export function RelatedProducts({ products, currentProductId, countryCode }: Rel
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Leaf className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold text-foreground">More Cultivars</h3>
+            <h3 className="text-xl font-semibold text-foreground">More Strains</h3>
           </div>
           
           <div className="flex items-center gap-2">
@@ -77,68 +77,67 @@ export function RelatedProducts({ products, currentProductId, countryCode }: Rel
           </div>
         </div>
 
-        {/* Scrolling Container */}
+        {/* Responsive Grid Container - fills across with no gaps */}
         <div
           ref={scrollContainerRef}
-          className="flex gap-5 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4"
         >
-        {relatedProducts.map((product, index) => (
-          <motion.div
-            key={product.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.3 }}
-            className="flex-shrink-0 w-[160px] snap-start"
-          >
-            <button
-              onClick={() => navigate(`/shop/cultivar/${product.id}`)}
-              className="w-full group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
+          {relatedProducts.map((product, index) => (
+            <motion.div
+              key={product.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03, duration: 0.25 }}
+              className="w-full"
             >
-              {/* Image Container */}
-              <div className="relative aspect-square rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/60 dark:to-slate-900/80 border border-border/30 overflow-hidden mb-2 group-hover:border-primary/40 transition-all duration-300">
-                {/* Light mode: crisp white background with subtle enhancement */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white via-slate-50/80 to-slate-100/60 dark:from-transparent dark:via-transparent dark:to-transparent" />
-                
-                <div className="absolute inset-0 flex items-center justify-center p-3">
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110"
-                    style={{
-                      filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))',
-                      maxWidth: '85%',
-                      maxHeight: '85%',
-                    }}
-                    loading="lazy"
-                  />
+              <button
+                onClick={() => navigate(`/shop/cultivar/${product.id}`)}
+                className="w-full group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
+              >
+                {/* Image Container */}
+                <div className="relative aspect-square rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/60 dark:to-slate-900/80 border border-border/30 overflow-hidden mb-2 group-hover:border-primary/40 group-hover:shadow-lg transition-all duration-300">
+                  {/* Light mode: crisp white background */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white via-slate-50/80 to-slate-100/60 dark:from-transparent dark:via-transparent dark:to-transparent" />
+                  
+                  <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-3">
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))',
+                        maxWidth: '88%',
+                        maxHeight: '88%',
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
+
+                  {/* Category badge */}
+                  <Badge
+                    className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold uppercase ${getCategoryColor(product.category)}`}
+                  >
+                    {product.category}
+                  </Badge>
+
+                  {/* Out of stock overlay */}
+                  {!product.availability && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-sky-600/90 py-1 text-center">
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-white uppercase">Out of Stock</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Category badge */}
-                <Badge
-                  className={`absolute top-2 left-2 px-2 py-0.5 text-[10px] font-semibold uppercase ${getCategoryColor(product.category)}`}
-                >
-                  {product.category}
-                </Badge>
-
-                {/* Out of stock overlay */}
-                {!product.availability && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-sky-600/90 py-1 text-center">
-                    <span className="text-[10px] font-semibold text-white uppercase">Out of Stock</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Product Info */}
-              <h4 className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                {product.name}
-              </h4>
-              <p className="text-sm font-semibold text-primary">
-                {formatPrice(product.retailPrice, countryCode)}
-              </p>
-            </button>
-          </motion.div>
-        ))}
+                {/* Product Info */}
+                <h4 className="text-xs sm:text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                  {product.name}
+                </h4>
+                <p className="text-xs sm:text-sm font-semibold text-primary">
+                  {formatPrice(product.retailPrice, countryCode)}
+                </p>
+              </button>
+            </motion.div>
+          ))}
         </div>
       </div>
     </div>
