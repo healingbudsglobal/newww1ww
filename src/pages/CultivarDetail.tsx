@@ -183,7 +183,10 @@ export default function CultivarDetail() {
       
       <Header />
       
-      <main className="min-h-screen bg-background pt-24 lg:pt-28">
+      {/* Spacer for fixed header separation */}
+      <div className="h-28 lg:h-32" />
+      
+      <main className="min-h-screen bg-background">
         {/* Hero Section with Image */}
         <section className={`relative overflow-hidden bg-gradient-to-b ${styles.gradient} to-background`}>
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent" />

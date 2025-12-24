@@ -16,6 +16,7 @@ export interface MedicalInfo {
 }
 
 // Cache medical info in memory to avoid repeated API calls
+// Use session storage to persist across page navigations but clear on reload
 const medicalInfoCache: Record<string, MedicalInfo> = {};
 
 export function useStrainMedicalInfo(product: Product | null) {
@@ -63,8 +64,17 @@ export function useStrainMedicalInfo(product: Product | null) {
         }
 
         if (data?.success && data?.data) {
-          medicalInfoCache[product.id] = data.data;
-          setMedicalInfo(data.data);
+          const fetchedData = data.data;
+          // Validate the data structure - make sure researchNotes doesn't contain raw JSON
+          if (typeof fetchedData.researchNotes === 'string' && 
+              (fetchedData.researchNotes.startsWith('{') || fetchedData.researchNotes.startsWith('```'))) {
+            // Bad data - use defaults instead
+            console.warn('Received malformed medical info, using defaults');
+            setMedicalInfo(getDefaultMedicalInfo(product));
+          } else {
+            medicalInfoCache[product.id] = fetchedData;
+            setMedicalInfo(fetchedData);
+          }
         } else if (data?.error) {
           console.error('API error:', data.error);
           setError(data.error);

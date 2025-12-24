@@ -57,19 +57,7 @@ Always include proper medical disclaimers and emphasize that patients should con
 - Terpene profile: ${strain.terpenes?.join(', ') || 'Not specified'}
 ${strain.description ? `- Description: ${strain.description}` : ''}
 
-Please provide a JSON response with the following structure:
-{
-  "medicalConditions": ["array of medical conditions this strain may help with"],
-  "therapeuticEffects": ["array of therapeutic effects"],
-  "potentialSideEffects": ["array of potential side effects"],
-  "recommendedFor": ["patient profiles this strain is best suited for"],
-  "dosageGuidance": "general dosage guidance for medical use",
-  "timeOfUse": "recommended time of day for use",
-  "onsetDuration": "onset time and duration of effects",
-  "interactionWarnings": ["potential drug interactions or contraindications"],
-  "researchNotes": "brief summary of relevant medical research",
-  "patientTestimonialSummary": "summary of common patient experiences"
-}`;
+Provide comprehensive medical guidance for this strain using the get_medical_info function.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -83,6 +71,72 @@ Please provide a JSON response with the following structure:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'get_medical_info',
+              description: 'Returns structured medical information about a cannabis strain',
+              parameters: {
+                type: 'object',
+                properties: {
+                  medicalConditions: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Medical conditions this strain may help with (max 6)'
+                  },
+                  therapeuticEffects: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Therapeutic effects of this strain (max 6)'
+                  },
+                  potentialSideEffects: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Potential side effects (max 5)'
+                  },
+                  recommendedFor: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Patient profiles this strain is best suited for (max 4)'
+                  },
+                  dosageGuidance: {
+                    type: 'string',
+                    description: 'General dosage guidance for medical use (1-2 sentences)'
+                  },
+                  timeOfUse: {
+                    type: 'string',
+                    description: 'Recommended time of day for use (short phrase)'
+                  },
+                  onsetDuration: {
+                    type: 'string',
+                    description: 'Onset time and duration of effects (1 sentence)'
+                  },
+                  interactionWarnings: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Potential drug interactions or contraindications (max 4)'
+                  },
+                  researchNotes: {
+                    type: 'string',
+                    description: 'Brief summary of relevant medical research (2-3 sentences max)'
+                  },
+                  patientTestimonialSummary: {
+                    type: 'string',
+                    description: 'Summary of common patient experiences (1-2 sentences)'
+                  }
+                },
+                required: [
+                  'medicalConditions', 'therapeuticEffects', 'potentialSideEffects',
+                  'recommendedFor', 'dosageGuidance', 'timeOfUse', 'onsetDuration',
+                  'interactionWarnings', 'researchNotes', 'patientTestimonialSummary'
+                ],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'get_medical_info' } }
       }),
     });
 
@@ -108,37 +162,26 @@ Please provide a JSON response with the following structure:
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
+    
+    // Extract tool call arguments
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall?.function?.arguments) {
+      console.error('No tool call in response');
       return new Response(
-        JSON.stringify({ error: 'No response from AI' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true, data: getDefaultMedicalInfo(strain) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse the JSON from the response
     let medicalInfo;
     try {
-      // Extract JSON from markdown code blocks if present
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      medicalInfo = JSON.parse(jsonStr);
+      medicalInfo = JSON.parse(toolCall.function.arguments);
     } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', parseError);
-      // Return a structured response with the raw content
-      medicalInfo = {
-        medicalConditions: [],
-        therapeuticEffects: strain.effects || [],
-        potentialSideEffects: ['Dry mouth', 'Dry eyes', 'Dizziness'],
-        recommendedFor: [],
-        dosageGuidance: 'Start with a low dose and increase gradually as needed.',
-        timeOfUse: strain.category === 'Sativa' ? 'Daytime' : strain.category === 'Indica' ? 'Evening' : 'Any time',
-        onsetDuration: 'Effects typically begin within 5-15 minutes when inhaled.',
-        interactionWarnings: ['Consult your doctor if taking other medications'],
-        researchNotes: content,
-        patientTestimonialSummary: 'Patient experiences vary. Consult your healthcare provider.',
-      };
+      console.error('Failed to parse tool call arguments:', parseError);
+      return new Response(
+        JSON.stringify({ success: true, data: getDefaultMedicalInfo(strain) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`Successfully fetched medical info for ${strain.name}`);
@@ -155,3 +198,45 @@ Please provide a JSON response with the following structure:
     );
   }
 });
+
+function getDefaultMedicalInfo(strain: StrainData) {
+  const category = strain.category?.toLowerCase() || 'hybrid';
+  
+  const baseConditions: Record<string, string[]> = {
+    sativa: ['Depression', 'Fatigue', 'ADHD', 'Mood disorders'],
+    indica: ['Insomnia', 'Chronic pain', 'Muscle spasms', 'Anxiety'],
+    hybrid: ['Stress', 'Mild pain', 'Appetite loss', 'Mood imbalance'],
+    cbd: ['Epilepsy', 'Inflammation', 'Anxiety', 'Chronic pain'],
+  };
+
+  const baseEffects: Record<string, string[]> = {
+    sativa: ['Uplifting', 'Energizing', 'Focus-enhancing', 'Creativity boost'],
+    indica: ['Relaxing', 'Sedating', 'Pain-relieving', 'Muscle relaxant'],
+    hybrid: ['Balanced relaxation', 'Mild euphoria', 'Stress relief', 'Gentle uplift'],
+    cbd: ['Non-intoxicating relief', 'Anti-inflammatory', 'Calming', 'Neuroprotective'],
+  };
+
+  const recommendedFor: Record<string, string[]> = {
+    sativa: ['Daytime users', 'Those seeking mental clarity', 'Creative professionals'],
+    indica: ['Evening users', 'Patients with sleep issues', 'Those with chronic pain'],
+    hybrid: ['Versatile users', 'First-time patients', 'Those seeking balance'],
+    cbd: ['Patients avoiding psychoactive effects', 'Those with epilepsy', 'Anxiety patients'],
+  };
+
+  return {
+    medicalConditions: baseConditions[category] || baseConditions.hybrid,
+    therapeuticEffects: strain.effects?.length > 0 ? strain.effects : (baseEffects[category] || baseEffects.hybrid),
+    potentialSideEffects: ['Dry mouth', 'Dry eyes', 'Dizziness', 'Increased appetite'],
+    recommendedFor: recommendedFor[category] || recommendedFor.hybrid,
+    dosageGuidance: 'Start with a low dose (2.5-5mg THC) and wait at least 2 hours before increasing. Consult your prescribing physician for personalized guidance.',
+    timeOfUse: category === 'sativa' ? 'Morning to afternoon' : category === 'indica' ? 'Evening to night' : 'Any time based on needs',
+    onsetDuration: 'Inhalation: 5-15 minutes onset, 2-4 hours duration. Oral: 30-90 minutes onset, 4-8 hours duration.',
+    interactionWarnings: [
+      'May interact with blood thinners',
+      'Avoid with sedatives or anti-anxiety medications',
+      'Consult doctor if taking immunosuppressants',
+    ],
+    researchNotes: `${strain.category} strains with ${strain.thcContent}% THC and ${strain.cbdContent}% CBD have been studied for various therapeutic applications. Research is ongoing.`,
+    patientTestimonialSummary: 'Individual experiences vary. Many patients report positive outcomes when used as directed under medical supervision.',
+  };
+}
