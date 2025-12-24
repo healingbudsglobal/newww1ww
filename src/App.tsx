@@ -21,6 +21,9 @@ import { CursorProvider } from "@/context/CursorContext";
 const Index = lazy(() => import("./pages/Index"));
 const Eligibility = lazy(() => import("./pages/Eligibility"));
 const Support = lazy(() => import("./pages/Support"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const Conditions = lazy(() => import("./pages/Conditions"));
+const Traceability = lazy(() => import("./pages/Traceability"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -48,6 +51,9 @@ const AnimatedRoutes = () => {
           <Route path="/" element={<Index />} />
           <Route path="/eligibility" element={<Eligibility />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/conditions" element={<Conditions />} />
+          <Route path="/traceability" element={<Traceability />} />
           <Route path="/auth" element={<Auth />} />
           
           {/* Patient Portal */}
