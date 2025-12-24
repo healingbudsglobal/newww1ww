@@ -179,7 +179,29 @@ All colors MUST be HSL.
     --success: 152 45% 45%;               /* Cleaner green for verified states */
     --warning: 38 75% 55%;                /* Warm amber for attention */
     --info: 200 60% 50%;                  /* Calm blue for info */
+    
+    /* Navigation overlay tokens - dark mode */
+    --nav-overlay: 210 12% 4%;            /* Dark backdrop overlay */
+    --nav-surface: 178 35% 18%;           /* Elevated menu surface - slightly lighter than background */
+    --nav-surface-elevated: 178 32% 22%;  /* Hover state surface */
+    --nav-item-active: 178 40% 28%;       /* Active item background */
+    --nav-item-hover: 178 35% 24%;        /* Hover item background */
+    --nav-text: 0 0% 98%;                 /* Primary nav text - high contrast */
+    --nav-text-muted: 0 0% 75%;           /* Secondary nav text */
+    --nav-border: 178 30% 30%;            /* Subtle borders for separation */
   }
+}
+
+/* Navigation overlay tokens - light mode (inside header context) */
+:root {
+  --nav-overlay: 0 0% 0%;                 /* Black backdrop overlay */
+  --nav-surface: 178 42% 22%;             /* Elevated menu surface - slightly lighter than header */
+  --nav-surface-elevated: 178 40% 26%;    /* Hover state surface */
+  --nav-item-active: 178 45% 32%;         /* Active item background */
+  --nav-item-hover: 178 42% 28%;          /* Hover item background */
+  --nav-text: 0 0% 100%;                  /* Primary nav text - pure white */
+  --nav-text-muted: 0 0% 85%;             /* Secondary nav text - high contrast */
+  --nav-border: 0 0% 100%;                /* White borders at low opacity */
 }
 
 @layer base {
@@ -561,4 +583,36 @@ All colors MUST be HSL.
   100% {
     transform: translateX(100%);
   }
+}
+
+/* Custom scrollbar for navigation overlay - subtle and minimal */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Hide scrollbar by default, show on hover */
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hover\:scrollbar-thumb-white\/30:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
 }
