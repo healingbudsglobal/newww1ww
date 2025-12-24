@@ -1,27 +1,20 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMemo } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import BackToTop from "@/components/BackToTop";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, User, ExternalLink } from "lucide-react";
-import { getNewsArticlesByRegion } from "@/data/newsArticles";
-import { useGeoLocation } from "@/hooks/useGeoLocation";
+import { ArrowLeft, Calendar, User, ExternalLink, MapPin } from "lucide-react";
+import { useNewsRegion } from "@/hooks/useNewsRegion";
 import ScrollAnimation from "@/components/ScrollAnimation";
 
 const NewsArticle = () => {
   const { t } = useTranslation("theWire");
   const { articleId } = useParams();
   const navigate = useNavigate();
-  const locationConfig = useGeoLocation();
-  
-  const articles = useMemo(() => 
-    getNewsArticlesByRegion(locationConfig.countryCode), 
-    [locationConfig.countryCode]
-  );
+  const { articles, currentRegionOption } = useNewsRegion();
   
   const article = articles.find((a) => a.id === articleId);
 
@@ -52,15 +45,25 @@ const NewsArticle = () => {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="pt-32 sm:pt-36 pb-20">
-          {/* Breadcrumb */}
+          {/* Breadcrumb with Region Badge */}
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-            <Link
-              to="/the-wire"
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-geist"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {t("backToWire")}
-            </Link>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <Link
+                to="/the-wire"
+                className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-geist"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {t("backToWire")}
+              </Link>
+              <Badge 
+                variant="outline" 
+                className="px-3 py-1.5 text-sm font-medium border-primary/30 bg-primary/5 text-foreground gap-2"
+              >
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                <span className="text-base">{currentRegionOption.flag}</span>
+                {currentRegionOption.label}
+              </Badge>
+            </div>
           </div>
 
           {/* Hero Image */}
