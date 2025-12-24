@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.prescription-expiry-check]
 verify_jwt = false
+
+[functions.seed-test-users]
+verify_jwt = false
