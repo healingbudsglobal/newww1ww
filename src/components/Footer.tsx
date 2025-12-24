@@ -1,4 +1,4 @@
-import HealingBudsLogo from "./HealingBudsLogo";
+import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 import { Link } from "react-router-dom";
 import { Mail, MapPin, Leaf } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -19,9 +19,10 @@ const Footer = () => {
             {/* Brand Column */}
             <div className="lg:col-span-4">
               <Link to="/" className="inline-block mb-5 group">
-                <HealingBudsLogo 
-                  variant="white"
-                  className="h-10 min-w-[100px] group-hover:opacity-80 transition-opacity"
+                <img 
+                  src={hbLogoWhite} 
+                  alt="Healing Buds Logo" 
+                  className="h-10 min-w-[100px] w-auto object-contain group-hover:opacity-80 transition-opacity"
                 />
               </Link>
               <p className="font-body text-white/70 text-sm leading-relaxed mb-6">

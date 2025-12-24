@@ -11,7 +11,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import { Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from "lucide-react";
-import HealingBudsLogo from "@/components/HealingBudsLogo";
+import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 import { useTranslation } from "react-i18next";
 
 const Auth = () => {
@@ -223,9 +223,10 @@ const Auth = () => {
               {/* Header - refined emerald-teal gradient */}
               <div className="bg-gradient-to-br from-[hsl(164,48%,53%)]/15 via-[hsl(178,48%,33%)]/20 to-[hsl(164,48%,53%)]/10 p-8 text-center">
                 <div className="flex justify-center mb-4">
-                  <HealingBudsLogo 
-                    variant="white"
-                    className="h-16 min-w-[140px]"
+                  <img 
+                    src={hbLogoWhite} 
+                    alt="Healing Buds" 
+                    className="h-16 min-w-[140px] w-auto object-contain"
                   />
                 </div>
                 <h1 className="font-display text-2xl font-bold text-foreground mb-2">

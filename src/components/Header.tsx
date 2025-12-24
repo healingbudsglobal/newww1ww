@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Menu, X, LogOut, LayoutDashboard } from "lucide-react";
-import HealingBudsLogo from "./HealingBudsLogo";
+import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import EligibilityDialog from "./EligibilityDialog";
@@ -242,10 +242,11 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               to="/" 
               className="flex items-center flex-shrink-0 group justify-self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-lg"
             >
-              <HealingBudsLogo 
-                variant="white"
+              <img 
+                src={hbLogoWhite} 
+                alt="Healing Buds Logo" 
                 className={cn(
-                  "min-w-[140px] sm:min-w-[160px] md:min-w-[180px] transition-all duration-500 ease-out group-hover:scale-105",
+                  "w-auto min-w-[140px] sm:min-w-[160px] md:min-w-[180px] object-contain transition-all duration-500 ease-out group-hover:scale-105",
                   scrolled ? "h-12 sm:h-14 md:h-16" : "h-14 sm:h-16 md:h-20"
                 )}
               />
@@ -610,9 +611,10 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                   onClick={() => setMobileMenuOpen(false)} 
                   className="flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 rounded-lg"
                 >
-                  <HealingBudsLogo 
-                    variant="white"
-                    className="h-12 min-w-[120px]"
+                  <img 
+                    src={hbLogoWhite} 
+                    alt="Healing Buds Logo" 
+                    className="h-12 min-w-[120px] w-auto object-contain"
                   />
                 </Link>
                 <button
