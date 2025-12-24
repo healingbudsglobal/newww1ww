@@ -141,64 +141,75 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* MEDICAL DARK THEME - Clean, professional, high readability */
-    /* Base: neutral charcoal, no green tint */
-    --background: 210 12% 8%;             /* Neutral near-black with slight cool tone */
-    --foreground: 0 0% 96%;               /* Bright off-white for maximum readability */
+    /* MEDICAL DARK THEME - Improved hierarchy with sage undertones */
+    /* Base: warm charcoal with subtle sage undertone */
+    --background: 180 8% 7%;              /* Warm near-black with sage hint */
+    --foreground: 150 8% 95%;             /* Soft off-white with warmth */
 
-    /* Cards: subtle lift from background */
-    --card: 210 8% 12%;                   /* Neutral dark gray */
-    --card-foreground: 0 0% 95%;
+    /* Cards: clear elevation from background */
+    --card: 175 6% 11%;                   /* Sage-tinted dark surface */
+    --card-foreground: 150 8% 94%;
 
-    --popover: 210 8% 13%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 175 6% 12%;
+    --popover-foreground: 150 8% 94%;
 
-    /* Primary - softer sage-teal, calmer for medical */
-    --primary: 172 32% 42%;               /* Soft sage-teal, professional */
+    /* Primary - balanced sage-teal for medical calm */
+    --primary: 168 38% 45%;               /* Brighter sage-teal for visibility */
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - neutral warm for balance */
-    --secondary: 210 6% 20%;              /* Neutral secondary surface */
-    --secondary-foreground: 0 0% 92%;
+    /* Secondary - sage-tinted for cohesion */
+    --secondary: 175 8% 18%;              /* Sage secondary surface */
+    --secondary-foreground: 150 10% 90%;
 
-    /* Muted surfaces - improved contrast */
-    --muted: 210 6% 16%;
-    --muted-foreground: 210 8% 65%;       /* Higher contrast muted text */
+    /* Muted surfaces - better hierarchy */
+    --muted: 175 6% 14%;                  /* Subtle sage muted */
+    --muted-foreground: 165 10% 60%;      /* Softer muted text */
 
-    /* Accent - subtle sage for highlights only */
-    --accent: 172 18% 20%;
-    --accent-foreground: 172 25% 70%;
+    /* Accent - visible sage for highlights */
+    --accent: 168 20% 18%;
+    --accent-foreground: 165 30% 75%;
 
-    --destructive: 0 55% 50%;
+    /* Destructive - warm amber instead of harsh red */
+    --destructive: 18 60% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders and inputs - softer */
-    --border: 210 6% 22%;
-    --input: 210 6% 16%;
-    --ring: 172 32% 42%;
+    /* Borders and inputs - softer sage-tinted */
+    --border: 170 8% 20%;
+    --input: 175 6% 14%;
+    --ring: 168 38% 45%;
     
     /* Status colors for medical UX */
-    --success: 152 45% 45%;               /* Cleaner green for verified states */
-    --warning: 38 75% 55%;                /* Warm amber for attention */
-    --info: 200 60% 50%;                  /* Calm blue for info */
+    --success: 158 50% 42%;               /* Sage-green for verified states */
+    --warning: 38 70% 50%;                /* Warm amber for attention */
+    --info: 195 55% 48%;                  /* Calm teal-blue for info */
+    
+    /* Sage-tinted shadows for dark mode */
+    --shadow-xs: 0 1px 2px 0 hsla(175, 20%, 5%, 0.3);
+    --shadow-sm: 0 1px 3px 0 hsla(175, 20%, 5%, 0.4), 0 1px 2px -1px hsla(175, 20%, 5%, 0.2);
+    --shadow-md: 0 2px 4px -1px hsla(175, 20%, 5%, 0.5), 0 4px 6px -1px hsla(175, 20%, 5%, 0.3);
+    --shadow-lg: 0 4px 6px -2px hsla(175, 20%, 5%, 0.4), 0 10px 15px -3px hsla(175, 20%, 5%, 0.5);
+    --shadow-xl: 0 10px 25px -5px hsla(175, 18%, 5%, 0.6), 0 8px 10px -6px hsla(175, 18%, 5%, 0.4);
+    --shadow-2xl: 0 20px 40px -12px hsla(175, 15%, 5%, 0.7);
+    --shadow-card: 0 0 0 1px hsla(170, 15%, 30%, 0.15), 0 2px 4px hsla(175, 15%, 5%, 0.3), 0 12px 24px hsla(175, 15%, 5%, 0.4);
+    --shadow-elegant: 0 0 0 1px hsla(170, 15%, 30%, 0.12), 0 8px 24px -4px hsla(175, 18%, 5%, 0.5);
     
     /* Navigation tokens - dark mode with proper hierarchy */
-    --nav-bg: 178 38% 18%;                /* Navigation background */
-    --nav-bg-elevated: 178 40% 22%;       /* Slightly elevated for scroll state */
-    --nav-surface: 178 35% 22%;           /* Menu surface - visible elevation */
-    --nav-surface-elevated: 178 32% 26%;  /* Hover state surface */
+    --nav-bg: 175 35% 16%;                /* Navigation background - sage-teal */
+    --nav-bg-elevated: 175 38% 19%;       /* Elevated for scroll state */
+    --nav-surface: 175 32% 20%;           /* Menu surface */
+    --nav-surface-elevated: 175 30% 24%;  /* Hover state surface */
     --nav-item-active: 0 0% 100%;         /* Active item uses white bg */
-    --nav-item-active-opacity: 0.2;       /* 20% opacity for active */
+    --nav-item-active-opacity: 0.18;      /* 18% opacity for active */
     --nav-item-hover: 0 0% 100%;          /* Hover uses white bg */
-    --nav-item-hover-opacity: 0.12;       /* 12% opacity for hover */
+    --nav-item-hover-opacity: 0.10;       /* 10% opacity for hover */
     --nav-text: 0 0% 100%;                /* Primary nav text - pure white */
-    --nav-text-muted: 0 0% 80%;           /* Secondary nav text */
+    --nav-text-muted: 150 8% 78%;         /* Warmer muted nav text */
     --nav-border: 0 0% 100%;              /* White borders */
-    --nav-border-opacity: 0.15;           /* Border opacity */
-    --nav-dropdown-bg: 210 12% 10%;       /* Dropdown background - darker for contrast */
-    --nav-dropdown-border: 210 8% 25%;    /* Dropdown border */
+    --nav-border-opacity: 0.12;           /* Softer border opacity */
+    --nav-dropdown-bg: 180 10% 9%;        /* Dropdown background */
+    --nav-dropdown-border: 175 8% 22%;    /* Dropdown border */
     --nav-dropdown-hover: 0 0% 100%;      /* Dropdown item hover */
-    --nav-dropdown-hover-opacity: 0.1;    /* Dropdown hover opacity */
+    --nav-dropdown-hover-opacity: 0.08;   /* Subtler dropdown hover */
   }
 }
 
@@ -338,6 +349,55 @@ All colors MUST be HSL.
     @apply shadow-md border-border/80 -translate-y-0.5;
   }
   
+  /* Alternating section backgrounds for visual rhythm */
+  .section-default {
+    @apply bg-background;
+  }
+  
+  .section-alt {
+    background-color: hsl(158 14% 95%);  /* Subtle sage tint */
+  }
+  
+  .dark .section-alt {
+    background-color: hsl(175 8% 10%);   /* Dark sage surface */
+  }
+  
+  .section-muted {
+    @apply bg-muted/40;
+  }
+  
+  .section-sage {
+    background-color: hsl(160 18% 94%);  /* Stronger sage tint */
+  }
+  
+  .dark .section-sage {
+    background-color: hsl(172 10% 12%);  /* Rich dark sage */
+  }
+  
+  .section-cream {
+    background-color: hsl(45 20% 97%);   /* Warm cream tint */
+  }
+  
+  .dark .section-cream {
+    background-color: hsl(40 6% 11%);    /* Warm dark surface */
+  }
+  
+  /* Smooth section transitions */
+  .section-transition {
+    @apply relative overflow-hidden;
+  }
+  
+  .section-transition::before {
+    content: '';
+    @apply absolute inset-x-0 top-0 h-16 pointer-events-none;
+    background: linear-gradient(to bottom, hsl(var(--background)), transparent);
+  }
+  
+  .section-transition::after {
+    content: '';
+    @apply absolute inset-x-0 bottom-0 h-16 pointer-events-none;
+    background: linear-gradient(to top, hsl(var(--background)), transparent);
+  }
   .dark .card-themed:hover {
     @apply border-border/50 shadow-xl;
   }
