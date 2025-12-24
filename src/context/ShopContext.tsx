@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useGeoLocation } from '@/hooks/useGeoLocation';
 
 interface CartItem {
   id: string;
@@ -43,13 +44,21 @@ interface ShopContextType {
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
+  const geoLocation = useGeoLocation();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [countryCode, setCountryCode] = useState('ZA');
+  const [countryCode, setCountryCode] = useState<string>(geoLocation.countryCode);
   const { toast } = useToast();
+
+  // Update countryCode when geoLocation changes
+  useEffect(() => {
+    if (!drGreenClient) {
+      setCountryCode(geoLocation.countryCode);
+    }
+  }, [geoLocation.countryCode, drGreenClient]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);

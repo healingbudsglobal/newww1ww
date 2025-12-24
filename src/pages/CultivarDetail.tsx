@@ -355,17 +355,17 @@ export default function CultivarDetail() {
                     {product.availability ? 'Add to Cart' : 'Out of Stock'}
                   </Button>
                 </div>
-
-                {/* Related Products Scroll Section */}
-                <RelatedProducts 
-                  products={products}
-                  currentProductId={product.id}
-                  countryCode={countryCode}
-                />
               </motion.div>
             </div>
           </div>
         </section>
+
+        {/* Related Products Scroll Section - Full Width */}
+        <RelatedProducts 
+          products={products}
+          currentProductId={product.id}
+          countryCode={countryCode}
+        />
 
         {/* Detailed Information Tabs */}
         <section className="container mx-auto px-4 py-12 lg:py-20">
@@ -550,20 +550,25 @@ export default function CultivarDetail() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.35 }}
-                      className="p-6 rounded-2xl bg-white/5 border border-white/10"
+                      className="p-6 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-900/30 border border-border/50 dark:border-white/10"
                     >
-                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
                         <BookOpen className="h-5 w-5 text-primary" />
                         Research & Evidence
                       </h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">
-                        {medicalInfo.researchNotes}
-                      </p>
-                      <div className="mt-4 pt-4 border-t border-white/10">
-                        <p className="text-sm font-medium mb-2">Patient Experiences:</p>
-                        <p className="text-xs text-muted-foreground italic">
-                          "{medicalInfo.patientTestimonialSummary}"
+                      <div className="prose prose-sm max-w-none">
+                        <p className="text-muted-foreground leading-relaxed">
+                          {medicalInfo.researchNotes}
                         </p>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-border/50 dark:border-white/10">
+                        <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          Patient Experiences:
+                        </p>
+                        <blockquote className="pl-4 border-l-2 border-primary/40 italic text-sm text-muted-foreground">
+                          {medicalInfo.patientTestimonialSummary}
+                        </blockquote>
                       </div>
                     </motion.div>
                   </div>

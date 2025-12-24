@@ -48,47 +48,48 @@ export function RelatedProducts({ products, currentProductId, countryCode }: Rel
   };
 
   return (
-    <div className="mt-8">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Leaf className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold text-foreground">More Cultivars</h3>
+    <div className="mt-12 py-8 bg-muted/30 dark:bg-white/5 border-t border-b border-border/30 dark:border-white/10">
+      <div className="container mx-auto px-4">
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Leaf className="h-5 w-5 text-primary" />
+            <h3 className="text-xl font-semibold text-foreground">More Cultivars</h3>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-full border-border/50 hover:bg-accent"
+              onClick={() => scroll('left')}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-full border-border/50 hover:bg-accent"
+              onClick={() => scroll('right')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 rounded-full border-border/50 hover:bg-accent"
-            onClick={() => scroll('left')}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 rounded-full border-border/50 hover:bg-accent"
-            onClick={() => scroll('right')}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
-      {/* Scrolling Container */}
-      <div
-        ref={scrollContainerRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2 snap-x snap-mandatory"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
+        {/* Scrolling Container */}
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-5 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
         {relatedProducts.map((product, index) => (
           <motion.div
             key={product.id}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05, duration: 0.3 }}
-            className="flex-shrink-0 w-[140px] snap-start"
+            className="flex-shrink-0 w-[160px] snap-start"
           >
             <button
               onClick={() => navigate(`/shop/cultivar/${product.id}`)}
@@ -138,6 +139,7 @@ export function RelatedProducts({ products, currentProductId, countryCode }: Rel
             </button>
           </motion.div>
         ))}
+        </div>
       </div>
     </div>
   );
