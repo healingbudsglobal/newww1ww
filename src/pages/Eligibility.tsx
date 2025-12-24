@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
-  XCircle, 
   ArrowRight, 
   Shield, 
   Stethoscope,
@@ -16,6 +15,7 @@ import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import BackToTop from "@/components/BackToTop";
 import SEOHead from "@/components/SEOHead";
+import HBIcon from "@/components/HBIcon";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ClientOnboarding } from '@/components/shop/ClientOnboarding';
@@ -94,7 +94,7 @@ const Eligibility = () => {
                   transition={{ duration: 0.5 }}
                 >
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-                    <Shield className="w-4 h-4" />
+                    <HBIcon size="sm" />
                     Secure & Confidential
                   </span>
                   <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">

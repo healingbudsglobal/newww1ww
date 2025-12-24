@@ -10,9 +10,7 @@ import {
   Shield,
   FileText,
   ArrowRight,
-  Loader2,
-  ExternalLink,
-  Upload
+  ExternalLink
 } from 'lucide-react';
 import PrescriptionManager from '@/components/dashboard/PrescriptionManager';
 import DosageTracker from '@/components/dashboard/DosageTracker';
@@ -22,6 +20,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import Header from '@/layout/Header';
 import Footer from '@/components/Footer';
+import HBIcon from '@/components/HBIcon';
+import HBLoader from '@/components/HBLoader';
 import { useShop } from '@/context/ShopContext';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,7 +95,7 @@ const PatientDashboard = () => {
           <div className="container mx-auto px-4 text-center">
             <Card className="max-w-md mx-auto bg-card/50 backdrop-blur-sm border-border/50">
               <CardContent className="pt-12 pb-8">
-                <User className="w-16 h-16 mx-auto mb-6 text-muted-foreground" />
+                <HBIcon size="xl" className="mx-auto mb-6 opacity-50" />
                 <h2 className="text-2xl font-bold text-foreground mb-4">Sign In Required</h2>
                 <p className="text-muted-foreground mb-6">
                   Please sign in to access your patient dashboard.
@@ -226,11 +226,11 @@ const PatientDashboard = () => {
                   <CardContent>
                     {ordersLoading ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <HBLoader size="md" />
                       </div>
                     ) : recentOrders.length === 0 ? (
                       <div className="text-center py-8">
-                        <Package className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <HBIcon size="xl" className="mx-auto mb-3 opacity-30" />
                         <p className="text-muted-foreground">No orders yet</p>
                         {isEligible && (
                           <Button 
@@ -301,10 +301,10 @@ const PatientDashboard = () => {
                     <Button 
                       variant="outline" 
                       className="w-full justify-start"
-                      onClick={() => navigate('/conditions')}
+                      onClick={() => navigate('/support')}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      Medical Conditions
+                      Help & FAQ
                     </Button>
                   </CardContent>
                 </Card>
