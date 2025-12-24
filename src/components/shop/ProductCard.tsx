@@ -63,27 +63,27 @@ export function ProductCard({ product, onViewDetails, showDataSource = false }: 
     switch (category.toLowerCase()) {
       case 'sativa':
         return {
-          badge: 'bg-amber-500/25 text-amber-300 border-amber-400/40 backdrop-blur-sm',
+          badge: 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-400/40 backdrop-blur-sm',
           glow: 'hover:shadow-amber-500/20',
         };
       case 'indica':
         return {
-          badge: 'bg-violet-500/25 text-violet-300 border-violet-400/40 backdrop-blur-sm',
+          badge: 'bg-violet-500/25 text-violet-700 dark:text-violet-300 border-violet-400/40 backdrop-blur-sm',
           glow: 'hover:shadow-violet-500/20',
         };
       case 'hybrid':
         return {
-          badge: 'bg-emerald-500/25 text-emerald-300 border-emerald-400/40 backdrop-blur-sm',
+          badge: 'bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-400/40 backdrop-blur-sm',
           glow: 'hover:shadow-emerald-500/20',
         };
       case 'cbd':
         return {
-          badge: 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40 backdrop-blur-sm',
+          badge: 'bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border-cyan-400/40 backdrop-blur-sm',
           glow: 'hover:shadow-cyan-500/20',
         };
       default:
         return {
-          badge: 'bg-slate-500/25 text-slate-300 border-slate-400/40',
+          badge: 'bg-slate-500/25 text-slate-700 dark:text-slate-300 border-slate-400/40',
           glow: '',
         };
     }
@@ -138,7 +138,7 @@ export function ProductCard({ product, onViewDetails, showDataSource = false }: 
       className="h-full cursor-pointer"
       onClick={() => navigate(`/shop/cultivar/${product.id}`)}
     >
-      <div className={`group relative h-full overflow-hidden rounded-2xl bg-gradient-to-b from-card/90 to-card/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 ${categoryStyles.glow}`}>
+      <div className={`group relative h-full overflow-hidden rounded-2xl bg-gradient-to-b from-card to-card/80 dark:from-card/90 dark:to-card/60 backdrop-blur-xl border border-border/50 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/20 hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 ${categoryStyles.glow}`}>
         {/* Gradient overlay for premium depth */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
         
@@ -186,8 +186,8 @@ export function ProductCard({ product, onViewDetails, showDataSource = false }: 
           {/* THC highlight for high potency */}
           {product.thcContent >= 25 && product.availability && (
             <div className="absolute bottom-4 left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-400/30">
-              <Sparkles className="h-3 w-3 text-amber-400" />
-              <span className="text-xs font-medium text-amber-300">High Potency</span>
+              <Sparkles className="h-3 w-3 text-amber-500 dark:text-amber-400" />
+              <span className="text-xs font-medium text-amber-600 dark:text-amber-300">High Potency</span>
             </div>
           )}
           
@@ -219,14 +219,14 @@ export function ProductCard({ product, onViewDetails, showDataSource = false }: 
           {/* THC/CBD stats - improved styling */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25">
-              <Leaf className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="text-sm font-bold text-emerald-400">{product.thcContent.toFixed(1)}%</span>
-              <span className="text-[10px] text-emerald-400/70 uppercase font-medium">THC</span>
+              <Leaf className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{product.thcContent.toFixed(1)}%</span>
+              <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-medium">THC</span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/25">
-              <Droplets className="h-3.5 w-3.5 text-cyan-400" />
-              <span className="text-sm font-bold text-cyan-400">{product.cbdContent.toFixed(1)}%</span>
-              <span className="text-[10px] text-cyan-400/70 uppercase font-medium">CBD</span>
+              <Droplets className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">{product.cbdContent.toFixed(1)}%</span>
+              <span className="text-[10px] text-cyan-600/70 dark:text-cyan-400/70 uppercase font-medium">CBD</span>
             </div>
           </div>
 
@@ -235,13 +235,13 @@ export function ProductCard({ product, onViewDetails, showDataSource = false }: 
             {product.effects.slice(0, 3).map((effect) => (
               <span
                 key={effect}
-                className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-white/5 border border-white/10 text-muted-foreground"
+                className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 text-muted-foreground"
               >
                 {effect}
               </span>
             ))}
             {product.effects.length > 3 && (
-              <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+              <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 text-muted-foreground">
                 +{product.effects.length - 3}
               </span>
             )}

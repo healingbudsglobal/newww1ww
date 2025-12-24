@@ -126,8 +126,9 @@ const languageToCountry: Record<string, string> = {
 };
 
 // Detect country from domain - ZA is default for lovable.app (first launch market)
-const getCountryFromDomain = (): string | null => {
-  if (typeof window === 'undefined') return null;
+// This function is synchronous and returns immediately on first render
+const getCountryFromDomain = (): string => {
+  if (typeof window === 'undefined') return 'ZA';
   
   const hostname = window.location.hostname;
   
@@ -148,27 +149,32 @@ const getCountryFromDomain = (): string | null => {
   return 'ZA';
 };
 
+// Get initial country synchronously to prevent currency flash
+const getInitialConfig = (): LocationConfig => {
+  const domainCountry = getCountryFromDomain();
+  return locationConfigs[domainCountry] || locationConfigs.DEFAULT;
+};
+
 export const useGeoLocation = (): LocationConfig => {
   const { i18n } = useTranslation();
-  const [locationConfig, setLocationConfig] = useState<LocationConfig>(locationConfigs.DEFAULT);
+  // Initialize with correct country from domain IMMEDIATELY - no flash
+  const [locationConfig, setLocationConfig] = useState<LocationConfig>(() => getInitialConfig());
 
   useEffect(() => {
-    // Priority: 1. Domain-based detection, 2. Language-based detection
+    // Only update if language suggests a different country than domain detection
     const domainCountry = getCountryFromDomain();
     
-    if (domainCountry && locationConfigs[domainCountry]) {
-      setLocationConfig(locationConfigs[domainCountry]);
+    // Domain detection takes priority - already set in initial state
+    if (locationConfigs[domainCountry]) {
       return;
     }
 
-    // Fallback to language-based detection
+    // Fallback to language-based detection only if domain didn't match
     const language = i18n.language;
     const countryCode = languageToCountry[language] || languageToCountry[language.split('-')[0]];
     
     if (countryCode && locationConfigs[countryCode]) {
       setLocationConfig(locationConfigs[countryCode]);
-    } else {
-      setLocationConfig(locationConfigs.DEFAULT);
     }
   }, [i18n.language]);
 

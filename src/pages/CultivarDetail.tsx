@@ -80,37 +80,37 @@ export default function CultivarDetail() {
     switch (category?.toLowerCase()) {
       case 'sativa':
         return {
-          badge: 'bg-amber-500/25 text-amber-300 border-amber-400/40',
+          badge: 'bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-400/40',
           gradient: 'from-amber-500/30 via-amber-500/5',
-          accent: 'text-amber-400',
+          accent: 'text-amber-600 dark:text-amber-400',
           ring: 'ring-amber-500/30',
         };
       case 'indica':
         return {
-          badge: 'bg-violet-500/25 text-violet-300 border-violet-400/40',
+          badge: 'bg-violet-500/25 text-violet-700 dark:text-violet-300 border-violet-400/40',
           gradient: 'from-violet-500/30 via-violet-500/5',
-          accent: 'text-violet-400',
+          accent: 'text-violet-600 dark:text-violet-400',
           ring: 'ring-violet-500/30',
         };
       case 'hybrid':
         return {
-          badge: 'bg-emerald-500/25 text-emerald-300 border-emerald-400/40',
+          badge: 'bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-400/40',
           gradient: 'from-emerald-500/30 via-emerald-500/5',
-          accent: 'text-emerald-400',
+          accent: 'text-emerald-600 dark:text-emerald-400',
           ring: 'ring-emerald-500/30',
         };
       case 'cbd':
         return {
-          badge: 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40',
+          badge: 'bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border-cyan-400/40',
           gradient: 'from-cyan-500/30 via-cyan-500/5',
-          accent: 'text-cyan-400',
+          accent: 'text-cyan-600 dark:text-cyan-400',
           ring: 'ring-cyan-500/30',
         };
       default:
         return {
-          badge: 'bg-slate-500/25 text-slate-300 border-slate-400/40',
+          badge: 'bg-slate-500/25 text-slate-700 dark:text-slate-300 border-slate-400/40',
           gradient: 'from-slate-500/30 via-slate-500/5',
-          accent: 'text-slate-400',
+          accent: 'text-slate-600 dark:text-slate-400',
           ring: 'ring-slate-500/30',
         };
     }
@@ -240,8 +240,8 @@ export default function CultivarDetail() {
 
                   {product.thcContent >= 25 && product.availability && (
                     <div className="absolute bottom-6 left-6 flex items-center gap-2 px-3 py-2 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-400/30">
-                      <Sparkles className="h-4 w-4 text-amber-400" />
-                      <span className="text-sm font-semibold text-amber-300">High Potency</span>
+                      <Sparkles className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-600 dark:text-amber-300">High Potency</span>
                     </div>
                   )}
 
@@ -288,29 +288,29 @@ export default function CultivarDetail() {
                   <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="p-2.5 rounded-xl bg-emerald-500/20">
-                        <Leaf className="h-6 w-6 text-emerald-400" />
+                        <Leaf className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <div>
-                        <p className="text-xs text-emerald-400/70 uppercase tracking-wide font-medium">THC Content</p>
-                        <p className="text-3xl font-bold text-emerald-400">{product.thcContent.toFixed(1)}%</p>
+                        <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wide font-medium">THC Content</p>
+                        <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{product.thcContent.toFixed(1)}%</p>
                       </div>
                     </div>
                   </div>
                   <div className="p-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="p-2.5 rounded-xl bg-cyan-500/20">
-                        <Droplets className="h-6 w-6 text-cyan-400" />
+                        <Droplets className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
                       </div>
                       <div>
-                        <p className="text-xs text-cyan-400/70 uppercase tracking-wide font-medium">CBD Content</p>
-                        <p className="text-3xl font-bold text-cyan-400">{product.cbdContent.toFixed(1)}%</p>
+                        <p className="text-xs text-cyan-600/70 dark:text-cyan-400/70 uppercase tracking-wide font-medium">CBD Content</p>
+                        <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{product.cbdContent.toFixed(1)}%</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Add to Cart */}
-                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                <div className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-semibold">Select Quantity</span>
@@ -339,7 +339,7 @@ export default function CultivarDetail() {
                     </div>
                   </div>
                   
-                  <Separator className="bg-white/10" />
+                  <Separator className="bg-border/50 dark:bg-white/10" />
                   
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Total:</span>
@@ -393,7 +393,7 @@ export default function CultivarDetail() {
             <TabsContent value="medical" className="space-y-8">
               {isMedicalLoading ? (
                 <div className="grid md:grid-cols-2 gap-8">
-                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <div className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 space-y-4">
                     <Skeleton className="h-6 w-48" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-3/4" />
@@ -403,7 +403,7 @@ export default function CultivarDetail() {
                       <Skeleton className="h-8 w-20" />
                     </div>
                   </div>
-                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <div className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 space-y-4">
                     <Skeleton className="h-6 w-48" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-2/3" />
@@ -419,7 +419,7 @@ export default function CultivarDetail() {
                       animate={{ opacity: 1, y: 0 }}
                       className="p-6 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20"
                     >
-                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-emerald-400">
+                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                         <Stethoscope className="h-5 w-5" />
                         May Help With
                       </h3>
@@ -427,7 +427,7 @@ export default function CultivarDetail() {
                         {medicalInfo.medicalConditions.map((condition) => (
                           <Badge
                             key={condition}
-                            className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+                            className="px-3 py-1.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400/30"
                           >
                             {condition}
                           </Badge>
@@ -442,7 +442,7 @@ export default function CultivarDetail() {
                       transition={{ delay: 0.1 }}
                       className="p-6 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20"
                     >
-                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400">
+                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
                         <Heart className="h-5 w-5" />
                         Therapeutic Effects
                       </h3>
@@ -450,7 +450,7 @@ export default function CultivarDetail() {
                         {medicalInfo.therapeuticEffects.map((effect) => (
                           <Badge
                             key={effect}
-                            className="px-3 py-1.5 bg-cyan-500/20 text-cyan-300 border-cyan-400/30"
+                            className="px-3 py-1.5 bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-400/30"
                           >
                             {effect}
                           </Badge>
@@ -465,7 +465,7 @@ export default function CultivarDetail() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.15 }}
-                      className="p-5 rounded-2xl bg-white/5 border border-white/10"
+                      className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Users className="h-5 w-5 text-primary" />
@@ -485,7 +485,7 @@ export default function CultivarDetail() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="p-5 rounded-2xl bg-white/5 border border-white/10"
+                      className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Timer className="h-5 w-5 text-primary" />
@@ -499,7 +499,7 @@ export default function CultivarDetail() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.25 }}
-                      className="p-5 rounded-2xl bg-white/5 border border-white/10"
+                      className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Pill className="h-5 w-5 text-primary" />
@@ -518,7 +518,7 @@ export default function CultivarDetail() {
                       transition={{ delay: 0.3 }}
                       className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20"
                     >
-                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-400">
+                      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-600 dark:text-amber-400">
                         <AlertTriangle className="h-5 w-5" />
                         Potential Side Effects
                       </h3>
@@ -527,7 +527,7 @@ export default function CultivarDetail() {
                           <Badge
                             key={effect}
                             variant="outline"
-                            className="px-3 py-1 bg-amber-500/10 text-amber-300 border-amber-400/30"
+                            className="px-3 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-400/30"
                           >
                             {effect}
                           </Badge>
@@ -535,10 +535,10 @@ export default function CultivarDetail() {
                       </div>
                       {medicalInfo.interactionWarnings.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-amber-500/20">
-                          <p className="text-sm font-medium text-amber-300 mb-2">Drug Interactions:</p>
+                          <p className="text-sm font-medium text-amber-700 dark:text-amber-300 mb-2">Drug Interactions:</p>
                           <ul className="space-y-1">
                             {medicalInfo.interactionWarnings.slice(0, 3).map((warning) => (
-                              <li key={warning} className="text-xs text-amber-200/70 flex items-start gap-2">
+                              <li key={warning} className="text-xs text-amber-600/80 dark:text-amber-200/70 flex items-start gap-2">
                                 <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
                                 {warning}
                               </li>
@@ -605,7 +605,7 @@ export default function CultivarDetail() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-6 rounded-2xl bg-white/5 border border-white/10"
+                  className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                 >
                   <h3 className={`text-xl font-bold mb-3 ${styles.accent}`}>
                     {currentCategoryInfo.title}
@@ -628,7 +628,7 @@ export default function CultivarDetail() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="p-6 rounded-2xl bg-white/5 border border-white/10"
+                  className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                 >
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Beaker className="h-5 w-5 text-primary" />
@@ -659,7 +659,7 @@ export default function CultivarDetail() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-6 rounded-2xl bg-white/5 border border-white/10"
+                  className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                 >
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Wind className="h-5 w-5 text-primary" />
@@ -670,7 +670,7 @@ export default function CultivarDetail() {
                       {product.effects.map((effect) => (
                         <div
                           key={effect}
-                          className="flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10"
+                          className="flex items-center gap-2 p-3 rounded-xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                         >
                           <div className="w-2 h-2 rounded-full bg-primary" />
                           <span className="text-sm font-medium">{effect}</span>
@@ -687,29 +687,29 @@ export default function CultivarDetail() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="p-6 rounded-2xl bg-white/5 border border-white/10"
+                  className="p-6 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                 >
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Heart className="h-5 w-5 text-primary" />
                     Therapeutic Benefits
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5">
-                      <Shield className="h-5 w-5 text-emerald-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 dark:bg-white/5">
+                      <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                       <div>
                         <p className="font-medium">Medical Grade</p>
                         <p className="text-sm text-muted-foreground">Cultivated under strict medical standards</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5">
-                      <CheckCircle2 className="h-5 w-5 text-cyan-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 dark:bg-white/5">
+                      <CheckCircle2 className="h-5 w-5 text-cyan-600 dark:text-cyan-400 mt-0.5" />
                       <div>
                         <p className="font-medium">Lab Tested</p>
                         <p className="text-sm text-muted-foreground">Verified cannabinoid content and purity</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5">
-                      <Clock className="h-5 w-5 text-amber-400 mt-0.5" />
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 dark:bg-white/5">
+                      <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                       <div>
                         <p className="font-medium">Consistent Quality</p>
                         <p className="text-sm text-muted-foreground">Batch-to-batch consistency guaranteed</p>
@@ -728,10 +728,10 @@ export default function CultivarDetail() {
               >
                 <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-8">
                   <div className="flex items-start gap-3">
-                    <Info className="h-6 w-6 text-amber-400 mt-0.5" />
+                    <Info className="h-6 w-6 text-amber-600 dark:text-amber-400 mt-0.5" />
                     <div>
-                      <h3 className="font-bold text-amber-300 mb-2">Medical Disclaimer</h3>
-                      <p className="text-amber-200/80 text-sm">
+                      <h3 className="font-bold text-amber-700 dark:text-amber-300 mb-2">Medical Disclaimer</h3>
+                      <p className="text-amber-700/80 dark:text-amber-200/80 text-sm">
                         This product is intended for medical use only. Always consult with your healthcare provider before starting any cannabis therapy. Dosage should be determined by your prescribing physician based on your individual needs.
                       </p>
                     </div>
@@ -739,21 +739,21 @@ export default function CultivarDetail() {
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-6">
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 text-center">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                       <span className="text-2xl font-bold text-primary">1</span>
                     </div>
                     <h4 className="font-semibold mb-2">Start Low</h4>
                     <p className="text-sm text-muted-foreground">Begin with a small dose and wait to feel effects before increasing.</p>
                   </div>
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 text-center">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                       <span className="text-2xl font-bold text-primary">2</span>
                     </div>
                     <h4 className="font-semibold mb-2">Go Slow</h4>
                     <p className="text-sm text-muted-foreground">Wait at least 2 hours between doses to properly gauge effects.</p>
                   </div>
-                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 text-center">
+                  <div className="p-5 rounded-2xl bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 text-center">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                       <span className="text-2xl font-bold text-primary">3</span>
                     </div>
