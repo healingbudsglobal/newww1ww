@@ -27,10 +27,12 @@ export function getCurrencySymbol(currencyCode: string): string {
 
 export function formatPrice(
   amount: number,
-  countryCode: string = 'ZA',
+  countryCode: string = 'ZA', // Default to South Africa (ZAR)
   options?: { showSymbol?: boolean }
 ): string {
-  const currency = getCurrencyForCountry(countryCode);
+  // ALWAYS default to ZA if countryCode is empty/invalid
+  const validCountryCode = countryCode && currencyMap[countryCode] ? countryCode : 'ZA';
+  const currency = getCurrencyForCountry(validCountryCode);
   const { showSymbol = true } = options || {};
   
   // Handle invalid amounts
@@ -40,7 +42,7 @@ export function formatPrice(
   
   try {
     // Use Intl.NumberFormat for locale-aware formatting
-    const formatter = new Intl.NumberFormat(getLocaleForCountry(countryCode), {
+    const formatter = new Intl.NumberFormat(getLocaleForCountry(validCountryCode), {
       style: showSymbol ? 'currency' : 'decimal',
       currency: currency,
       minimumFractionDigits: 2,

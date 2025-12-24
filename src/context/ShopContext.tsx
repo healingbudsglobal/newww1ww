@@ -50,12 +50,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [countryCode, setCountryCode] = useState<string>(geoLocation.countryCode);
+  // Always default to ZA (South Africa) - primary launch market
+  // geoLocation hook now initializes synchronously with correct country
+  const [countryCode, setCountryCode] = useState<string>('ZA');
   const { toast } = useToast();
 
-  // Update countryCode when geoLocation changes
+  // Sync countryCode with geoLocation on mount and when it changes
   useEffect(() => {
-    if (!drGreenClient) {
+    // Only update from geo if no drGreenClient override
+    if (!drGreenClient && geoLocation.countryCode) {
       setCountryCode(geoLocation.countryCode);
     }
   }, [geoLocation.countryCode, drGreenClient]);
