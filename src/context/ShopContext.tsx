@@ -48,7 +48,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [countryCode, setCountryCode] = useState('PT');
+  const [countryCode, setCountryCode] = useState('ZA');
   const { toast } = useToast();
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
