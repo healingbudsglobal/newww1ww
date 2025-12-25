@@ -5,7 +5,7 @@ import SEOHead from '@/components/SEOHead';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Shield, FileText, Building2, Wifi, Database, User } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Shield, FileText, Building2, Wifi, Database, User, Download } from 'lucide-react';
 import { buildLegacyClientPayload } from '@/lib/drgreenApi';
 import { supabase } from '@/integrations/supabase/client';
 interface TestResult {
@@ -587,7 +587,7 @@ export default function Debug() {
             )}
 
             {/* Run Tests Button */}
-            <div className="mb-6">
+            <div className="mb-6 flex gap-3">
               <Button
                 onClick={runTests}
                 disabled={isRunning}
@@ -604,6 +604,45 @@ export default function Debug() {
                     Run Tests Again
                   </>
                 )}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={isRunning || tests.every(t => t.status === 'pending')}
+                onClick={() => {
+                  const exportData = {
+                    exportedAt: new Date().toISOString(),
+                    environment: {
+                      userAgent: navigator.userAgent,
+                      url: window.location.href,
+                      timestamp: Date.now(),
+                    },
+                    summary: {
+                      total: tests.length,
+                      passed: tests.filter(t => t.status === 'pass').length,
+                      failed: tests.filter(t => t.status === 'fail').length,
+                      pending: tests.filter(t => t.status === 'pending').length,
+                    },
+                    tests: tests.map((test, index) => ({
+                      testNumber: index + 1,
+                      ...test,
+                    })),
+                  };
+                  
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `debug-results-${new Date().toISOString().slice(0, 10)}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Results
               </Button>
             </div>
 
