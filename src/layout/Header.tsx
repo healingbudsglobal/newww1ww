@@ -249,7 +249,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
                   scrolled && "p-2"
                 )}
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                onClick={() => setMobileMenuOpen(prev => !prev)}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={mobileMenuOpen}
               >
