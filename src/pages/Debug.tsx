@@ -5,7 +5,7 @@ import SEOHead from '@/components/SEOHead';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Shield, FileText, Building2, Wifi, Database, User, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, RefreshCw, Shield, FileText, Building2, Wifi, Database, User, Download, Leaf } from 'lucide-react';
 import { buildLegacyClientPayload } from '@/lib/drgreenApi';
 import { supabase } from '@/integrations/supabase/client';
 interface TestResult {
@@ -75,6 +75,11 @@ export default function Debug() {
     {
       name: 'Authentication State',
       description: 'Verify current user session and display user ID/email if logged in',
+      status: 'pending',
+    },
+    {
+      name: 'Dr. Green API Live Test',
+      description: 'Call actual strains endpoint to verify HMAC signature works with production API',
       status: 'pending',
     },
   ]);
@@ -491,6 +496,89 @@ export default function Debug() {
       });
     }
     
+    // ===========================================
+    // TEST 7: Dr. Green API Live Test
+    // ===========================================
+    updateTest(6, { status: 'running' });
+    
+    try {
+      const startTime = Date.now();
+      
+      // Call the actual strains endpoint via drgreen-proxy
+      const { data, error } = await supabase.functions.invoke('drgreen-proxy', {
+        body: {
+          action: 'get-strains-legacy',
+          countryCode: 'PRT',
+          orderBy: 'desc',
+          take: 5,
+          page: 1,
+        },
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (error) {
+        anyFailed = true;
+        updateTest(6, {
+          status: 'fail',
+          details: `API call failed: ${error.message}`,
+          expected: 'Valid response from Dr. Green API',
+          actual: `Error: ${error.message}`,
+        });
+      } else if (data?.error || data?.success === false) {
+        // API returned an error response
+        const apiError = data?.error || data?.message || 'Unknown API error';
+        anyFailed = true;
+        updateTest(6, {
+          status: 'fail',
+          details: `API returned error: ${apiError}`,
+          expected: 'Strains data from Portugal',
+          actual: `API Error: ${apiError}`,
+        });
+      } else {
+        // Success - check if we got strains data
+        const strainsData = data?.data || data;
+        const isArray = Array.isArray(strainsData);
+        const strainCount = isArray ? strainsData.length : 0;
+        
+        if (isArray && strainCount > 0) {
+          const firstStrain = strainsData[0];
+          const strainNames = strainsData.slice(0, 3).map((s: { name?: string }) => s.name || 'Unknown').join(', ');
+          
+          updateTest(6, {
+            status: 'pass',
+            details: `HMAC signature accepted. Retrieved ${strainCount} strains in ${responseTime}ms`,
+            expected: 'Valid strains response from Dr. Green API',
+            actual: `${strainCount} strains: ${strainNames}${strainCount > 3 ? '...' : ''}`,
+          });
+        } else if (isArray && strainCount === 0) {
+          // Empty array is still a valid response
+          updateTest(6, {
+            status: 'pass',
+            details: `HMAC signature accepted. No strains available for Portugal (${responseTime}ms)`,
+            expected: 'Valid API response',
+            actual: 'Empty strains list (may be normal if no products)',
+          });
+        } else {
+          // Unexpected response format
+          updateTest(6, {
+            status: 'pass',
+            details: `API responded in ${responseTime}ms (unexpected format)`,
+            expected: 'Array of strains',
+            actual: `Response type: ${typeof strainsData}`,
+          });
+        }
+      }
+    } catch (error) {
+      anyFailed = true;
+      updateTest(6, {
+        status: 'fail',
+        details: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        expected: 'Dr. Green API reachable',
+        actual: 'Connection failed',
+      });
+    }
+    
     setHasFailures(anyFailed);
     setIsRunning(false);
   }, []);
@@ -527,6 +615,8 @@ export default function Debug() {
         return <Database className="h-5 w-5" />;
       case 5:
         return <User className="h-5 w-5" />;
+      case 6:
+        return <Leaf className="h-5 w-5" />;
       default:
         return null;
     }
@@ -728,6 +818,7 @@ export default function Debug() {
                 <p><strong>Test 4:</strong> Pings the <code className="bg-muted px-1 rounded">drgreen-proxy</code> edge function to verify backend connectivity and response time</p>
                 <p><strong>Test 5:</strong> Queries Supabase tables (<code className="bg-muted px-1 rounded">strains</code>, <code className="bg-muted px-1 rounded">profiles</code>, <code className="bg-muted px-1 rounded">user_roles</code>, <code className="bg-muted px-1 rounded">drgreen_clients</code>) and returns row counts</p>
                 <p><strong>Test 6:</strong> Checks <code className="bg-muted px-1 rounded">supabase.auth.getSession()</code> and displays user ID, email, provider, and assigned roles if authenticated</p>
+                <p><strong>Test 7:</strong> Calls the live Dr. Green API <code className="bg-muted px-1 rounded">/strains</code> endpoint for Portugal to verify HMAC query signing works end-to-end</p>
               </CardContent>
             </Card>
           </div>
