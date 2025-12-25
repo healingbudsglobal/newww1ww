@@ -408,6 +408,13 @@ const AdminDashboard = () => {
       icon: Leaf,
       link: "/admin/strains",
       badge: stats?.archivedStrains ? `${stats.archivedStrains} archived` : null
+    },
+    {
+      title: "Strain Sync Dashboard",
+      description: "View country availability and trigger API syncs",
+      icon: RefreshCw,
+      link: "/admin/strain-sync",
+      badge: null
     }
   ];
 
