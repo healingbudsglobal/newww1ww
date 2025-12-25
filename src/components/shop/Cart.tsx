@@ -17,7 +17,7 @@ import { formatPrice } from '@/lib/currency';
 export function Cart() {
   const {
     cart,
-    cartTotal,
+    cartTotalConverted,
     isCartOpen,
     setIsCartOpen,
     removeFromCart,
@@ -26,6 +26,7 @@ export function Cart() {
     drGreenClient,
     isLoading,
     countryCode,
+    convertFromZAR,
   } = useShop();
 
   const getEligibilityStatus = () => {
@@ -98,7 +99,7 @@ export function Cart() {
                         {item.strain_name}
                       </h4>
                       <p className="text-sm text-muted-foreground">
-                        {formatPrice(item.unit_price, countryCode)} / gram
+                        {formatPrice(convertFromZAR(item.unit_price), countryCode)} / gram
                       </p>
                       
                       {/* Quantity controls */}
@@ -140,7 +141,7 @@ export function Cart() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                       <span className="font-semibold text-foreground">
-                        {formatPrice(item.unit_price * item.quantity, countryCode)}
+                        {formatPrice(convertFromZAR(item.unit_price * item.quantity), countryCode)}
                       </span>
                     </div>
                   </motion.div>
@@ -174,7 +175,7 @@ export function Cart() {
             <div className="flex items-center justify-between w-full">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="text-xl font-bold text-foreground">
-                {formatPrice(cartTotal, countryCode)}
+                {formatPrice(cartTotalConverted, countryCode)}
               </span>
             </div>
 

@@ -1,4 +1,4 @@
-// Currency utility for country-based formatting
+// Currency utility for country-based formatting and conversion
 // Maps country codes to their respective currencies
 
 const currencyMap: Record<string, string> = {
@@ -17,27 +17,82 @@ const currencySymbols: Record<string, string> = {
   USD: '$',
 };
 
+// Default exchange rates (ZAR base) - used as fallback
+// These are updated by the exchange-rates edge function
+let cachedRates: Record<string, number> = {
+  ZAR: 1,
+  EUR: 0.052,
+  GBP: 0.044,
+  USD: 0.057,
+  THB: 1.98,
+};
+
 export function getCurrencyForCountry(countryCode: string): string {
-  return currencyMap[countryCode] || 'ZAR'; // Default to ZAR for South Africa
+  return currencyMap[countryCode] || 'ZAR';
 }
 
 export function getCurrencySymbol(currencyCode: string): string {
   return currencySymbols[currencyCode] || 'R';
 }
 
+// Update cached rates (called from useExchangeRates hook)
+export function updateCachedRates(rates: { [key: string]: number }): void {
+  cachedRates = { ...cachedRates, ...rates };
+}
+
+// Convert price from source currency (usually ZAR from API) to target currency
+export function convertPrice(
+  amount: number,
+  fromCountryOrCurrency: string = 'ZA',
+  toCountryOrCurrency: string = 'ZA',
+  rates?: Record<string, number>
+): number {
+  const ratesMap = rates || cachedRates;
+  
+  // Get currency codes
+  const fromCurrency = currencyMap[fromCountryOrCurrency] || fromCountryOrCurrency;
+  const toCurrency = currencyMap[toCountryOrCurrency] || toCountryOrCurrency;
+  
+  // If same currency, no conversion needed
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+  
+  // Get rates (rates are relative to ZAR - how much 1 ZAR equals in that currency)
+  const fromRate = ratesMap[fromCurrency] || 1;
+  const toRate = ratesMap[toCurrency] || 1;
+  
+  // Convert: amount -> ZAR -> target currency
+  const amountInZAR = amount / fromRate;
+  const convertedAmount = amountInZAR * toRate;
+  
+  return Math.round(convertedAmount * 100) / 100;
+}
+
 export function formatPrice(
   amount: number,
-  countryCode: string = 'ZA', // Default to South Africa (ZAR)
-  options?: { showSymbol?: boolean }
+  countryCode: string = 'ZA',
+  options?: { 
+    showSymbol?: boolean;
+    convertFrom?: string;
+    rates?: Record<string, number>;
+  }
 ): string {
+  const { showSymbol = true, convertFrom, rates } = options || {};
+  
   // ALWAYS default to ZA if countryCode is empty/invalid
   const validCountryCode = countryCode && currencyMap[countryCode] ? countryCode : 'ZA';
   const currency = getCurrencyForCountry(validCountryCode);
-  const { showSymbol = true } = options || {};
+  
+  // Convert price if source currency specified
+  let displayAmount = amount;
+  if (convertFrom && convertFrom !== validCountryCode) {
+    displayAmount = convertPrice(amount, convertFrom, validCountryCode, rates);
+  }
   
   // Handle invalid amounts
-  if (isNaN(amount) || amount === null || amount === undefined) {
-    amount = 0;
+  if (isNaN(displayAmount) || displayAmount === null || displayAmount === undefined) {
+    displayAmount = 0;
   }
   
   try {
@@ -49,11 +104,11 @@ export function formatPrice(
       maximumFractionDigits: 2,
     });
     
-    return formatter.format(amount);
+    return formatter.format(displayAmount);
   } catch {
     // Fallback to simple formatting
     const symbol = getCurrencySymbol(currency);
-    return `${symbol}${amount.toFixed(2)}`;
+    return `${symbol}${displayAmount.toFixed(2)}`;
   }
 }
 
@@ -65,5 +120,5 @@ function getLocaleForCountry(countryCode: string): string {
     TH: 'th-TH',
     US: 'en-US',
   };
-  return localeMap[countryCode] || 'en-ZA'; // Default to South Africa locale
+  return localeMap[countryCode] || 'en-ZA';
 }

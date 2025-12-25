@@ -2,13 +2,15 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { updateCachedRates } from '@/lib/currency';
 
 interface CartItem {
   id: string;
   strain_id: string;
   strain_name: string;
   quantity: number;
-  unit_price: number;
+  unit_price: number; // Always in ZAR from API
 }
 
 interface DrGreenClient {
@@ -21,10 +23,19 @@ interface DrGreenClient {
   kyc_link: string | null;
 }
 
+interface ExchangeRatesData {
+  ZAR: number;
+  EUR: number;
+  GBP: number;
+  USD: number;
+  THB: number;
+}
+
 interface ShopContextType {
   cart: CartItem[];
   cartCount: number;
   cartTotal: number;
+  cartTotalConverted: number; // In user's currency
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
   addToCart: (item: Omit<CartItem, 'id'>) => Promise<void>;
@@ -39,25 +50,43 @@ interface ShopContextType {
   isSyncing: boolean;
   countryCode: string;
   setCountryCode: (code: string) => void;
+  // Exchange rates
+  exchangeRates: ExchangeRatesData | null;
+  convertFromZAR: (amount: number, toCountry?: string) => number;
+  ratesLastUpdated: Date | null;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
+// Currency mapping
+const COUNTRY_TO_CURRENCY: Record<string, keyof ExchangeRatesData> = {
+  PT: 'EUR',
+  ZA: 'ZAR',
+  GB: 'GBP',
+  TH: 'THB',
+  US: 'USD',
+};
+
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const geoLocation = useGeoLocation();
+  const { rates, lastUpdated, convertPrice } = useExchangeRates();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  // Always default to ZA (South Africa) - primary launch market
-  // geoLocation hook now initializes synchronously with correct country
   const [countryCode, setCountryCode] = useState<string>('ZA');
   const { toast } = useToast();
 
+  // Update cached rates when they change
+  useEffect(() => {
+    if (rates) {
+      updateCachedRates(rates);
+    }
+  }, [rates]);
+
   // Sync countryCode with geoLocation on mount and when it changes
   useEffect(() => {
-    // Only update from geo if no drGreenClient override
     if (!drGreenClient && geoLocation.countryCode) {
       setCountryCode(geoLocation.countryCode);
     }
@@ -65,6 +94,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  
+  // Convert cart total to user's currency
+  const convertFromZAR = useCallback((amount: number, toCountry?: string): number => {
+    const targetCountry = toCountry || countryCode;
+    return convertPrice(amount, 'ZAR', targetCountry);
+  }, [convertPrice, countryCode]);
+
+  const cartTotalConverted = convertFromZAR(cartTotal);
+  
   const isEligible = drGreenClient?.is_kyc_verified === true && drGreenClient?.admin_approval === 'VERIFIED';
 
   const fetchCart = useCallback(async () => {
@@ -285,6 +323,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         cart,
         cartCount,
         cartTotal,
+        cartTotalConverted,
         isCartOpen,
         setIsCartOpen,
         addToCart,
@@ -299,6 +338,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         isSyncing,
         countryCode,
         setCountryCode,
+        exchangeRates: rates,
+        convertFromZAR,
+        ratesLastUpdated: lastUpdated,
       }}
     >
       {children}
