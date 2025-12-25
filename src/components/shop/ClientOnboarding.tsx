@@ -70,21 +70,42 @@ const validPostalZones: Record<string, { pattern: RegExp; description: string }>
   },
 };
 
-const MINIMUM_AGE = 21;
+// Legal minimum ages by country
+const legalAgeByCountry: Record<string, number> = {
+  PT: 18, // Portugal - Medical cannabis legal at 18
+  GB: 18, // UK - Medical cannabis legal at 18
+  ZA: 18, // South Africa - Private use legal at 18
+  TH: 20, // Thailand - Legal age for cannabis is 20
+  US: 21, // USA - Federal standard
+};
 
-const personalDetailsSchema = z.object({
-  firstName: z.string().min(2, 'First name must be at least 2 characters').max(50, 'First name is too long'),
-  lastName: z.string().min(2, 'Last name must be at least 2 characters').max(50, 'Last name is too long'),
-  email: z.string().email('Invalid email address').max(255, 'Email is too long'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits').max(20, 'Phone number is too long'),
-  dateOfBirth: z.string().min(1, 'Date of birth is required').refine(
-    (dob) => {
-      const age = calculateAge(dob);
-      return age >= MINIMUM_AGE;
-    },
-    { message: `You must be at least ${MINIMUM_AGE} years old to register for medical cannabis` }
-  ),
-});
+const DEFAULT_MINIMUM_AGE = 21; // Conservative fallback
+
+// Get minimum age for a country
+const getMinimumAge = (countryCode: string): number => {
+  return legalAgeByCountry[countryCode] || DEFAULT_MINIMUM_AGE;
+};
+
+// Create personal details schema with country-specific age validation
+const createPersonalDetailsSchema = (countryCode: string) => {
+  const minimumAge = getMinimumAge(countryCode);
+  return z.object({
+    firstName: z.string().min(2, 'First name must be at least 2 characters').max(50, 'First name is too long'),
+    lastName: z.string().min(2, 'Last name must be at least 2 characters').max(50, 'Last name is too long'),
+    email: z.string().email('Invalid email address').max(255, 'Email is too long'),
+    phone: z.string().min(10, 'Phone number must be at least 10 digits').max(20, 'Phone number is too long'),
+    dateOfBirth: z.string().min(1, 'Date of birth is required').refine(
+      (dob) => {
+        const age = calculateAge(dob);
+        return age >= minimumAge;
+      },
+      { message: `You must be at least ${minimumAge} years old to register for medical cannabis in your region` }
+    ),
+  });
+};
+
+// Default schema for initial form (uses conservative age)
+const personalDetailsSchema = createPersonalDetailsSchema('US');
 
 const createAddressSchema = (country: string) => z.object({
   street: z.string().min(5, 'Street address is required').max(200, 'Street address is too long'),
@@ -184,14 +205,16 @@ export function ClientOnboarding() {
     },
   });
 
-  // Watch country for postal code validation
-  const selectedCountry = addressForm.watch('country');
+  // Watch country for age and postal code validation
+  const selectedCountry = addressForm.watch('country') || 'PT';
+  const minimumAge = getMinimumAge(selectedCountry);
 
   const handlePersonalSubmit = (data: PersonalDetails) => {
-    // Double-check age validation
+    // Double-check age validation with country-specific minimum
+    const minimumAge = getMinimumAge(selectedCountry);
     const age = calculateAge(data.dateOfBirth);
-    if (age < MINIMUM_AGE) {
-      setAgeError(`You must be at least ${MINIMUM_AGE} years old to register for medical cannabis`);
+    if (age < minimumAge) {
+      setAgeError(`You must be at least ${minimumAge} years old to register for medical cannabis in your region`);
       return;
     }
     setAgeError(null);
@@ -421,13 +444,13 @@ export function ClientOnboarding() {
                           <FormControl>
                             <Input 
                               type="date" 
-                              max={new Date(new Date().setFullYear(new Date().getFullYear() - MINIMUM_AGE)).toISOString().split('T')[0]}
+                              max={new Date(new Date().setFullYear(new Date().getFullYear() - minimumAge)).toISOString().split('T')[0]}
                               {...field} 
                             />
                           </FormControl>
                           <FormMessage />
                           <p className="text-xs text-muted-foreground">
-                            You must be at least {MINIMUM_AGE} years old to register
+                            You must be at least {minimumAge} years old to register in {countries.find(c => c.code === selectedCountry)?.name || 'your region'}
                           </p>
                         </FormItem>
                       )}
