@@ -242,9 +242,86 @@ serve(async (req) => {
       // EXISTING CLIENT/SHOP ENDPOINTS
       // ==========================================
       
-      // Client operations
+      // Client operations - Create client with structured payload
       case "create-client": {
-        response = await drGreenRequest("/dapp/clients", "POST", body.data);
+        const { personal, address, medicalRecord } = body.data || {};
+        
+        // Build schema-compliant payload for KYC API
+        const kycPayload = {
+          transaction_metadata: {
+            source: "Healingbuds_Web_Store",
+            timestamp: new Date().toISOString(),
+            flow_type: "Onboarding_KYC_v1"
+          },
+          user_identity: {
+            first_name: personal?.firstName || "",
+            last_name: personal?.lastName || "",
+            dob: personal?.dateOfBirth || "",
+            email: personal?.email || "",
+            phone_number: personal?.phone || ""
+          },
+          eligibility_results: {
+            age_verified: true,
+            region_eligible: true,
+            postal_code: address?.postalCode || "",
+            country_code: address?.country || "PT",
+            declared_medical_patient: medicalRecord?.doctorApproval || false
+          },
+          shipping_address: {
+            street: address?.street || "",
+            city: address?.city || "",
+            postal_code: address?.postalCode || "",
+            country: address?.country || "PT"
+          },
+          medical_record: {
+            conditions: medicalRecord?.conditions || "",
+            current_medications: medicalRecord?.currentMedications || "",
+            allergies: medicalRecord?.allergies || "",
+            previous_cannabis_use: medicalRecord?.previousCannabisUse || false
+          },
+          kyc_requirements: {
+            document_type: "Government_ID",
+            id_country: address?.country || "PT",
+            selfie_required: true,
+            liveness_check: "active"
+          }
+        };
+        
+        console.log("Creating client with KYC payload:", JSON.stringify(kycPayload, null, 2));
+        response = await drGreenRequest("/dapp/clients", "POST", kycPayload);
+        break;
+      }
+      
+      // Request KYC link for existing client
+      case "request-kyc-link": {
+        const { clientId, personal, address } = body.data || {};
+        
+        if (!clientId) {
+          throw new Error("clientId is required for KYC link request");
+        }
+        
+        const kycLinkPayload = {
+          transaction_metadata: {
+            source: "Healingbuds_Web_Store",
+            timestamp: new Date().toISOString(),
+            flow_type: "KYC_Link_Retry_v1"
+          },
+          client_id: clientId,
+          user_identity: {
+            first_name: personal?.firstName || "",
+            last_name: personal?.lastName || "",
+            email: personal?.email || ""
+          },
+          kyc_requirements: {
+            document_type: "Government_ID",
+            id_country: address?.country || "PT",
+            selfie_required: true,
+            liveness_check: "active"
+          }
+        };
+        
+        console.log("Requesting KYC link with payload:", JSON.stringify(kycLinkPayload, null, 2));
+        response = await drGreenRequest(`/dapp/clients/${clientId}/kyc-link`, "POST", kycLinkPayload);
         break;
       }
       
@@ -343,9 +420,24 @@ serve(async (req) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error("Dr Green proxy error:", error);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (message.includes('timed out')) {
+      statusCode = 504; // Gateway Timeout
+    } else if (message.includes('required')) {
+      statusCode = 400; // Bad Request
+    } else if (message.includes('Unprocessable') || message.includes('422')) {
+      statusCode = 422; // Unprocessable Entity (e.g., blurry ID)
+    }
+    
     return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        error: message,
+        errorCode: statusCode === 422 ? 'DOCUMENT_QUALITY' : statusCode === 504 ? 'TIMEOUT' : 'SERVER_ERROR',
+        retryable: statusCode !== 400
+      }),
+      { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

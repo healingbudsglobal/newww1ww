@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/layout/Header';
 import Footer from '@/components/Footer';
 import SEOHead from '@/components/SEOHead';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 type EligibilityReason = 'age' | 'postal' | 'unknown';
 
@@ -49,6 +51,21 @@ export default function NotEligible() {
   const reason = state?.reason || 'unknown';
   const config = reasonConfig[reason];
   const IconComponent = config.icon;
+
+  // Security: Clear session and local storage to prevent back-button bypass
+  useEffect(() => {
+    const clearSession = async () => {
+      // Sign out the user to invalidate the session
+      await supabase.auth.signOut();
+      
+      // Clear any eligibility-related local storage
+      localStorage.removeItem('eligibility_form_data');
+      localStorage.removeItem('onboarding_step');
+      sessionStorage.clear();
+    };
+    
+    clearSession();
+  }, []);
 
   return (
     <>
