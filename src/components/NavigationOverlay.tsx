@@ -91,9 +91,11 @@ const NavigationOverlay = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  // Close on route change
+  // Close on route change (only if open)
   useEffect(() => {
-    onClose();
+    if (isOpen) {
+      onClose();
+    }
   }, [location.pathname]);
 
   const handleEligibility = () => {

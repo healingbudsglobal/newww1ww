@@ -26,8 +26,8 @@ import { RelatedProducts } from '@/components/shop/RelatedProducts';
 export default function CultivarDetail() {
   const { cultivarId } = useParams<{ cultivarId: string }>();
   const navigate = useNavigate();
-  const { products, isLoading } = useProducts();
   const { addToCart, isEligible, drGreenClient, countryCode } = useShop();
+  const { products, isLoading } = useProducts(countryCode);
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [product, setProduct] = useState<Product | null>(null);

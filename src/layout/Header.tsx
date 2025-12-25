@@ -153,15 +153,13 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
             {/* ZONE 1: Left - Logo (fixed width, never shrinks) */}
             <Link 
               to="/" 
-              className="flex items-center flex-shrink-0 group justify-self-start focus-visible:outline-none rounded-lg relative"
+              className="flex items-center flex-shrink-0 justify-self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 rounded-lg"
             >
-              {/* Branded ring effect on hover/focus */}
-              <span className="absolute -inset-2 rounded-xl opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-all duration-500 ring-2 ring-primary/50 ring-offset-2 ring-offset-transparent scale-90 group-hover:scale-100" />
               <img 
                 src={hbLogoWhite} 
                 alt="Healing Buds Logo" 
                 className={cn(
-                  "w-auto min-w-[120px] sm:min-w-[140px] md:min-w-[160px] object-contain transition-all duration-700 ease-out group-hover:scale-105 relative z-10",
+                  "w-auto min-w-[120px] sm:min-w-[140px] md:min-w-[160px] object-contain transition-all duration-700 ease-out hover:scale-105",
                   scrolled ? "h-10 sm:h-11 md:h-12" : "h-12 sm:h-14 md:h-16"
                 )}
               />
