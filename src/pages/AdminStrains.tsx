@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
+import { formatPrice } from '@/lib/currency';
+import {
   Leaf, 
   Plus,
   Pencil,
@@ -470,7 +471,7 @@ const AdminStrains = () => {
                             </TableCell>
                             <TableCell>{strain.thc_content}%</TableCell>
                             <TableCell>{strain.cbd_content}%</TableCell>
-                            <TableCell>€{strain.retail_price.toFixed(2)}</TableCell>
+                            <TableCell>{formatPrice(strain.retail_price, 'ZA')}</TableCell>
                             <TableCell>{strain.stock}</TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1">

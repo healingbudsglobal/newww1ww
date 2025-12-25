@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatPrice } from "@/lib/currency";
 import { motion } from "framer-motion";
 import { 
   FileText, 
@@ -344,7 +345,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Total Sales (Live)",
-      value: `€${(stats?.dappTotalSales || 0).toLocaleString()}`,
+      value: formatPrice(stats?.dappTotalSales || 0, 'ZA'),
       icon: DollarSign,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
