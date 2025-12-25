@@ -390,6 +390,17 @@ export function buildLegacyClientPayload(formData: {
     country: string;
     state?: string;
   };
+  business?: {
+    isBusiness: boolean;
+    businessType?: string;
+    businessName?: string;
+    businessAddress1?: string;
+    businessAddress2?: string;
+    businessCity?: string;
+    businessState?: string;
+    businessCountryCode?: string;
+    businessPostalCode?: string;
+  };
   medicalHistory: {
     medicalHistory0?: boolean;
     medicalHistory1?: boolean;
@@ -421,7 +432,7 @@ export function buildLegacyClientPayload(formData: {
     return hasNone ? defaultValue : arr.map(v => v.toLowerCase());
   };
   
-  return {
+  const payload: LegacyClientPayload = {
     firstName: formData.personal.firstName,
     lastName: formData.personal.lastName,
     email: formData.personal.email.toLowerCase(),
@@ -464,6 +475,24 @@ export function buildLegacyClientPayload(formData: {
       otherMedicalTreatments: formData.medicalHistory.otherMedicalTreatments,
     },
   };
+  
+  // Conditionally add clientBusiness if user selected "I am a business"
+  if (formData.business?.isBusiness && formData.business.businessName) {
+    const businessCountry = formData.business.businessCountryCode || formData.address.country;
+    payload.clientBusiness = {
+      businessType: formData.business.businessType || 'other',
+      name: formData.business.businessName,
+      address1: formData.business.businessAddress1 || '',
+      address2: formData.business.businessAddress2 || '',
+      city: formData.business.businessCity || '',
+      state: formData.business.businessState || '',
+      country: businessCountry,
+      countryCode: toAlpha3(businessCountry),
+      postalCode: formData.business.businessPostalCode || '',
+    };
+  }
+  
+  return payload;
 }
 
 // Export all functions for use in components

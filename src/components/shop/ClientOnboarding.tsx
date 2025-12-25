@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   FileWarning,
   HeartPulse,
+  Building2,
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -170,17 +171,41 @@ const medicalSchema = z.object({
   consent: z.boolean().refine((val) => val, 'You must consent to continue'),
 });
 
+// Business registration schema
+const businessSchema = z.object({
+  isBusiness: z.boolean().default(false),
+  businessType: z.string().optional(),
+  businessName: z.string().optional(),
+  businessAddress1: z.string().optional(),
+  businessAddress2: z.string().optional(),
+  businessCity: z.string().optional(),
+  businessState: z.string().optional(),
+  businessCountryCode: z.string().optional(),
+  businessPostalCode: z.string().optional(),
+});
+
 type PersonalDetails = z.infer<typeof personalDetailsSchema>;
 type Address = z.infer<typeof addressSchema>;
+type Business = z.infer<typeof businessSchema>;
 type MedicalHistory = z.infer<typeof medicalHistorySchema>;
 type Medical = z.infer<typeof medicalSchema>;
 
 const steps = [
   { id: 'personal', title: 'Personal Details', icon: User },
   { id: 'address', title: 'Shipping Address', icon: MapPin },
+  { id: 'business', title: 'Business Details', icon: Building2 },
   { id: 'history', title: 'Medical History', icon: HeartPulse },
   { id: 'medical', title: 'Medical Information', icon: Stethoscope },
   { id: 'complete', title: 'Complete', icon: CheckCircle2 },
+];
+
+const businessTypes = [
+  { value: 'dispensary', label: 'Dispensary' },
+  { value: 'clinic', label: 'Clinic' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'wellness_center', label: 'Wellness Center' },
+  { value: 'research', label: 'Research Institution' },
+  { value: 'other', label: 'Other' },
 ];
 
 const countries = [
@@ -235,6 +260,7 @@ export function ClientOnboarding() {
   const [formData, setFormData] = useState<{
     personal?: PersonalDetails;
     address?: Address;
+    business?: Business;
     medicalHistory?: MedicalHistory;
     medical?: Medical;
   }>({});
@@ -261,6 +287,21 @@ export function ClientOnboarding() {
       city: '',
       postalCode: '',
       country: 'PT',
+    },
+  });
+
+  const businessForm = useForm<Business>({
+    resolver: zodResolver(businessSchema),
+    defaultValues: formData.business || {
+      isBusiness: false,
+      businessType: '',
+      businessName: '',
+      businessAddress1: '',
+      businessAddress2: '',
+      businessCity: '',
+      businessState: '',
+      businessCountryCode: '',
+      businessPostalCode: '',
     },
   });
 
@@ -337,12 +378,17 @@ export function ClientOnboarding() {
     }
     setPostalError(null);
     setFormData((prev) => ({ ...prev, address: data }));
-    setCurrentStep(2); // Go to Medical History step
+    setCurrentStep(2); // Go to Business Details step
+  };
+
+  const handleBusinessSubmit = (data: Business) => {
+    setFormData((prev) => ({ ...prev, business: data }));
+    setCurrentStep(3); // Go to Medical History step
   };
 
   const handleMedicalHistorySubmit = (data: MedicalHistory) => {
     setFormData((prev) => ({ ...prev, medicalHistory: data }));
-    setCurrentStep(3); // Go to Medical Information step
+    setCurrentStep(4); // Go to Medical Information step
   };
 
   const handleMedicalSubmit = async (data: Medical) => {
@@ -441,7 +487,7 @@ export function ClientOnboarding() {
       setStoredClientId(clientId);
       setKycLinkReceived(!!kycLink);
       setKycStatus('success');
-      setCurrentStep(4); // Go to Complete step
+      setCurrentStep(5); // Go to Complete step
 
       // Show appropriate toast based on API success
       if (kycLink) {
@@ -840,8 +886,222 @@ export function ClientOnboarding() {
           </motion.div>
         )}
 
-        {/* Step 3: Medical History (Legacy DAPP fields) */}
+        {/* Step 3: Business Details (Optional) */}
         {currentStep === 2 && (
+          <motion.div
+            key="business"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Business Details
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  If you're registering on behalf of a business, please provide the details below. Otherwise, you can skip this step.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Form {...businessForm}>
+                  <form
+                    onSubmit={businessForm.handleSubmit(handleBusinessSubmit)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={businessForm.control}
+                      name="isBusiness"
+                      render={({ field }) => (
+                        <FormItem className="flex items-start space-x-3 space-y-0 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="font-medium cursor-pointer">
+                              I am registering as a business
+                            </FormLabel>
+                            <FormDescription className="text-xs">
+                              Select this if you're a dispensary, clinic, pharmacy, or other business
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    {businessForm.watch('isBusiness') && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 pt-2"
+                      >
+                        <FormField
+                          control={businessForm.control}
+                          name="businessType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {businessTypes.map((type) => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={businessForm.control}
+                          name="businessName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your Company Ltd" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={businessForm.control}
+                          name="businessAddress1"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Address</FormLabel>
+                              <FormControl>
+                                <Input placeholder="123 Business Street" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={businessForm.control}
+                          name="businessAddress2"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address Line 2 (Optional)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Suite, Floor, Building" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={businessForm.control}
+                            name="businessCity"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>City</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Lisbon" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessForm.control}
+                            name="businessState"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>State/Province</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Optional" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={businessForm.control}
+                            name="businessCountryCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Country</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value || formData.address?.country}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select country" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {countries.map((country) => (
+                                      <SelectItem key={country.code} value={country.code}>
+                                        {country.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessForm.control}
+                            name="businessPostalCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Postal Code</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="1000-001" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={goBack}
+                        className="flex-1"
+                      >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                      </Button>
+                      <Button type="submit" className="flex-1">
+                        {businessForm.watch('isBusiness') ? 'Continue' : 'Skip & Continue'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Step 4: Medical History (Legacy DAPP fields) */}
+        {currentStep === 3 && (
           <motion.div
             key="medical-history"
             initial={{ opacity: 0, x: 20 }}
@@ -998,8 +1258,8 @@ export function ClientOnboarding() {
           </motion.div>
         )}
 
-        {/* Step 4: Medical Information */}
-        {currentStep === 3 && (
+        {/* Step 5: Medical Information */}
+        {currentStep === 4 && (
           <motion.div
             key="medical"
             initial={{ opacity: 0, x: 20 }}
@@ -1169,7 +1429,7 @@ export function ClientOnboarding() {
         )}
 
         {/* KYC Verification In Progress Screen */}
-        {currentStep === 3 && kycStatus === 'verifying' && (
+        {currentStep === 4 && kycStatus === 'verifying' && (
           <motion.div
             key="verifying"
             initial={{ opacity: 0 }}
@@ -1204,7 +1464,7 @@ export function ClientOnboarding() {
         )}
 
         {/* Document Quality Error Screen (422) */}
-        {currentStep === 3 && documentError === 'document_quality' && (
+        {currentStep === 4 && documentError === 'document_quality' && (
           <motion.div
             key="document-error"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -1277,8 +1537,8 @@ export function ClientOnboarding() {
           </motion.div>
         )}
 
-        {/* Step 5: Complete */}
-        {currentStep === 4 && (
+        {/* Step 6: Complete */}
+        {currentStep === 5 && (
           <motion.div
             key="complete"
             initial={{ opacity: 0, scale: 0.95 }}
