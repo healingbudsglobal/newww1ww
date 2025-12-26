@@ -103,12 +103,12 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
       <header 
         ref={headerRef}
         className={cn(
-          "fixed top-0 left-0 right-0 z-50",
+          "fixed top-2 left-3 right-3 sm:left-4 sm:right-4 z-50",
           "transition-all duration-500 ease-out",
-          "border-b",
+          "rounded-xl",
           scrolled 
-            ? "border-white/10 bg-[#1a3835]/95 backdrop-blur-xl shadow-2xl shadow-black/20" 
-            : "border-transparent bg-[#1f4340]"
+            ? "bg-[#1a3835]/95 backdrop-blur-xl shadow-2xl shadow-black/20 border border-white/10" 
+            : "bg-[#1f4340] border border-transparent"
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
