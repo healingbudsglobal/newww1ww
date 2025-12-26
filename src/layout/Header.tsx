@@ -1,22 +1,8 @@
 /**
- * Header Component - Structure Only
+ * Header Component - Modern Full-Width Design
  * 
- * Systems-Level Architecture:
- * 
- * STRUCTURE: 3-Zone Grid Layout
- * - Left Zone: Logo (fixed width, never shrinks)
- * - Center Zone: Navigation (flexible, collapses first)
- * - Right Zone: Actions (fixed width, never overlaps)
- * 
- * This component is STRUCTURE ONLY:
- * - NO dropdown logic (handled by NavigationMenu)
- * - NO overlay logic (handled by NavigationOverlay)
- * - NO scroll locking (handled by NavigationOverlay)
- * - NO focus trapping (handled by NavigationOverlay)
- * 
- * Imports and coordinates:
- * - NavigationMenu (desktop navigation)
- * - NavigationOverlay (mobile overlay)
+ * Clean, modern header that sits flush at the top with no gaps.
+ * Uses glass morphism effect with smooth scroll transitions.
  */
 
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -61,7 +47,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   // Scroll detection
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
+      setScrolled(window.scrollY > 20);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -103,124 +89,91 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
     navigate("/");
   };
 
-  const handleEligibilityClick = () => {
-    setEligibilityDialogOpen(true);
-  };
-
   return (
     <>
-      {/* Header Background Strip - solid teal to eliminate white gap */}
-      <div 
-        className="fixed top-0 left-0 right-0 z-40 transition-all duration-700"
-        style={{ 
-          height: scrolled ? '76px' : '100px',
-          backgroundColor: 'hsl(178, 35%, 18%)'
-        }}
-      />
-      
-      {/* Scroll Progress Bar - Always sticky at absolute top */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-[#1C4F4D]/30 z-[100]">
+      {/* Scroll Progress Bar */}
+      <div className="fixed top-0 left-0 right-0 h-0.5 bg-white/10 z-[100]">
         <motion.div
-          className="h-full bg-gradient-to-r from-[#4DBFA1] via-[#2C7D7A] to-[#1C4F4D] origin-left will-change-transform"
-          style={{ 
-            scaleX,
-            transformOrigin: "0%"
-          }}
+          className="h-full bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 origin-left"
+          style={{ scaleX }}
         />
       </div>
-      
+
+      {/* Main Header */}
       <header 
         ref={headerRef}
         className={cn(
-          "fixed top-2 left-4 right-4 sm:left-5 sm:right-5 md:left-6 md:right-6 z-50",
-          "backdrop-blur-2xl rounded-2xl transition-all duration-700 ease-out",
-          "border",
+          "fixed top-0 left-0 right-0 z-50",
+          "transition-all duration-500 ease-out",
+          "border-b",
           scrolled 
-            ? "shadow-2xl shadow-black/30 border-white/30 scale-[0.99]" 
-            : "shadow-xl shadow-black/20 border-white/20"
+            ? "border-white/10 bg-[#1a3835]/95 backdrop-blur-xl shadow-2xl shadow-black/20" 
+            : "border-transparent bg-[#1f4340]"
         )}
-        style={{ 
-          backgroundColor: scrolled 
-            ? 'hsla(178, 35%, 16%, 0.98)' 
-            : 'hsla(178, 35%, 20%, 0.9)',
-          transition: 'background-color 0.7s ease-out, transform 0.7s ease-out, box-shadow 0.7s ease-out'
-        }}
       >
-        <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12">
-          {/* 
-            3-ZONE GRID LAYOUT - Regression-proof architecture
-            - Grid ensures zones never overlap regardless of content
-            - Left/Right zones have fixed constraints
-            - Center zone flexes to available space
-          */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Grid Layout */}
           <div className={cn(
-            "grid grid-cols-[auto_1fr_auto] items-center gap-4",
-            "transition-all duration-700 ease-out",
-            scrolled ? "h-16 md:h-[72px]" : "h-20 md:h-24"
+            "grid grid-cols-[auto_1fr_auto] items-center gap-6",
+            "transition-all duration-500 ease-out",
+            scrolled ? "h-16" : "h-20"
           )}>
             
-            {/* ZONE 1: Left - Logo (fixed width, never shrinks) */}
+            {/* Logo */}
             <Link 
               to="/" 
-              className="flex items-center flex-shrink-0 justify-self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 rounded-lg"
+              className="flex items-center flex-shrink-0 group"
             >
               <img 
                 src={hbLogoWhite} 
-                alt="Healing Buds Logo" 
+                alt="Healing Buds" 
                 className={cn(
-                  "w-auto min-w-[120px] sm:min-w-[140px] md:min-w-[160px] object-contain transition-all duration-700 ease-out hover:scale-105",
-                  scrolled ? "h-10 sm:h-11 md:h-12" : "h-12 sm:h-14 md:h-16"
+                  "w-auto object-contain transition-all duration-500 group-hover:opacity-90",
+                  scrolled ? "h-9 sm:h-10" : "h-11 sm:h-12"
                 )}
               />
             </Link>
           
-            {/* ZONE 2: Center - Navigation (flexible, adapts to available space) */}
+            {/* Center Navigation */}
             <NavigationMenu scrolled={scrolled} />
             
-            {/* ZONE 3: Right - Actions (uses 2xl breakpoint to prevent overlap with nav) */}
-            <div className="hidden xl:flex items-center gap-2 justify-self-end flex-shrink-0">
+            {/* Right Actions - Desktop */}
+            <div className="hidden xl:flex items-center gap-3 flex-shrink-0">
               <LanguageSwitcher scrolled={scrolled} />
               <ThemeToggle />
 
-              {/* Action Buttons - explicit constraints prevent collapse */}
-              <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+              <div className="flex items-center gap-2 ml-2">
                 <button
                   onClick={() => setEligibilityDialogOpen(true)}
                   className={cn(
-                    "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
-                    "hover:scale-105 hover:shadow-xl whitespace-nowrap",
-                    "bg-white text-[#2A3D3A] hover:bg-white/95",
-                    "border-2 border-white shadow-lg",
-                    "text-xs",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
+                    "font-medium px-4 py-2 rounded-lg transition-all duration-300",
+                    "bg-emerald-500 text-white hover:bg-emerald-400",
+                    "shadow-lg shadow-emerald-500/25 hover:shadow-emerald-400/40",
+                    "text-sm whitespace-nowrap"
                   )}
                 >
                   {t('nav.checkEligibility')}
                 </button>
+                
                 {user ? (
                   <>
                     <Link
                       to="/dashboard"
                       className={cn(
-                        "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
-                        "hover:scale-105 hover:shadow-xl whitespace-nowrap",
-                        "bg-primary text-white hover:bg-primary/90",
-                        "border-2 border-primary shadow-lg flex items-center gap-1",
-                        "text-xs",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
+                        "font-medium px-4 py-2 rounded-lg transition-all duration-300",
+                        "bg-white/10 text-white hover:bg-white/20",
+                        "border border-white/20 hover:border-white/30",
+                        "text-sm flex items-center gap-2"
                       )}
                     >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      <LayoutDashboard className="w-4 h-4" />
                       Portal
                     </Link>
                     <button
                       onClick={handleLogout}
                       className={cn(
-                        "font-body font-bold p-1.5 rounded-full transition-all duration-300",
-                        "hover:scale-105 hover:shadow-xl",
-                        "bg-transparent text-white hover:bg-white/20",
-                        "border-2 border-white/60 shadow-lg flex items-center justify-center",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
+                        "p-2 rounded-lg transition-all duration-300",
+                        "text-white/70 hover:text-white hover:bg-white/10"
                       )}
                       title={t('nav.signOut')}
                     >
@@ -231,12 +184,10 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                   <Link
                     to="/auth"
                     className={cn(
-                      "font-body font-bold px-3 py-1.5 rounded-full transition-all duration-300",
-                      "hover:scale-105 hover:shadow-xl whitespace-nowrap",
-                      "bg-transparent text-white hover:bg-white/20",
-                      "border-2 border-white/60 shadow-lg",
-                      "text-xs",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2"
+                      "font-medium px-4 py-2 rounded-lg transition-all duration-300",
+                      "bg-white/10 text-white hover:bg-white/20",
+                      "border border-white/20 hover:border-white/30",
+                      "text-sm"
                     )}
                   >
                     {t('nav.patientLogin')}
@@ -245,28 +196,24 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               </div>
             </div>
 
-            {/* Mobile/Tablet Menu Button & Theme Toggle - shows below 2xl */}
-            <div className="xl:hidden flex items-center gap-2 justify-self-end">
+            {/* Mobile Menu Button */}
+            <div className="xl:hidden flex items-center gap-2">
               <ThemeToggle />
               <button
                 type="button"
                 className={cn(
-                  "text-white p-2.5 rounded-xl transition-all duration-300",
-                  "hover:scale-110 active:scale-95 touch-manipulation",
-                  "min-h-[44px] min-w-[44px] flex items-center justify-center",
+                  "text-white p-2 rounded-lg transition-all duration-300",
                   "hover:bg-white/10 active:bg-white/20",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-                scrolled && "p-2",
-                "hover:rotate-180 transition-transform duration-500"
+                  "min-h-[44px] min-w-[44px] flex items-center justify-center"
                 )}
                 onClick={() => setMobileMenuOpen(prev => !prev)}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={mobileMenuOpen}
               >
                 {mobileMenuOpen ? (
-                  <X className={cn("transition-all duration-300", scrolled ? "w-5 h-5" : "w-6 h-6")} />
+                  <X className="w-6 h-6" />
                 ) : (
-                  <Menu className={cn("transition-all duration-300", scrolled ? "w-5 h-5" : "w-6 h-6")} />
+                  <Menu className="w-6 h-6" />
                 )}
               </button>
             </div>
@@ -274,13 +221,13 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
         </div>
       </header>
 
-      {/* Mobile Navigation Overlay - OUTSIDE header for true full-viewport ownership */}
+      {/* Mobile Navigation Overlay */}
       <NavigationOverlay
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
         user={user}
         onLogout={handleLogout}
-        onEligibilityClick={handleEligibilityClick}
+        onEligibilityClick={() => setEligibilityDialogOpen(true)}
         scrolled={scrolled}
       />
 
