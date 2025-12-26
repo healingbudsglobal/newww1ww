@@ -3,10 +3,9 @@ import { useState, useEffect, useRef } from "react";
 
 interface Particle {
   id: number;
-  x: number;
-  y: number;
-  midX: number;
-  midY: number;
+  // Turbulence keyframes for wavy path
+  xPath: number[];
+  yPath: number[];
   size: number;
   duration: number;
   delay: number;
@@ -16,8 +15,8 @@ interface Particle {
 
 interface Wisp {
   id: number;
-  x: number;
-  y: number;
+  xPath: number[];
+  yPath: number[];
   size: number;
   duration: number;
   delay: number;
@@ -46,21 +45,23 @@ export const SmokeParticles = ({
     if (isActive) {
       setIsFadingOut(false);
       const newParticles: Particle[] = Array.from({ length: particleCount }, (_, i) => {
-        // Smoke rises upward with gentle horizontal drift
-        const horizontalDrift = (Math.random() - 0.5) * 50;
-        const riseHeight = -(Math.random() * 80 + 50); // Negative = upward
-        const midDrift = (Math.random() - 0.5) * 30;
+        // Smoke rises upward with turbulent horizontal drift
+        const baseX = (Math.random() - 0.5) * 30;
+        const riseHeight = -(Math.random() * 90 + 60);
+        
+        // Create wavy turbulence path with 5 keyframes
+        const turbulence1 = (Math.random() - 0.5) * 25;
+        const turbulence2 = (Math.random() - 0.5) * 35;
+        const turbulence3 = (Math.random() - 0.5) * 20;
         
         return {
           id: i,
-          x: horizontalDrift + (Math.random() - 0.5) * 20,
-          y: riseHeight,
-          midX: midDrift,
-          midY: riseHeight * 0.4,
-          size: Math.random() * 40 + 24,
-          duration: Math.random() * 2.0 + 1.6,
+          xPath: [0, baseX + turbulence1, baseX - turbulence2, baseX + turbulence3, baseX + (Math.random() - 0.5) * 40],
+          yPath: [0, riseHeight * 0.25, riseHeight * 0.5, riseHeight * 0.75, riseHeight],
+          size: Math.random() * 45 + 28,
+          duration: Math.random() * 2.2 + 1.8,
           delay: Math.random() * 0.3,
-          rotation: (Math.random() - 0.5) * 90,
+          rotation: (Math.random() - 0.5) * 120,
           blur: Math.random() * 1.5 + 0.5,
         };
       });
@@ -109,17 +110,22 @@ export const SmokeParticles = ({
 
   const createWisp = (): Wisp => {
     wispIdRef.current += 1;
-    // Wisps rise upward with gentle swaying
-    const horizontalSway = (Math.random() - 0.5) * 35;
-    const riseHeight = -(Math.random() * 60 + 30); // Negative = upward
+    // Wisps rise upward with gentle swaying turbulence
+    const baseX = (Math.random() - 0.5) * 20;
+    const riseHeight = -(Math.random() * 70 + 35);
+    
+    // Wavy path for organic movement
+    const sway1 = (Math.random() - 0.5) * 18;
+    const sway2 = (Math.random() - 0.5) * 22;
+    
     return {
       id: wispIdRef.current,
-      x: horizontalSway,
-      y: riseHeight,
-      size: Math.random() * 30 + 18,
-      duration: Math.random() * 2.2 + 2.0,
+      xPath: [0, baseX + sway1, baseX - sway2, baseX + sway1 * 0.5],
+      yPath: [0, riseHeight * 0.35, riseHeight * 0.7, riseHeight],
+      size: Math.random() * 32 + 20,
+      duration: Math.random() * 2.4 + 2.2,
       delay: 0,
-      rotation: (Math.random() - 0.5) * 60,
+      rotation: (Math.random() - 0.5) * 80,
     };
   };
 
@@ -134,8 +140,12 @@ export const SmokeParticles = ({
             style={{
               width: wisp.size,
               height: wisp.size,
-              background: `radial-gradient(ellipse at 50% 50%, ${color}70 0%, ${color}40 35%, ${color}15 60%, transparent 80%)`,
-              filter: "blur(1px)",
+              background: `radial-gradient(ellipse at 50% 50%, 
+                rgba(255,255,255,0.5) 0%, 
+                rgba(200,210,205,0.35) 25%,
+                rgba(180,190,185,0.2) 50%, 
+                transparent 80%)`,
+              filter: "blur(1.5px)",
             }}
             initial={{ 
               x: 0, 
@@ -145,10 +155,10 @@ export const SmokeParticles = ({
               rotate: 0,
             }}
             animate={{ 
-              x: wisp.x,
-              y: wisp.y,
-              opacity: isFadingOut ? [0.5, 0] : [0, 0.6, 0.5, 0],
-              scale: [0.6, 1.0, 1.4],
+              x: wisp.xPath,
+              y: wisp.yPath,
+              opacity: isFadingOut ? [0.5, 0] : [0, 0.55, 0.5, 0],
+              scale: [0.6, 1.0, 1.3, 1.5],
               rotate: wisp.rotation,
             }}
             exit={{ 
@@ -157,8 +167,8 @@ export const SmokeParticles = ({
             }}
             transition={{ 
               duration: wisp.duration,
-              ease: [0.4, 0, 0.2, 1], // Smooth deceleration like rising smoke
-              times: [0, 0.3, 0.7, 1],
+              ease: [0.4, 0, 0.2, 1],
+              times: [0, 0.3, 0.65, 1],
             }}
           />
         ))}
@@ -173,29 +183,34 @@ export const SmokeParticles = ({
             style={{
               width: particle.size,
               height: particle.size,
-              background: `radial-gradient(ellipse at 45% 45%, ${color}90 0%, ${color}60 25%, ${color}30 50%, transparent 75%)`,
+              background: `radial-gradient(ellipse at 45% 45%, 
+                rgba(255,255,255,0.75) 0%, 
+                rgba(220,225,222,0.55) 20%,
+                rgba(180,190,185,0.35) 45%, 
+                rgba(150,160,155,0.15) 65%,
+                transparent 80%)`,
               filter: `blur(${particle.blur}px)`,
             }}
             initial={{ 
               x: 0, 
               y: 0, 
-              opacity: 0.85, 
+              opacity: 0.8, 
               scale: 0.4,
               rotate: 0,
             }}
             animate={{ 
-              x: [0, particle.midX, particle.x],
-              y: [0, particle.midY, particle.y],
-              opacity: [0.85, 0.7, 0], 
-              scale: [0.4, 1.0, 1.6],
+              x: particle.xPath,
+              y: particle.yPath,
+              opacity: [0.8, 0.7, 0.55, 0.3, 0], 
+              scale: [0.4, 0.8, 1.1, 1.4, 1.7],
               rotate: particle.rotation,
             }}
             exit={{ opacity: 0 }}
             transition={{ 
               duration: particle.duration, 
               delay: particle.delay,
-              ease: [0.4, 0, 0.15, 1], // Starts fast, slows as it rises (like smoke losing momentum)
-              times: [0, 0.35, 1],
+              ease: [0.4, 0, 0.15, 1],
+              times: [0, 0.2, 0.45, 0.7, 1],
             }}
           />
         ))}
