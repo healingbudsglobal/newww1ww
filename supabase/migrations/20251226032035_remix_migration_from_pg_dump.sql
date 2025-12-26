@@ -209,6 +209,28 @@ CREATE TABLE public.profiles (
 
 
 --
+-- Name: strain_knowledge; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.strain_knowledge (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    strain_name text NOT NULL,
+    source_url text NOT NULL,
+    source_name text NOT NULL,
+    country_code text DEFAULT 'PT'::text NOT NULL,
+    category text DEFAULT 'dispensary'::text NOT NULL,
+    scraped_content text,
+    medical_conditions text[],
+    effects text[],
+    patient_reviews text,
+    product_info jsonb DEFAULT '{}'::jsonb,
+    last_scraped_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: strains; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -321,6 +343,22 @@ ALTER TABLE ONLY public.profiles
 
 
 --
+-- Name: strain_knowledge strain_knowledge_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.strain_knowledge
+    ADD CONSTRAINT strain_knowledge_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: strain_knowledge strain_knowledge_strain_name_source_url_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.strain_knowledge
+    ADD CONSTRAINT strain_knowledge_strain_name_source_url_key UNIQUE (strain_name, source_url);
+
+
+--
 -- Name: strains strains_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -350,6 +388,20 @@ ALTER TABLE ONLY public.user_roles
 
 ALTER TABLE ONLY public.user_roles
     ADD CONSTRAINT user_roles_user_id_role_key UNIQUE (user_id, role);
+
+
+--
+-- Name: idx_strain_knowledge_country; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_strain_knowledge_country ON public.strain_knowledge USING btree (country_code);
+
+
+--
+-- Name: idx_strain_knowledge_strain_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_strain_knowledge_strain_name ON public.strain_knowledge USING btree (strain_name);
 
 
 --
@@ -406,6 +458,13 @@ CREATE TRIGGER update_prescription_documents_updated_at BEFORE UPDATE ON public.
 --
 
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: strain_knowledge update_strain_knowledge_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_strain_knowledge_updated_at BEFORE UPDATE ON public.strain_knowledge FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -479,6 +538,13 @@ CREATE POLICY "Admins can manage roles" ON public.user_roles USING (public.has_r
 
 
 --
+-- Name: strain_knowledge Admins can manage strain knowledge; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Admins can manage strain knowledge" ON public.strain_knowledge USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+
+--
 -- Name: strains Admins can manage strains; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -504,6 +570,13 @@ CREATE POLICY "Admins can view all prescription documents" ON public.prescriptio
 --
 
 CREATE POLICY "Admins can view all roles" ON public.user_roles FOR SELECT USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+
+--
+-- Name: strain_knowledge Anyone can view strain knowledge; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Anyone can view strain knowledge" ON public.strain_knowledge FOR SELECT USING (true);
 
 
 --
@@ -702,6 +775,12 @@ ALTER TABLE public.prescription_documents ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: strain_knowledge; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.strain_knowledge ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: strains; Type: ROW SECURITY; Schema: public; Owner: -
