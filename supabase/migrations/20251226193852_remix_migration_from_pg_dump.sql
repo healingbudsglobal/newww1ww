@@ -169,6 +169,22 @@ ALTER TABLE ONLY public.drgreen_orders REPLICA IDENTITY FULL;
 
 
 --
+-- Name: generated_product_images; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.generated_product_images (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id text NOT NULL,
+    product_name text NOT NULL,
+    original_image_url text,
+    generated_image_url text NOT NULL,
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: prescription_documents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -327,6 +343,22 @@ ALTER TABLE ONLY public.drgreen_orders
 
 
 --
+-- Name: generated_product_images generated_product_images_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.generated_product_images
+    ADD CONSTRAINT generated_product_images_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: generated_product_images generated_product_images_product_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.generated_product_images
+    ADD CONSTRAINT generated_product_images_product_id_key UNIQUE (product_id);
+
+
+--
 -- Name: prescription_documents prescription_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -391,6 +423,13 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
+-- Name: idx_generated_product_images_product_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_generated_product_images_product_id ON public.generated_product_images USING btree (product_id);
+
+
+--
 -- Name: idx_strain_knowledge_country; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -444,6 +483,13 @@ CREATE TRIGGER update_drgreen_clients_updated_at BEFORE UPDATE ON public.drgreen
 --
 
 CREATE TRIGGER update_drgreen_orders_updated_at BEFORE UPDATE ON public.drgreen_orders FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: generated_product_images update_generated_product_images_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_generated_product_images_updated_at BEFORE UPDATE ON public.generated_product_images FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -570,6 +616,13 @@ CREATE POLICY "Admins can view all prescription documents" ON public.prescriptio
 --
 
 CREATE POLICY "Admins can view all roles" ON public.user_roles FOR SELECT USING (public.has_role(auth.uid(), 'admin'::public.app_role));
+
+
+--
+-- Name: generated_product_images Anyone can view generated product images; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Anyone can view generated product images" ON public.generated_product_images FOR SELECT USING (true);
 
 
 --
@@ -763,6 +816,12 @@ ALTER TABLE public.drgreen_clients ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.drgreen_orders ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: generated_product_images; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.generated_product_images ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: prescription_documents; Type: ROW SECURITY; Schema: public; Owner: -
