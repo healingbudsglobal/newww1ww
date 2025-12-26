@@ -1,4 +1,5 @@
 import hbLogoWhite from "@/assets/hb-logo-white-new.png";
+import drGreenLogo from "@/assets/drgreen-nft-logo.png";
 import { Link } from "react-router-dom";
 import { Mail, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -137,6 +138,20 @@ const Footer = () => {
             <p className="font-body text-white/40 text-xs">
               Medical cannabis for qualifying patients only.
             </p>
+            {/* Dr. Green NFT Partnership Logo */}
+            <a 
+              href="https://drgreennft.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="opacity-30 hover:opacity-60 transition-opacity duration-300"
+              title="Powered by Dr. Green NFT"
+            >
+              <img 
+                src={drGreenLogo}
+                alt="Dr. Green NFT"
+                className="h-8 w-auto"
+              />
+            </a>
           </div>
         </div>
       </div>
