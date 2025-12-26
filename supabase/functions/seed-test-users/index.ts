@@ -10,7 +10,7 @@ const TEST_USERS = [
   {
     email: "patient@healingbuds.test",
     password: "Patient123!",
-    fullName: "Test Patient",
+    fullName: "Test Patient (Verified)",
     isKycVerified: true,
     adminApproval: "VERIFIED",
     role: null,
@@ -18,9 +18,17 @@ const TEST_USERS = [
   {
     email: "pending@healingbuds.test",
     password: "Pending123!",
-    fullName: "Pending User",
+    fullName: "Pending User (KYC Pending)",
     isKycVerified: false,
     adminApproval: "PENDING",
+    role: null,
+  },
+  {
+    email: "rejected@healingbuds.test",
+    password: "Rejected123!",
+    fullName: "Rejected User (Blocked)",
+    isKycVerified: true,
+    adminApproval: "REJECTED",
     role: null,
   },
   {

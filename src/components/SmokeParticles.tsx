@@ -27,6 +27,7 @@ interface Wisp {
 }
 
 type WindDirection = 'none' | 'left' | 'right' | 'up' | 'up-left' | 'up-right';
+type PulseSpeed = 'slow' | 'medium' | 'fast';
 
 interface SmokeParticlesProps {
   isActive: boolean;
@@ -38,7 +39,15 @@ interface SmokeParticlesProps {
   interactive?: boolean;
   wind?: WindDirection;
   windStrength?: 'gentle' | 'moderate' | 'strong';
+  pulsating?: boolean;
+  pulseSpeed?: PulseSpeed;
 }
+
+const pulseSpeedConfig = {
+  slow: 3000,
+  medium: 1800,
+  fast: 900,
+};
 
 const densityConfig = {
   light: { particleMultiplier: 0.6, maxWisps: 5, spawnRate: 600 },
@@ -79,11 +88,15 @@ export const SmokeParticles = ({
   interactive = true,
   wind = 'none',
   windStrength = 'moderate',
+  pulsating = false,
+  pulseSpeed = 'medium',
 }: SmokeParticlesProps) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const [wisps, setWisps] = useState<Wisp[]>([]);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [pulseMultiplier, setPulseMultiplier] = useState(1);
   const wispIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pulseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const wispIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   
@@ -111,14 +124,43 @@ export const SmokeParticles = ({
     }
   }, [interactive, isActive, handleMouseMove]);
 
+  // Pulsating wind effect
+  useEffect(() => {
+    if (pulsating && isActive) {
+      const pulseInterval = pulseSpeedConfig[pulseSpeed];
+      let startTime = Date.now();
+      
+      pulseIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        // Sinusoidal oscillation between 0.3 and 1.0
+        const sine = Math.sin((elapsed / pulseInterval) * Math.PI * 2);
+        const multiplier = 0.65 + sine * 0.35; // Range: 0.3 to 1.0
+        setPulseMultiplier(multiplier);
+      }, 50); // Update every 50ms for smooth animation
+      
+      return () => {
+        if (pulseIntervalRef.current) {
+          clearInterval(pulseIntervalRef.current);
+          pulseIntervalRef.current = null;
+        }
+      };
+    } else {
+      setPulseMultiplier(1);
+      if (pulseIntervalRef.current) {
+        clearInterval(pulseIntervalRef.current);
+        pulseIntervalRef.current = null;
+      }
+    }
+  }, [pulsating, isActive, pulseSpeed]);
+
   const config = densityConfig[density];
   const opacitySettings = opacityConfig[opacity];
   const effectiveSpawnRate = spawnRate ?? config.spawnRate;
   const effectiveParticleCount = Math.round(particleCount * config.particleMultiplier);
   
-  // Wind calculations
+  // Wind calculations with pulsating multiplier
   const windVector = getWindVector(wind);
-  const windMultiplier = windStrengthConfig[windStrength];
+  const windMultiplier = windStrengthConfig[windStrength] * pulseMultiplier;
   const windDriftX = windVector.x * 60 * windMultiplier;
   const windDriftY = windVector.y * 40 * windMultiplier;
 
