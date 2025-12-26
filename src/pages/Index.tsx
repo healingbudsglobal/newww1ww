@@ -64,8 +64,8 @@ const Index = () => {
         <Header onMenuStateChange={setMenuOpen} />
         
         <main>
-          {/* Video Hero Section - with side padding to match header */}
-          <section ref={heroRef} className="relative min-h-[85vh] flex items-center justify-center overflow-hidden mx-3 sm:mx-4 mt-24 rounded-xl">
+          {/* Video Hero Section - with consistent 8px margins */}
+          <section ref={heroRef} className="relative min-h-[85vh] flex items-center justify-center overflow-hidden mx-2 mt-2 rounded-xl">
             {/* Video Background with Parallax */}
             <motion.div 
               className="absolute inset-0 z-0"
