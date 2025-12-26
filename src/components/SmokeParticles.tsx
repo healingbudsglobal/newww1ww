@@ -152,10 +152,11 @@ export const SmokeParticles = ({
     >
       <defs>
         <radialGradient id={`smokeGradient-${id}`} cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.7)" />
-          <stop offset="20%" stopColor="rgba(235,240,238,0.55)" />
-          <stop offset="45%" stopColor="rgba(210,218,214,0.4)" />
-          <stop offset="70%" stopColor="rgba(185,195,190,0.2)" />
+          <stop offset="0%" stopColor="rgba(255,255,255,0.65)" />
+          <stop offset="15%" stopColor="rgba(230,245,240,0.55)" />
+          <stop offset="35%" stopColor="rgba(180,210,200,0.4)" />
+          <stop offset="55%" stopColor="rgba(140,180,170,0.28)" />
+          <stop offset="75%" stopColor="rgba(100,160,150,0.15)" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
         <filter id={`smokeBlur-${id}`} x="-80%" y="-80%" width="260%" height="260%">
