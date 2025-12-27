@@ -130,7 +130,7 @@ const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="py-8">
+        <div className="py-8 pb-28 lg:pb-8">
           {/* Top row: Copyright and Dr. Green logo */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="font-body text-white/50 text-xs">
@@ -142,14 +142,14 @@ const Footer = () => {
               href="https://drgreennft.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center gap-2 opacity-50 hover:opacity-70 transition-opacity duration-300 mr-16"
+              className="flex items-center gap-2 opacity-60 hover:opacity-80 transition-opacity duration-300"
               title="Powered by Dr. Green NFT"
             >
-              <span className="font-body text-white/40 text-xs">Powered by</span>
+              <span className="font-body text-white/50 text-xs">Powered by</span>
               <img 
                 src={drGreenLogo}
                 alt="Dr. Green NFT"
-                className="h-10 w-auto"
+                className="h-8 w-auto"
               />
             </a>
           </div>
