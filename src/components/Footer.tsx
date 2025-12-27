@@ -131,28 +131,33 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="py-8">
+          {/* Top row: Copyright and Dr. Green logo */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="font-body text-white/50 text-xs">
               © {currentYear} Healing Buds. All rights reserved.
             </p>
-            <p className="font-body text-white/40 text-xs">
-              Medical cannabis for qualifying patients only.
-            </p>
-            {/* Dr. Green NFT Partnership Logo */}
+            
+            {/* Dr. Green NFT Partnership Logo - with "Powered by" text */}
             <a 
               href="https://drgreennft.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="opacity-70 hover:opacity-100 transition-opacity duration-300"
+              className="flex items-center gap-2 opacity-50 hover:opacity-70 transition-opacity duration-300 mr-16"
               title="Powered by Dr. Green NFT"
             >
+              <span className="font-body text-white/40 text-xs">Powered by</span>
               <img 
                 src={drGreenLogo}
                 alt="Dr. Green NFT"
-                className="h-12 w-auto"
+                className="h-10 w-auto"
               />
             </a>
           </div>
+          
+          {/* Bottom row: Medical cannabis statement - full width, centered */}
+          <p className="font-body text-white/40 text-xs text-center mt-4">
+            Medical cannabis for qualifying patients only.
+          </p>
         </div>
       </div>
     </footer>
