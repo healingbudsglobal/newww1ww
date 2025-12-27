@@ -153,11 +153,6 @@ const Footer = () => {
               />
             </a>
           </div>
-          
-          {/* Bottom row: Medical cannabis statement - full width, centered */}
-          <p className="font-body text-white/40 text-xs text-center mt-4">
-            Medical cannabis for qualifying patients only.
-          </p>
         </div>
       </div>
     </footer>
