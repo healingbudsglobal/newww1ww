@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAccount, useDisconnect, useBalance, useChainId, useSwitchChain } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,10 +17,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useNFTOwnership, NFT_CONTRACTS } from '@/hooks/useNFTOwnership';
+import { useDrGreenKeyOwnership } from '@/hooks/useNFTOwnership';
 import { cn } from '@/lib/utils';
 
 interface WalletConnectionModalProps {
@@ -34,11 +33,7 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
   const chainId = useChainId();
   const { chains, switchChain } = useSwitchChain();
   const { data: balance } = useBalance({ address });
-  
-  const { hasNFT, isLoading: nftLoading } = useNFTOwnership({
-    contractAddress: NFT_CONTRACTS.drGreenKey,
-    enabled: isConnected,
-  });
+  const { hasNFT, isLoading: nftLoading } = useDrGreenKeyOwnership();
 
   const [copied, setCopied] = useState(false);
 
@@ -207,7 +202,7 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
                     onClick={() => {
                       if (address) {
                         window.open(
-                          `https://etherscan.io/address/${address}`,
+                          `https://polygonscan.com/address/${address}`,
                           '_blank'
                         );
                       }
@@ -247,10 +242,7 @@ interface WalletButtonProps {
 export function WalletButton({ className }: WalletButtonProps) {
   const { isConnected, address } = useAccount();
   const [modalOpen, setModalOpen] = useState(false);
-  const { hasNFT } = useNFTOwnership({
-    contractAddress: NFT_CONTRACTS.drGreenKey,
-    enabled: isConnected,
-  });
+  const { hasNFT } = useDrGreenKeyOwnership();
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;

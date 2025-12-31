@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { useAccount } from 'wagmi';
-import { useNFTOwnership, NFT_CONTRACTS } from '@/hooks/useNFTOwnership';
+import { useDrGreenKeyOwnership } from '@/hooks/useNFTOwnership';
 import { WalletConnectionModal } from '@/components/WalletConnectionModal';
 
 interface WalletContextValue {
@@ -37,10 +37,7 @@ export function WalletContextProvider({ children }: WalletContextProviderProps) 
   const { isConnected, address } = useAccount();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { hasNFT, isLoading: nftLoading } = useNFTOwnership({
-    contractAddress: NFT_CONTRACTS.drGreenKey,
-    enabled: isConnected,
-  });
+  const { hasNFT, isLoading: nftLoading } = useDrGreenKeyOwnership();
 
   // App is "hydrated" when wallet is connected and NFT check is complete
   const isHydrated = isConnected && !nftLoading;

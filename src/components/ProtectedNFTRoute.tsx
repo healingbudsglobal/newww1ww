@@ -7,7 +7,7 @@ import { useAccount } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWallet } from '@/context/WalletContext';
-import { useNFTOwnership, NFT_CONTRACTS } from '@/hooks/useNFTOwnership';
+import { useDrGreenKeyOwnership } from '@/hooks/useNFTOwnership';
 
 interface ProtectedNFTRouteProps {
   children: ReactNode;
@@ -37,10 +37,7 @@ export function ProtectedNFTRoute({
 }: ProtectedNFTRouteProps) {
   const { isConnected } = useAccount();
   const { openWalletModal } = useWallet();
-  const { hasNFT, isLoading } = useNFTOwnership({
-    contractAddress: NFT_CONTRACTS.drGreenKey,
-    enabled: isConnected,
-  });
+  const { hasNFT, isLoading } = useDrGreenKeyOwnership();
 
   // Loading state
   if (isLoading) {

@@ -1,7 +1,8 @@
 import { useAccount, useReadContract } from 'wagmi';
+import { polygon, mainnet } from 'wagmi/chains';
 import { Address } from 'viem';
 
-// Standard ERC-721 ABI for balanceOf
+// Standard ERC-721 ABI for balanceOf and ownerOf
 const ERC721_ABI = [
   {
     inputs: [{ name: 'owner', type: 'address' }],
@@ -18,6 +19,50 @@ const ERC721_ABI = [
     type: 'function',
   },
 ] as const;
+
+/**
+ * Dr. Green Digital Key NFT Contract Configuration
+ * 
+ * The Dr. Green ecosystem uses NFTs as "Digital Keys" for access control.
+ * These are deployed on Polygon for lower gas fees.
+ * 
+ * Key Types:
+ * - Standard Key: Access to 1 planet, basic functionality
+ * - Gold Key: Access to multiple planets, enhanced benefits
+ * - Platinum Key: Access to all 20 planets, custom strain creation
+ * 
+ * IMPORTANT: Replace placeholder addresses with actual contract addresses
+ * from the Dr. Green team before production deployment.
+ */
+export const NFT_CONTRACTS = {
+  // Dr. Green Digital Key - Main access NFT on Polygon
+  // This is the primary NFT that grants access to the platform
+  drGreenDigitalKey: {
+    address: '0x0000000000000000000000000000000000000000' as Address, // TODO: Get from Dr. Green team
+    chainId: polygon.id,
+    name: 'Dr. Green Digital Key',
+  },
+  
+  // Dr. Green Platinum Key - Premium tier NFT
+  drGreenPlatinumKey: {
+    address: '0x0000000000000000000000000000000000000000' as Address, // TODO: Get from Dr. Green team
+    chainId: polygon.id,
+    name: 'Dr. Green Platinum Key',
+  },
+  
+  // Healing Buds Partner Access (if applicable)
+  healingBudsAccess: {
+    address: '0x0000000000000000000000000000000000000000' as Address, // TODO: Configure if needed
+    chainId: polygon.id,
+    name: 'Healing Buds Access',
+  },
+} as const;
+
+// Legacy export for backwards compatibility
+export const LEGACY_NFT_CONTRACTS = {
+  drGreenKey: NFT_CONTRACTS.drGreenDigitalKey.address,
+  healingBudsAccess: NFT_CONTRACTS.healingBudsAccess.address,
+} as const;
 
 interface UseNFTOwnershipOptions {
   contractAddress: Address;
@@ -38,10 +83,13 @@ interface NFTOwnershipResult {
  */
 export function useNFTOwnership({
   contractAddress,
-  chainId = 1, // Default to mainnet
+  chainId = polygon.id, // Default to Polygon where Dr. Green NFTs are deployed
   enabled = true,
 }: UseNFTOwnershipOptions): NFTOwnershipResult {
   const { address, isConnected } = useAccount();
+
+  // Check if contract address is configured (not zero address)
+  const isContractConfigured = contractAddress !== '0x0000000000000000000000000000000000000000';
 
   const {
     data: balance,
@@ -55,7 +103,7 @@ export function useNFTOwnership({
     args: address ? [address] : undefined,
     chainId,
     query: {
-      enabled: enabled && isConnected && !!address,
+      enabled: enabled && isConnected && !!address && isContractConfigured,
       staleTime: 1000 * 60 * 5, // 5 minutes
     },
   });
@@ -63,9 +111,51 @@ export function useNFTOwnership({
   return {
     hasNFT: balance !== undefined && balance > BigInt(0),
     balance,
-    isLoading,
+    isLoading: isLoading && isContractConfigured,
     error: error as Error | null,
     refetch,
+  };
+}
+
+/**
+ * Hook to check Dr. Green Digital Key ownership specifically
+ * Uses the configured contract address and Polygon chain
+ */
+export function useDrGreenKeyOwnership() {
+  return useNFTOwnership({
+    contractAddress: NFT_CONTRACTS.drGreenDigitalKey.address,
+    chainId: NFT_CONTRACTS.drGreenDigitalKey.chainId,
+  });
+}
+
+/**
+ * Hook to check Dr. Green Platinum Key ownership
+ */
+export function usePlatinumKeyOwnership() {
+  return useNFTOwnership({
+    contractAddress: NFT_CONTRACTS.drGreenPlatinumKey.address,
+    chainId: NFT_CONTRACTS.drGreenPlatinumKey.chainId,
+  });
+}
+
+/**
+ * Hook to check any tier of Dr. Green Key ownership
+ * Returns true if the user owns any Digital Key (Standard, Gold, or Platinum)
+ */
+export function useAnyDrGreenKeyOwnership() {
+  const digitalKey = useDrGreenKeyOwnership();
+  const platinumKey = usePlatinumKeyOwnership();
+
+  return {
+    hasAnyKey: digitalKey.hasNFT || platinumKey.hasNFT,
+    hasPlatinumKey: platinumKey.hasNFT,
+    hasDigitalKey: digitalKey.hasNFT,
+    isLoading: digitalKey.isLoading || platinumKey.isLoading,
+    error: digitalKey.error || platinumKey.error,
+    refetch: () => {
+      digitalKey.refetch();
+      platinumKey.refetch();
+    },
   };
 }
 
@@ -92,9 +182,3 @@ export function useMultiNFTOwnership(
     contracts,
   };
 }
-
-// Example NFT contract addresses (these would come from tenant config)
-export const NFT_CONTRACTS = {
-  drGreenKey: '0x0000000000000000000000000000000000000000' as Address, // Placeholder
-  healingBudsAccess: '0x0000000000000000000000000000000000000000' as Address, // Placeholder
-} as const;
