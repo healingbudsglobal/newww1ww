@@ -78,6 +78,9 @@ function getEmailTemplate(request: ClientEmailRequest, config: typeof DOMAIN_CON
 
   const headerColor = type.includes('rejected') ? '#ef4444' : '#0d9488';
 
+  // Logo URL hosted in Supabase storage
+  const logoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/email-assets/hb-logo-white.png`;
+
   const templates: Record<string, { subject: string; body: string }> = {
     'welcome': {
       subject: `Welcome to ${config.brandName} - Registration Complete`,
@@ -271,7 +274,8 @@ function getEmailTemplate(request: ClientEmailRequest, config: typeof DOMAIN_CON
       <body style="${baseStyles}">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
           <div style="background-color: ${headerColor}; padding: 24px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">${config.brandName}</h1>
+            <img src="${logoUrl}" alt="${config.brandName}" width="180" style="display: inline-block; max-width: 180px; height: auto;" />
+            <p style="color: #ffffff; margin: 12px 0 0 0; font-size: 14px;">Medical Cannabis Care</p>
           </div>
           <div style="padding: 32px;">
             ${template.body}

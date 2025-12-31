@@ -48,6 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const siteUrl = Deno.env.get("SITE_URL") || "https://healingbuds.com";
     const registrationUrl = `${siteUrl}/shop/register`;
+    const logoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/email-assets/hb-logo-white.png`;
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -66,10 +67,8 @@ const handler = async (req: Request): Promise<Response> => {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #0d5c4d 0%, #1a7a6d 100%); padding: 40px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">
-                🌿 Healing Buds
-              </h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">
+              <img src="${logoUrl}" alt="Healing Buds" width="180" style="display: inline-block; max-width: 180px; height: auto;" />
+              <p style="color: rgba(255,255,255,0.9); margin: 12px 0 0 0; font-size: 14px;">
                 Medical Cannabis Care
               </p>
             </td>

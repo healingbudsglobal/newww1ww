@@ -67,6 +67,9 @@ serve(async (req) => {
 
         console.log(`Sending expiry notification to ${userEmail} for ${doc.file_name}`);
 
+        // Logo URL for email header
+        const logoUrl = `${supabaseUrl}/storage/v1/object/public/email-assets/hb-logo-white.png`;
+
         const emailHtml = `
           <!DOCTYPE html>
           <html>
@@ -75,7 +78,8 @@ serve(async (req) => {
               body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
               .container { max-width: 600px; margin: 0 auto; padding: 20px; }
               .header { background: linear-gradient(135deg, #16a34a 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .header h1 { color: white; margin: 0; font-size: 24px; }
+              .header img { max-width: 180px; height: auto; }
+              .header p { color: rgba(255,255,255,0.9); margin: 12px 0 0 0; font-size: 14px; }
               .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
               .alert-box { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 20px 0; }
               .alert-box h2 { color: #92400e; margin-top: 0; }
@@ -87,7 +91,8 @@ serve(async (req) => {
           <body>
             <div class="container">
               <div class="header">
-                <h1>🌿 Healing Buds</h1>
+                <img src="${logoUrl}" alt="Healing Buds" width="180" />
+                <p>Medical Cannabis Care</p>
               </div>
               <div class="content">
                 <div class="alert-box">

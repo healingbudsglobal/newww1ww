@@ -144,6 +144,9 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
     
+    // Logo URL for email header
+    const logoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/email-assets/hb-logo-white.png`;
+
     // Build email HTML
     const emailHtml = `
       <!DOCTYPE html>
@@ -155,7 +158,8 @@ const handler = async (req: Request): Promise<Response> => {
       <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6;">
         <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
           <div style="background: linear-gradient(135deg, #2a3d3a 0%, #1a2e2a 100%); padding: 32px; border-radius: 16px 16px 0 0; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Healing Buds Global</h1>
+            <img src="${logoUrl}" alt="Healing Buds" width="180" style="display: inline-block; max-width: 180px; height: auto;" />
+            <p style="color: rgba(255,255,255,0.9); margin: 12px 0 0 0; font-size: 14px;">Medical Cannabis Care</p>
           </div>
           <div style="background-color: #ffffff; padding: 32px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
             <h2 style="color: #1a2e2a; margin: 0 0 16px; font-size: 20px;">Thank you for contacting us, ${name.trim()}!</h2>
