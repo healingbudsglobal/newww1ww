@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useGeoLocation } from '@/hooks/useGeoLocation';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { updateCachedRates } from '@/lib/currency';
 
@@ -69,15 +68,39 @@ const COUNTRY_TO_CURRENCY: Record<string, keyof ExchangeRatesData> = {
   US: 'USD',
 };
 
+// Get country code from domain (URL-first strategy)
+function getCountryFromDomain(): string {
+  const hostname = window.location.hostname.toLowerCase();
+  
+  // Lovable preview URLs and .co.za domains → South Africa
+  if (hostname.includes('lovable.app') || hostname.includes('lovableproject.com') || hostname.endsWith('.co.za')) {
+    return 'ZA';
+  }
+  // Portugal domains
+  if (hostname.endsWith('.pt')) {
+    return 'PT';
+  }
+  // UK domains
+  if (hostname.endsWith('.co.uk')) {
+    return 'GB';
+  }
+  // Thailand domains
+  if (hostname.endsWith('.co.th') || hostname.endsWith('.th')) {
+    return 'TH';
+  }
+  // Global/fallback to South Africa
+  return 'ZA';
+}
+
 export function ShopProvider({ children }: { children: React.ReactNode }) {
-  const geoLocation = useGeoLocation();
   const { rates, lastUpdated, convertPrice } = useExchangeRates();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [countryCode, setCountryCode] = useState<string>('ZA');
+  // Country is determined by URL domain, not geolocation
+  const [countryCode, setCountryCode] = useState<string>(() => getCountryFromDomain());
   const { toast } = useToast();
 
   // Update cached rates when they change
@@ -86,13 +109,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       updateCachedRates(rates);
     }
   }, [rates]);
-
-  // Sync countryCode with geoLocation on mount and when it changes
-  useEffect(() => {
-    if (!drGreenClient && geoLocation.countryCode) {
-      setCountryCode(geoLocation.countryCode);
-    }
-  }, [geoLocation.countryCode, drGreenClient]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
