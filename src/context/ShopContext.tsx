@@ -168,9 +168,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     }
 
     setDrGreenClient(data);
-    if (data?.country_code) {
-      setCountryCode(data.country_code);
-    }
+    // NOTE: Country is determined by URL domain, NOT client record
+    // Client's stored country_code is for their registration, not for browsing
     setIsLoading(false);
   }, []);
 
