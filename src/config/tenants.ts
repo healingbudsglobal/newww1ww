@@ -34,9 +34,9 @@ export interface TenantConfig {
   };
 }
 
-// Import logo assets - Use the correct full logos
-import hbLogoWhite from '@/assets/hb-logo-white-new.png';
-import hbLogoTeal from '@/assets/hb-logo-teal.png';
+// Import logo assets - Full Healing Buds logos with text
+import hbLogoWhite from '@/assets/hb-logo-white-full.png';
+import hbLogoTeal from '@/assets/hb-logo-teal-full.png';
 import hbIconTeal from '@/assets/hb-icon-teal.png';
 import drGreenLogo from '@/assets/drgreen-logo.svg';
 import drGreenNftLogo from '@/assets/drgreen-nft-logo.png';
