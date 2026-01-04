@@ -8,35 +8,63 @@ const corsHeaders = {
 
 const TEST_USERS = [
   {
-    email: "patient@healingbuds.test",
-    password: "Patient123!",
-    fullName: "Test Patient (Verified)",
-    isKycVerified: true,
-    adminApproval: "VERIFIED",
+    email: "new@healingbuds.test",
+    password: "NewUser123!",
+    fullName: "New User (No Registration)",
+    createClient: false, // No drgreen_clients record - brand new user
+    isKycVerified: false,
+    adminApproval: "PENDING",
+    kycLink: null,
     role: null,
   },
   {
     email: "pending@healingbuds.test",
     password: "Pending123!",
     fullName: "Pending User (KYC Pending)",
+    createClient: true,
     isKycVerified: false,
     adminApproval: "PENDING",
+    kycLink: "https://example.com/kyc/test-link", // Mock KYC link
+    role: null,
+  },
+  {
+    email: "kycdone@healingbuds.test",
+    password: "KycDone123!",
+    fullName: "KYC Done (Awaiting Review)",
+    createClient: true,
+    isKycVerified: true,
+    adminApproval: "PENDING", // KYC done but admin hasn't approved yet
+    kycLink: null,
+    role: null,
+  },
+  {
+    email: "patient@healingbuds.test",
+    password: "Patient123!",
+    fullName: "Test Patient (Fully Verified)",
+    createClient: true,
+    isKycVerified: true,
+    adminApproval: "VERIFIED",
+    kycLink: null,
     role: null,
   },
   {
     email: "rejected@healingbuds.test",
     password: "Rejected123!",
     fullName: "Rejected User (Blocked)",
+    createClient: true,
     isKycVerified: true,
     adminApproval: "REJECTED",
+    kycLink: null,
     role: null,
   },
   {
     email: "admin@healingbuds.test",
     password: "Admin123!",
     fullName: "Admin User",
+    createClient: true,
     isKycVerified: true,
     adminApproval: "VERIFIED",
+    kycLink: null,
     role: "admin",
   },
 ];
@@ -104,21 +132,31 @@ serve(async (req) => {
           console.error(`Profile error for ${testUser.email}:`, profileError);
         }
 
-        // Upsert drgreen_client
-        const { error: clientError } = await supabaseAdmin
-          .from("drgreen_clients")
-          .upsert(
-            {
-              user_id: userId,
-              drgreen_client_id: `test-${userId.slice(0, 8)}`,
-              is_kyc_verified: testUser.isKycVerified,
-              admin_approval: testUser.adminApproval,
-              country_code: "PT",
-            },
-            { onConflict: "user_id" }
-          );
-        if (clientError) {
-          console.error(`Client error for ${testUser.email}:`, clientError);
+        // Upsert drgreen_client (only if createClient is true)
+        if (testUser.createClient) {
+          const { error: clientError } = await supabaseAdmin
+            .from("drgreen_clients")
+            .upsert(
+              {
+                user_id: userId,
+                drgreen_client_id: `test-${userId.slice(0, 8)}`,
+                is_kyc_verified: testUser.isKycVerified,
+                admin_approval: testUser.adminApproval,
+                kyc_link: testUser.kycLink,
+                country_code: "PT",
+              },
+              { onConflict: "user_id" }
+            );
+          if (clientError) {
+            console.error(`Client error for ${testUser.email}:`, clientError);
+          }
+        } else {
+          // Delete any existing client record for "new user" test
+          await supabaseAdmin
+            .from("drgreen_clients")
+            .delete()
+            .eq("user_id", userId);
+          console.log(`Deleted client record for new user: ${testUser.email}`);
         }
 
         // Assign role if needed
