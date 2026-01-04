@@ -193,24 +193,19 @@ const API_TIMEOUT_MS = 20000;
  * This is used for POST requests and singular GET requests (Method A)
  */
 async function signPayload(payload: string, secretKey: string): Promise<string> {
-  // Decode Base64-encoded private key to get raw bytes
-  const keyString = atob(secretKey);
-  const keyBytes = new Uint8Array(keyString.length);
-  for (let i = 0; i < keyString.length; i++) {
-    keyBytes[i] = keyString.charCodeAt(i);
-  }
+  const encoder = new TextEncoder();
   
-  // Import the decoded key for HMAC
+  // Import the secret key for HMAC - use key directly as UTF-8 bytes
+  const keyData = encoder.encode(secretKey);
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    keyBytes,
+    keyData,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
   
   // Sign the payload
-  const encoder = new TextEncoder();
   const payloadData = encoder.encode(payload);
   const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, payloadData);
   
