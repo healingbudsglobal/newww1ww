@@ -34,8 +34,8 @@ export interface TenantConfig {
   };
 }
 
-// Import logo assets
-import hbLogoWhite from '@/assets/hb-logo-white.png';
+// Import logo assets - Use the correct full logos
+import hbLogoWhite from '@/assets/hb-logo-white-new.png';
 import hbLogoTeal from '@/assets/hb-logo-teal.png';
 import hbIconTeal from '@/assets/hb-icon-teal.png';
 import drGreenLogo from '@/assets/drgreen-logo.svg';
