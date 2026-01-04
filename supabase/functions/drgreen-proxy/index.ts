@@ -495,28 +495,69 @@ serve(async (req) => {
       // LEGACY WORDPRESS-COMPATIBLE ENDPOINTS
       // ==========================================
       
-      // Create client with legacy payload format (Method A - Body Sign)
+      // Create client with legacy payload format - transformed to new /dapp/clients schema
       case "create-client-legacy": {
-        const payload = body?.payload;
-        if (!payload) throw new Error("Payload is required for client creation");
+        const legacyPayload = body?.payload;
+        if (!legacyPayload) throw new Error("Payload is required for client creation");
         
         // Validate required fields
-        if (!validateEmail(payload.email)) {
+        if (!validateEmail(legacyPayload.email)) {
           throw new Error("Invalid email format");
         }
-        if (!validateStringLength(payload.firstName, 100) || !validateStringLength(payload.lastName, 100)) {
+        if (!validateStringLength(legacyPayload.firstName, 100) || !validateStringLength(legacyPayload.lastName, 100)) {
           throw new Error("Name fields exceed maximum length");
         }
         
-        // Enhanced logging for debugging API credential issues
-        logInfo("Creating client with legacy payload", {
+        // Transform legacy payload to new /dapp/clients schema
+        const dappPayload = {
+          transaction_metadata: {
+            source: "Healingbuds_Web_Store",
+            timestamp: new Date().toISOString(),
+            flow_type: "Legacy_Onboarding_v1"
+          },
+          user_identity: {
+            first_name: String(legacyPayload.firstName || "").slice(0, 100),
+            last_name: String(legacyPayload.lastName || "").slice(0, 100),
+            dob: legacyPayload.dob || legacyPayload.dateOfBirth || "",
+            email: String(legacyPayload.email || "").toLowerCase().slice(0, 255),
+            phone_number: String(legacyPayload.contactNumber || legacyPayload.phone || "").slice(0, 20)
+          },
+          eligibility_results: {
+            age_verified: true,
+            region_eligible: true,
+            postal_code: String(legacyPayload.postalCode || "").slice(0, 20),
+            country_code: String(legacyPayload.countryCode || "PT").slice(0, 3),
+            declared_medical_patient: legacyPayload.medicalHistory3 === true || legacyPayload.doctorApproval === true
+          },
+          shipping_address: {
+            street: String(legacyPayload.address1 || legacyPayload.street || "").slice(0, 200),
+            city: String(legacyPayload.city || "").slice(0, 100),
+            postal_code: String(legacyPayload.postalCode || "").slice(0, 20),
+            country: String(legacyPayload.countryCode || "PT").slice(0, 3)
+          },
+          medical_record: {
+            conditions: String(legacyPayload.medicalConditions || legacyPayload.medicalHistory11 || "").slice(0, 2000),
+            current_medications: String(legacyPayload.currentMedications || legacyPayload.medicalHistory13 || "").slice(0, 1000),
+            allergies: String(legacyPayload.allergies || "").slice(0, 500),
+            previous_cannabis_use: legacyPayload.medicalHistory0 === true || legacyPayload.previousCannabisUse === true
+          },
+          kyc_requirements: {
+            document_type: "Government_ID",
+            id_country: String(legacyPayload.countryCode || "PT").slice(0, 3),
+            selfie_required: true,
+            liveness_check: "active"
+          }
+        };
+        
+        // Enhanced logging for debugging
+        logInfo("Creating client with transformed legacy payload", {
           hasApiKey: !!Deno.env.get("DRGREEN_API_KEY"),
           hasPrivateKey: !!Deno.env.get("DRGREEN_PRIVATE_KEY"),
-          email: payload.email?.slice(0, 5) + '***',
-          countryCode: payload.countryCode,
+          email: dappPayload.user_identity.email?.slice(0, 5) + '***',
+          countryCode: dappPayload.eligibility_results.country_code,
         });
         
-        response = await drGreenRequestBody("/dapp/clients", "POST", payload);
+        response = await drGreenRequestBody("/dapp/clients", "POST", dappPayload);
         
         // Log response details for debugging
         const clonedResp = response.clone();
