@@ -193,19 +193,24 @@ const API_TIMEOUT_MS = 20000;
  * This is used for POST requests and singular GET requests (Method A)
  */
 async function signPayload(payload: string, secretKey: string): Promise<string> {
-  const encoder = new TextEncoder();
+  // Decode Base64-encoded private key to get raw bytes
+  const keyString = atob(secretKey);
+  const keyBytes = new Uint8Array(keyString.length);
+  for (let i = 0; i < keyString.length; i++) {
+    keyBytes[i] = keyString.charCodeAt(i);
+  }
   
-  // Import the secret key for HMAC
-  const keyData = encoder.encode(secretKey);
+  // Import the decoded key for HMAC
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    keyData,
+    keyBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
   
   // Sign the payload
+  const encoder = new TextEncoder();
   const payloadData = encoder.encode(payload);
   const signatureBuffer = await crypto.subtle.sign("HMAC", cryptoKey, payloadData);
   
@@ -245,12 +250,10 @@ async function drGreenRequestBody(
   const payload = body ? JSON.stringify(body) : "";
   const signature = await signPayload(payload, secretKey);
   
-  // API key must be Base64 encoded per Dr Green API spec
-  const encodedApiKey = btoa(apiKey);
-  
+  // API key is already Base64 encoded - send as-is
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-auth-apikey": encodedApiKey,
+    "x-auth-apikey": apiKey,
     "x-auth-signature": signature,
   };
   
@@ -304,12 +307,10 @@ async function drGreenRequestQuery(
   // Sign the query string (not the body)
   const signature = await signQueryString(queryString, secretKey);
   
-  // API key must be Base64 encoded per Dr Green API spec
-  const encodedApiKey = btoa(apiKey);
-  
+  // API key is already Base64 encoded - send as-is
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-auth-apikey": encodedApiKey,
+    "x-auth-apikey": apiKey,
     "x-auth-signature": signature,
   };
   
