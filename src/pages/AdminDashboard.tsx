@@ -41,6 +41,7 @@ import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { BatchImageGenerator } from "@/components/admin/BatchImageGenerator";
 import { KYCJourneyViewer } from "@/components/admin/KYCJourneyViewer";
 import { AdminEmailTrigger } from "@/components/admin/AdminEmailTrigger";
+import { ApiDebugPanel } from "@/components/admin/ApiDebugPanel";
 import { useAccount, useDisconnect, useBalance, useChainId } from "wagmi";
 import { useDrGreenKeyOwnership } from "@/hooks/useNFTOwnership";
 import { useWallet } from "@/context/WalletContext";
@@ -718,6 +719,11 @@ const AdminDashboard = () => {
             {/* Manual Email Trigger */}
             <div className="mb-12">
               <AdminEmailTrigger />
+            </div>
+
+            {/* API Debug Panel */}
+            <div className="mb-12">
+              <ApiDebugPanel />
             </div>
 
             {/* Admin Tools */}
