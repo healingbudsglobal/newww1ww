@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { BatchImageGenerator } from "@/components/admin/BatchImageGenerator";
 import { KYCJourneyViewer } from "@/components/admin/KYCJourneyViewer";
+import { AdminEmailTrigger } from "@/components/admin/AdminEmailTrigger";
 import { useAccount, useDisconnect, useBalance, useChainId } from "wagmi";
 import { useDrGreenKeyOwnership } from "@/hooks/useNFTOwnership";
 import { useWallet } from "@/context/WalletContext";
@@ -712,6 +713,11 @@ const AdminDashboard = () => {
             {/* KYC Journey Logs */}
             <div className="mb-12">
               <KYCJourneyViewer />
+            </div>
+
+            {/* Manual Email Trigger */}
+            <div className="mb-12">
+              <AdminEmailTrigger />
             </div>
 
             {/* Admin Tools */}
