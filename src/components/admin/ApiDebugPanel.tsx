@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -23,7 +24,8 @@ import {
   Database,
   Users,
   ShoppingCart,
-  Package
+  Package,
+  Shield
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +46,7 @@ interface EndpointConfig {
   params?: Array<{ name: string; type: "text" | "select"; options?: string[]; required: boolean }>;
   hasBody?: boolean;
   defaultBody?: Record<string, unknown>;
+  supportsDebugMode?: boolean;
 }
 
 const ENDPOINTS: EndpointConfig[] = [
@@ -98,6 +101,7 @@ const ENDPOINTS: EndpointConfig[] = [
     category: "clients",
     requiresParams: false,
     hasBody: true,
+    supportsDebugMode: true,
     defaultBody: {
       firstName: "Test",
       lastName: "User",
@@ -228,6 +232,8 @@ export function ApiDebugPanel() {
   const [params, setParams] = useState<Record<string, string>>({});
   const [bodyJson, setBodyJson] = useState<string>("");
   const [bodyError, setBodyError] = useState<string | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugKey, setDebugKey] = useState("");
   const [response, setResponse] = useState<ApiResponse>({ status: "idle" });
   const [history, setHistory] = useState<Array<{ endpoint: string; response: ApiResponse; timestamp: Date }>>([]);
   const { callProxy } = useDrGreenApi();
@@ -268,6 +274,12 @@ export function ApiDebugPanel() {
       return;
     }
 
+    // Validate debug key if debug mode is enabled for supported endpoints
+    if (debugMode && endpoint.supportsDebugMode && !debugKey.trim()) {
+      toast.error("Debug key is required when debug mode is enabled");
+      return;
+    }
+
     setResponse({ status: "loading" });
     const startTime = performance.now();
 
@@ -289,16 +301,37 @@ export function ApiDebugPanel() {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke('drgreen-proxy', {
-        body: requestBody,
+      // Use fetch with custom headers for debug mode
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+      };
+
+      // Add debug header if debug mode is enabled for this endpoint
+      if (debugMode && endpoint.supportsDebugMode && debugKey.trim()) {
+        headers['x-admin-debug-key'] = debugKey.trim();
+        console.log('[ApiDebugPanel] Debug mode enabled, adding x-admin-debug-key header');
+      }
+
+      const fetchResponse = await fetch(`${supabaseUrl}/functions/v1/drgreen-proxy`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
       });
+
+      const data = await fetchResponse.json();
 
       const duration = Math.round(performance.now() - startTime);
 
-      if (error) {
+      if (!fetchResponse.ok) {
         const errorResponse: ApiResponse = {
           status: "error",
-          error: error.message,
+          statusCode: fetchResponse.status,
+          error: data?.error || data?.message || `HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`,
           duration,
         };
         setResponse(errorResponse);
@@ -306,7 +339,7 @@ export function ApiDebugPanel() {
       } else {
         const successResponse: ApiResponse = {
           status: "success",
-          statusCode: 200,
+          statusCode: fetchResponse.status,
           data,
           duration,
         };
@@ -442,6 +475,40 @@ export function ApiDebugPanel() {
                 <p className="text-xs text-muted-foreground">
                   This payload mirrors the onboarding form structure. Modify to test different scenarios.
                 </p>
+              </div>
+            )}
+
+            {/* Debug Mode Toggle - only show for supported endpoints */}
+            {endpoint?.supportsDebugMode && (
+              <div className="space-y-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-amber-600" />
+                    <Label className="text-sm font-medium text-amber-700 dark:text-amber-400">Admin Debug Mode</Label>
+                  </div>
+                  <Switch
+                    checked={debugMode}
+                    onCheckedChange={setDebugMode}
+                  />
+                </div>
+                {debugMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="debug-key" className="text-xs text-amber-600 dark:text-amber-400">
+                      Debug Key (first 16 chars of DRGREEN_PRIVATE_KEY)
+                    </Label>
+                    <Input
+                      id="debug-key"
+                      type="password"
+                      value={debugKey}
+                      onChange={(e) => setDebugKey(e.target.value)}
+                      placeholder="Enter debug key..."
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+                      ⚠️ Debug mode bypasses authentication. Use only for testing.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
