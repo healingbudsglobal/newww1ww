@@ -2,12 +2,13 @@
  * Header Component - Pharmaceutical-Grade Design
  * 
  * Premium, trustworthy navbar with theme-aware styling.
+ * Role-aware: Shows Admin Portal for admins, Patient Portal for patients.
  * Light mode: teal/dark text on light background
  * Dark mode: white text on dark background
  */
 
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { LogOut, LayoutDashboard, User } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Shield } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { motion, useScroll, useSpring } from "framer-motion";
@@ -17,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { useTenant } from "@/hooks/useTenant";
+import { useUserRole } from "@/hooks/useUserRole";
 import EligibilityDialog from "@/components/EligibilityDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -41,6 +43,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const { t } = useTranslation('common');
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   const headerRef = useRef<HTMLElement>(null);
   
   const isDark = resolvedTheme === 'dark';
@@ -100,6 +103,11 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
     setMobileMenuOpen(false);
     navigate("/");
   };
+
+  // Determine portal link based on role
+  const portalLink = isAdmin && !roleLoading ? "/admin" : "/dashboard";
+  const portalLabel = isAdmin && !roleLoading ? "Admin" : "Portal";
+  const PortalIcon = isAdmin && !roleLoading ? Shield : LayoutDashboard;
 
   return (
     <>
@@ -194,16 +202,19 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                   
                   {user ? (
                     <>
+                      {/* Role-aware Portal Button */}
                       <Link
-                        to="/dashboard"
+                        to={portalLink}
                         className={cn(
                           "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
-                          "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50",
-                          "text-sm flex items-center gap-2"
+                          "text-sm flex items-center gap-2",
+                          isAdmin && !roleLoading
+                            ? "bg-primary/20 text-primary-foreground hover:bg-primary/30 border border-primary/50"
+                            : "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50"
                         )}
                       >
-                        <LayoutDashboard className="w-4 h-4" />
-                        Portal
+                        <PortalIcon className="w-4 h-4" />
+                        {portalLabel}
                       </Link>
                       <button
                         onClick={handleLogout}

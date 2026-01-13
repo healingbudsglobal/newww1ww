@@ -9,14 +9,11 @@ import {
   Download,
   Eye,
   User,
-  Calendar,
-  Shield,
-  AlertTriangle
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -30,9 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import Header from '@/layout/Header';
-import Footer from '@/components/Footer';
-import { useNavigate } from 'react-router-dom';
+import AdminLayout from '@/layout/AdminLayout';
 
 interface PrescriptionDocument {
   id: string;
@@ -63,48 +58,15 @@ const documentTypeLabels: Record<string, string> = {
 const AdminPrescriptions = () => {
   const [documents, setDocuments] = useState<PrescriptionDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<PrescriptionDocument | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    checkAdminStatus();
+    fetchDocuments();
   }, []);
-
-  const checkAdminStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
-
-      // Check if user has admin role
-      const { data: roles, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin');
-
-      if (error) throw error;
-
-      if (!roles || roles.length === 0) {
-        setIsAdmin(false);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsAdmin(true);
-      fetchDocuments();
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsLoading(false);
-    }
-  };
 
   const fetchDocuments = async () => {
     try {
@@ -118,7 +80,6 @@ const AdminPrescriptions = () => {
       // Fetch user emails for each document
       const docsWithEmails = await Promise.all(
         (data || []).map(async (doc) => {
-          // We can't directly query auth.users, so we'll show user_id
           return { ...doc, user_email: doc.user_id.slice(0, 8) + '...' };
         })
       );
@@ -228,174 +189,128 @@ const AdminPrescriptions = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="container mx-auto px-4 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="container mx-auto px-4 text-center">
-            <Card className="max-w-md mx-auto bg-card/50 backdrop-blur-sm border-border/50">
-              <CardContent className="pt-12 pb-8">
-                <AlertTriangle className="w-16 h-16 mx-auto mb-6 text-yellow-500" />
-                <h2 className="text-2xl font-bold text-foreground mb-4">Access Denied</h2>
-                <p className="text-muted-foreground mb-6">
-                  You don't have permission to access this page. Admin privileges are required.
-                </p>
-                <Button onClick={() => navigate('/dashboard')}>
-                  Return to Dashboard
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-        <Footer />
-      </div>
+      <AdminLayout title="Document Review" description="Review and approve patient prescription documents">
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="pt-32 pb-20">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-6xl mx-auto"
-          >
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-2">
-                <Shield className="h-8 w-8 text-primary" />
-                <h1 className="text-3xl font-bold text-foreground">Admin: Document Review</h1>
-              </div>
-              <p className="text-muted-foreground">
-                Review and approve patient prescription documents
-              </p>
-            </div>
+    <AdminLayout title="Document Review" description="Review and approve patient prescription documents">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full max-w-md grid-cols-4">
+            <TabsTrigger value="pending" className="relative">
+              Pending
+              {documents.filter(d => d.status === 'pending').length > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-primary-foreground">
+                  {documents.filter(d => d.status === 'pending').length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="grid w-full max-w-md grid-cols-4">
-                <TabsTrigger value="pending" className="relative">
-                  Pending
-                  {documents.filter(d => d.status === 'pending').length > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-primary-foreground">
-                      {documents.filter(d => d.status === 'pending').length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="approved">Approved</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected</TabsTrigger>
-                <TabsTrigger value="all">All</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value={activeTab}>
-                <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      {activeTab === 'pending' ? 'Pending Review' : 
-                       activeTab === 'approved' ? 'Approved Documents' :
-                       activeTab === 'rejected' ? 'Rejected Documents' : 'All Documents'}
-                    </CardTitle>
-                    <CardDescription>
-                      {filteredDocs.length} document{filteredDocs.length !== 1 ? 's' : ''}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {filteredDocs.length === 0 ? (
-                      <div className="text-center py-12">
-                        <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                        <p className="text-muted-foreground">No documents in this category</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {filteredDocs.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-4 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors"
-                          >
-                            <div className="flex items-start gap-4 min-w-0 flex-1">
-                              <div className={`p-2 rounded-lg ${
-                                doc.file_type.includes('pdf') ? 'bg-red-500/10' : 'bg-blue-500/10'
-                              }`}>
-                                <FileText className={`h-6 w-6 ${
-                                  doc.file_type.includes('pdf') ? 'text-red-500' : 'text-blue-500'
-                                }`} />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-medium truncate">{doc.file_name}</p>
-                                  {getStatusBadge(doc.status)}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
-                                  <span className="flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {doc.user_email}
-                                  </span>
-                                  <span>{documentTypeLabels[doc.document_type]}</span>
-                                  <span>{formatFileSize(doc.file_size)}</span>
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(doc.upload_date).toLocaleDateString()}
-                                  </span>
-                                  {doc.expiry_date && (
-                                    <span className={new Date(doc.expiry_date) < new Date() ? 'text-destructive' : ''}>
-                                      Expires: {new Date(doc.expiry_date).toLocaleDateString()}
-                                    </span>
-                                  )}
-                                </div>
-                                {doc.review_notes && (
-                                  <p className="text-sm text-muted-foreground mt-2 italic">
-                                    Note: {doc.review_notes}
-                                  </p>
-                                )}
-                              </div>
+          <TabsContent value={activeTab}>
+            <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  {activeTab === 'pending' ? 'Pending Review' : 
+                   activeTab === 'approved' ? 'Approved Documents' :
+                   activeTab === 'rejected' ? 'Rejected Documents' : 'All Documents'}
+                </CardTitle>
+                <CardDescription>
+                  {filteredDocs.length} document{filteredDocs.length !== 1 ? 's' : ''}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {filteredDocs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">No documents in this category</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredDocs.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-4 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-start gap-4 min-w-0 flex-1">
+                          <div className={`p-2 rounded-lg ${
+                            doc.file_type.includes('pdf') ? 'bg-red-500/10' : 'bg-blue-500/10'
+                          }`}>
+                            <FileText className={`h-6 w-6 ${
+                              doc.file_type.includes('pdf') ? 'text-red-500' : 'text-blue-500'
+                            }`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium truncate">{doc.file_name}</p>
+                              {getStatusBadge(doc.status)}
                             </div>
-                            <div className="flex items-center gap-2 ml-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownload(doc)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              {doc.status === 'pending' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedDoc(doc);
-                                    setReviewNotes('');
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Review
-                                </Button>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {doc.user_email}
+                              </span>
+                              <span>{documentTypeLabels[doc.document_type]}</span>
+                              <span>{formatFileSize(doc.file_size)}</span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(doc.upload_date).toLocaleDateString()}
+                              </span>
+                              {doc.expiry_date && (
+                                <span className={new Date(doc.expiry_date) < new Date() ? 'text-destructive' : ''}>
+                                  Expires: {new Date(doc.expiry_date).toLocaleDateString()}
+                                </span>
                               )}
                             </div>
+                            {doc.review_notes && (
+                              <p className="text-sm text-muted-foreground mt-2 italic">
+                                Note: {doc.review_notes}
+                              </p>
+                            )}
                           </div>
-                        ))}
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(doc)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {doc.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                setReviewNotes('');
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Review
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </motion.div>
-        </div>
-      </main>
-      <Footer />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </motion.div>
 
       {/* Review Dialog */}
       <Dialog open={!!selectedDoc} onOpenChange={() => setSelectedDoc(null)}>
@@ -459,7 +374,7 @@ const AdminPrescriptions = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminLayout>
   );
 };
 

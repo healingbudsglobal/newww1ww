@@ -2,16 +2,18 @@
  * NavigationOverlay Component - Pharmaceutical Grade
  * 
  * Premium mobile navigation drawer sliding from RIGHT with glassmorphism.
+ * Role-aware: Shows Admin Portal for admins, Patient Portal for patients.
  */
 
 import { Link, useLocation } from "react-router-dom";
-import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, ShoppingBag, HeadphonesIcon, Home } from "lucide-react";
+import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, ShoppingBag, HeadphonesIcon, Home, Shield } from "lucide-react";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useUserRole } from "@/hooks/useUserRole";
 import hbLogoWhite from "@/assets/hb-logo-white-full.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeToggle from "./ThemeToggle";
@@ -34,6 +36,7 @@ const NavigationOverlay = ({
 }: NavigationOverlayProps) => {
   const location = useLocation();
   const { t } = useTranslation('common');
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   
   // Focus trap for accessibility
   const focusTrapRef = useFocusTrap(isOpen);
@@ -41,6 +44,7 @@ const NavigationOverlay = ({
   // Active state detection
   const isActive = (path: string) => location.pathname === path;
   const isShopActive = location.pathname === '/shop' || location.pathname.startsWith('/shop/');
+  const isAdminActive = location.pathname.startsWith('/admin');
 
   // Lock body scroll when overlay is open
   useEffect(() => {
@@ -244,19 +248,43 @@ const NavigationOverlay = ({
               <div className="space-y-4">
                 {user ? (
                   <>
-                    <Link
-                      to="/dashboard"
-                      onClick={onClose}
-                      className={cn(
-                        "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-200",
-                        "touch-manipulation min-h-[56px] active:scale-[0.98]",
-                        "bg-white/10 text-white hover:bg-white/15 border border-white/20",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EAB308]/50"
-                      )}
-                    >
-                      <LayoutDashboard className="w-5 h-5 text-[#EAB308]" />
-                      <span className="font-medium">Patient Portal</span>
-                    </Link>
+                    {/* Role-aware Portal Link */}
+                    {isAdmin && !roleLoading ? (
+                      // Admin Portal Link
+                      <Link
+                        to="/admin"
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-200",
+                          "touch-manipulation min-h-[56px] active:scale-[0.98]",
+                          isAdminActive
+                            ? "bg-primary text-primary-foreground border border-primary"
+                            : "bg-white/10 text-white hover:bg-white/15 border border-white/20",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EAB308]/50"
+                        )}
+                      >
+                        <Shield className={cn(
+                          "w-5 h-5",
+                          isAdminActive ? "text-primary-foreground" : "text-[#EAB308]"
+                        )} />
+                        <span className="font-medium">Admin Portal</span>
+                      </Link>
+                    ) : (
+                      // Patient Portal Link
+                      <Link
+                        to="/dashboard"
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-4 py-4 px-5 rounded-xl transition-all duration-200",
+                          "touch-manipulation min-h-[56px] active:scale-[0.98]",
+                          "bg-white/10 text-white hover:bg-white/15 border border-white/20",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EAB308]/50"
+                        )}
+                      >
+                        <LayoutDashboard className="w-5 h-5 text-[#EAB308]" />
+                        <span className="font-medium">Patient Portal</span>
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className={cn(

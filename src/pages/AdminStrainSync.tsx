@@ -6,13 +6,11 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  Shield,
-  AlertTriangle,
   Package,
   Clock,
-  ArrowLeft,
   Calendar,
-  Zap
+  Zap,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,9 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import Header from '@/layout/Header';
-import Footer from '@/components/Footer';
-import { useNavigate } from 'react-router-dom';
+import AdminLayout from '@/layout/AdminLayout';
 
 interface CountryStatus {
   code: string;
@@ -44,46 +40,14 @@ const COUNTRIES: Omit<CountryStatus, 'strainCount' | 'lastSync' | 'isLoading' | 
 ];
 
 const AdminStrainSync = () => {
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [countries, setCountries] = useState<CountryStatus[]>([]);
   const [syncingAll, setSyncingAll] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    checkAdminStatus();
+    fetchCountryStatuses();
   }, []);
-
-  const checkAdminStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
-
-      const { data: roles, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin');
-
-      if (error) throw error;
-
-      if (!roles || roles.length === 0) {
-        setIsAdmin(false);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsAdmin(true);
-      await fetchCountryStatuses();
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsLoading(false);
-    }
-  };
 
   const fetchCountryStatuses = async () => {
     setIsLoading(true);
@@ -213,300 +177,232 @@ const AdminStrainSync = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="container mx-auto px-4 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="container mx-auto px-4 text-center">
-            <Card className="max-w-md mx-auto bg-card/50 backdrop-blur-sm border-border/50">
-              <CardContent className="pt-12 pb-8">
-                <AlertTriangle className="w-16 h-16 mx-auto mb-6 text-yellow-500" />
-                <h2 className="text-2xl font-bold text-foreground mb-4">Access Denied</h2>
-                <p className="text-muted-foreground mb-6">
-                  Admin privileges are required to access this page.
-                </p>
-                <Button onClick={() => navigate('/dashboard')}>
-                  Return to Dashboard
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-        <Footer />
-      </div>
+      <AdminLayout title="Strain Sync Dashboard" description="View strain availability by country and trigger manual API syncs">
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="pt-32 pb-20">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-5xl mx-auto"
+    <AdminLayout title="Strain Sync Dashboard" description="View strain availability by country and trigger manual API syncs">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        {/* Sync All Button */}
+        <div className="flex justify-end mb-6">
+          <Button
+            onClick={syncAllCountries}
+            disabled={syncingAll || countries.some(c => c.isLoading)}
           >
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="mb-2"
-                  onClick={() => navigate('/admin')}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Dashboard
-                </Button>
-                <div className="flex items-center gap-3 mb-2">
-                  <Shield className="h-8 w-8 text-primary" />
-                  <h1 className="text-3xl font-bold text-foreground">Strain Sync Dashboard</h1>
+            {syncingAll ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Sync All Countries
+          </Button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Globe className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-muted-foreground">
-                  View strain availability by country and trigger manual API syncs
-                </p>
+                <div>
+                  <p className="text-sm text-muted-foreground">Countries Active</p>
+                  <p className="text-2xl font-bold text-foreground">{countriesWithStrains} / {COUNTRIES.length}</p>
+                </div>
               </div>
-              <Button
-                onClick={syncAllCountries}
-                disabled={syncingAll || countries.some(c => c.isLoading)}
-              >
-                {syncingAll ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Sync All Countries
-              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Package className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Strains</p>
+                  <p className="text-2xl font-bold text-foreground">{totalStrains}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <Shield className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Restricted Markets</p>
+                  <p className="text-2xl font-bold text-foreground">{COUNTRIES.filter(c => c.restricted).length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50 border-cyan-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-cyan-500/10">
+                  <Zap className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Auto-Sync</p>
+                  <p className="text-lg font-bold text-foreground">Daily 6 AM UTC</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Scheduled Jobs Info */}
+        <Card className="bg-gradient-to-r from-cyan-500/5 to-primary/5 border-cyan-500/20 mb-8">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-cyan-500" />
+              <CardTitle className="text-lg">Scheduled Auto-Sync</CardTitle>
             </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Globe className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Countries Active</p>
-                      <p className="text-2xl font-bold text-foreground">{countriesWithStrains} / {COUNTRIES.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-emerald-500/10">
-                      <Package className="h-5 w-5 text-emerald-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Strains</p>
-                      <p className="text-2xl font-bold text-foreground">{totalStrains}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-amber-500/10">
-                      <Shield className="h-5 w-5 text-amber-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Restricted Markets</p>
-                      <p className="text-2xl font-bold text-foreground">{COUNTRIES.filter(c => c.restricted).length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50 border-cyan-500/20">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-cyan-500/10">
-                      <Zap className="h-5 w-5 text-cyan-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Auto-Sync</p>
-                      <p className="text-lg font-bold text-foreground">Daily 6 AM UTC</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            <CardDescription>
+              Strains are automatically synced from the Dr. Green API daily
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 rounded-lg bg-background/50">
+                <p className="text-xs text-muted-foreground mb-1">🇵🇹 Portugal</p>
+                <p className="font-mono text-sm">06:00 UTC</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background/50">
+                <p className="text-xs text-muted-foreground mb-1">🇬🇧 United Kingdom</p>
+                <p className="font-mono text-sm">06:05 UTC</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background/50">
+                <p className="text-xs text-muted-foreground mb-1">🇿🇦 South Africa</p>
+                <p className="font-mono text-sm">06:10 UTC</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background/50">
+                <p className="text-xs text-muted-foreground mb-1">🇹🇭 Thailand</p>
+                <p className="font-mono text-sm">06:15 UTC</p>
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              Jobs are staggered by 5 minutes to avoid API rate limits. Manual sync is always available above.
+            </p>
+          </CardContent>
+        </Card>
 
-            {/* Scheduled Jobs Info */}
-            <Card className="bg-gradient-to-r from-cyan-500/5 to-primary/5 border-cyan-500/20 mb-8">
+        {/* Country Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {countries.map((country) => (
+            <Card 
+              key={country.code} 
+              className={`bg-card/50 backdrop-blur-sm border-border/50 transition-all ${
+                country.error ? 'border-destructive/50' : ''
+              }`}
+            >
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-cyan-500" />
-                  <CardTitle className="text-lg">Scheduled Auto-Sync</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{country.flag}</span>
+                    <div>
+                      <CardTitle className="text-lg">{country.name}</CardTitle>
+                      <CardDescription className="flex items-center gap-2">
+                        <span>{country.code}</span>
+                        {country.restricted ? (
+                          <Badge variant="secondary" className="text-xs">
+                            Restricted
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-500/30">
+                            Open
+                          </Badge>
+                        )}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncCountry(country.code, country.alpha3)}
+                    disabled={country.isLoading || syncingAll}
+                  >
+                    {country.isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
-                <CardDescription>
-                  Strains are automatically synced from the Dr. Green API daily
-                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 rounded-lg bg-background/50">
-                    <p className="text-xs text-muted-foreground mb-1">🇵🇹 Portugal</p>
-                    <p className="font-mono text-sm">06:00 UTC</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background/50">
-                    <p className="text-xs text-muted-foreground mb-1">🇬🇧 United Kingdom</p>
-                    <p className="font-mono text-sm">06:05 UTC</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background/50">
-                    <p className="text-xs text-muted-foreground mb-1">🇿🇦 South Africa</p>
-                    <p className="font-mono text-sm">06:10 UTC</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background/50">
-                    <p className="text-xs text-muted-foreground mb-1">🇹🇭 Thailand</p>
-                    <p className="font-mono text-sm">06:15 UTC</p>
+              <CardContent className="space-y-4">
+                {/* Strain Count */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Strains Available</span>
+                  <div className="flex items-center gap-2">
+                    {country.strainCount > 0 ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span className="font-bold text-foreground">{country.strainCount}</span>
+                      </>
+                    ) : country.error ? (
+                      <>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-destructive">Error</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">0</span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Jobs are staggered by 5 minutes to avoid API rate limits. Manual sync is always available above.
-                </p>
+
+                {/* Progress Bar */}
+                <div className="space-y-1">
+                  <Progress 
+                    value={totalStrains > 0 ? (country.strainCount / totalStrains) * 100 : 0} 
+                    className="h-2"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {totalStrains > 0 
+                      ? `${((country.strainCount / totalStrains) * 100).toFixed(1)}% of total`
+                      : 'No strains loaded'
+                    }
+                  </p>
+                </div>
+
+                {/* Last Sync */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {country.lastSync 
+                    ? `Last synced: ${new Date(country.lastSync).toLocaleString()}`
+                    : 'Never synced'
+                  }
+                </div>
+
+                {/* Error Message */}
+                {country.error && (
+                  <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <p className="text-xs text-destructive">{country.error}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-
-            {/* Country Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {countries.map((country) => (
-                <Card 
-                  key={country.code} 
-                  className={`bg-card/50 backdrop-blur-sm border-border/50 transition-all ${
-                    country.error ? 'border-destructive/50' : ''
-                  }`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">{country.flag}</span>
-                        <div>
-                          <CardTitle className="text-lg">{country.name}</CardTitle>
-                          <CardDescription className="flex items-center gap-2">
-                            <span>{country.code}</span>
-                            {country.restricted ? (
-                              <Badge variant="secondary" className="text-xs">
-                                Restricted
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-500/30">
-                                Open
-                              </Badge>
-                            )}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => syncCountry(country.code, country.alpha3)}
-                        disabled={country.isLoading || syncingAll}
-                      >
-                        {country.isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Strain Count */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Strains Available</span>
-                      <div className="flex items-center gap-2">
-                        {country.strainCount > 0 ? (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                            <span className="font-bold text-foreground">{country.strainCount}</span>
-                          </>
-                        ) : country.error ? (
-                          <>
-                            <XCircle className="h-4 w-4 text-destructive" />
-                            <span className="text-destructive">Error</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">0</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="space-y-1">
-                      <Progress 
-                        value={totalStrains > 0 ? (country.strainCount / totalStrains) * 100 : 0} 
-                        className="h-2"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {totalStrains > 0 
-                          ? `${((country.strainCount / totalStrains) * 100).toFixed(1)}% of total`
-                          : 'No strains loaded'
-                        }
-                      </p>
-                    </div>
-
-                    {/* Last Sync */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {country.lastSync ? (
-                        <span>Last checked: {new Date(country.lastSync).toLocaleTimeString()}</span>
-                      ) : (
-                        <span>Never synced</span>
-                      )}
-                    </div>
-
-                    {/* Error Message */}
-                    {country.error && (
-                      <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                        <p className="text-xs text-destructive">{country.error}</p>
-                      </div>
-                    )}
-
-                    {/* Access Info */}
-                    <div className={`p-3 rounded-lg text-xs ${
-                      country.restricted 
-                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' 
-                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                    }`}>
-                      {country.restricted ? (
-                        <p>⚠️ Products require KYC verification + medical approval to display</p>
-                      ) : (
-                        <p>✓ Products display freely without verification</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </motion.div>
+          ))}
         </div>
-      </main>
-      <Footer />
-    </div>
+      </motion.div>
+    </AdminLayout>
   );
 };
 

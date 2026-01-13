@@ -95,42 +95,12 @@ const AnimatedRoutes = () => {
             </ComplianceGuard>
           } />
           
-          {/* Protected Admin Routes - Dual Auth: Supabase Role + NFT Ownership */}
-          <Route path="/admin" element={
-            <ProtectedRoute requiredRole="admin">
-              <ProtectedNFTRoute accessDeniedMessage="Admin access requires a Dr. Green Digital Key NFT on Ethereum Mainnet.">
-                <AdminDashboard />
-              </ProtectedNFTRoute>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/prescriptions" element={
-            <ProtectedRoute requiredRole="admin">
-              <ProtectedNFTRoute accessDeniedMessage="Admin access requires a Dr. Green Digital Key NFT.">
-                <AdminPrescriptions />
-              </ProtectedNFTRoute>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/strains" element={
-            <ProtectedRoute requiredRole="admin">
-              <ProtectedNFTRoute accessDeniedMessage="Admin access requires a Dr. Green Digital Key NFT.">
-                <AdminStrains />
-              </ProtectedNFTRoute>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/strain-sync" element={
-            <ProtectedRoute requiredRole="admin">
-              <ProtectedNFTRoute accessDeniedMessage="Admin access requires a Dr. Green Digital Key NFT.">
-                <AdminStrainSync />
-              </ProtectedNFTRoute>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/strain-knowledge" element={
-            <ProtectedRoute requiredRole="admin">
-              <ProtectedNFTRoute accessDeniedMessage="Admin access requires a Dr. Green Digital Key NFT.">
-                <AdminStrainKnowledge />
-              </ProtectedNFTRoute>
-            </ProtectedRoute>
-          } />
+          {/* Admin Routes - Protected by AdminLayout (which uses useUserRole) */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/prescriptions" element={<AdminPrescriptions />} />
+          <Route path="/admin/strains" element={<AdminStrains />} />
+          <Route path="/admin/strain-sync" element={<AdminStrainSync />} />
+          <Route path="/admin/strain-knowledge" element={<AdminStrainKnowledge />} />
           
           {/* Debug/Diagnosis */}
           <Route path="/debug" element={<Debug />} />
