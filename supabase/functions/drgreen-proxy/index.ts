@@ -1236,16 +1236,17 @@ serve(async (req) => {
         break;
       }
       
-      // Add to cart (Method A - Body Sign)
+      // Add to cart (Method A - Body Sign) - uses /dapp/carts endpoint
       case "add-to-cart": {
         const cartData = body?.data;
         if (!cartData) throw new Error("Cart data is required");
         
-        response = await drGreenRequestBody("/carts", "POST", cartData);
+        logInfo("API request: POST /dapp/carts");
+        response = await drGreenRequestBody("/dapp/carts", "POST", cartData);
         break;
       }
       
-      // Remove from cart (Method A - Body Sign for signature, query for strainId)
+      // Remove from cart (Method A - Body Sign for signature, query for strainId) - uses /dapp/carts endpoint
       case "remove-from-cart": {
         const { cartId, strainId } = body || {};
         if (!cartId || !strainId) throw new Error("cartId and strainId are required");
@@ -1260,9 +1261,9 @@ serve(async (req) => {
         const signature = await signPayload(JSON.stringify(signPayloadData), Deno.env.get("DRGREEN_PRIVATE_KEY")!);
         
         const apiKey = Deno.env.get("DRGREEN_API_KEY")!;
-        const apiUrl = `${DRGREEN_API_URL}/carts/${cartId}?strainId=${strainId}`;
+        const apiUrl = `${DRGREEN_API_URL}/dapp/carts/${cartId}?strainId=${strainId}`;
         
-        logInfo(`Removing item from cart`);
+        logInfo(`Removing item from cart via /dapp/carts endpoint`);
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -1282,21 +1283,23 @@ serve(async (req) => {
         break;
       }
       
-      // Empty cart (Method A - Body Sign)
+      // Empty cart (Method A - Body Sign) - uses /dapp/carts endpoint
       case "empty-cart": {
         const { cartId } = body || {};
         if (!cartId) throw new Error("cartId is required");
         
-        response = await drGreenRequestBody(`/carts/${cartId}`, "DELETE", { cartId });
+        logInfo("API request: DELETE /dapp/carts/:cartId");
+        response = await drGreenRequestBody(`/dapp/carts/${cartId}`, "DELETE", { cartId });
         break;
       }
       
-      // Place order (Method A - Body Sign)
+      // Place order (Method A - Body Sign) - uses /dapp/orders endpoint
       case "place-order": {
         const orderData = body?.data;
         if (!orderData) throw new Error("Order data is required");
         
-        response = await drGreenRequestBody("/orders", "POST", orderData);
+        logInfo("API request: POST /dapp/orders");
+        response = await drGreenRequestBody("/dapp/orders", "POST", orderData);
         break;
       }
       
