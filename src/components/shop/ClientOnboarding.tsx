@@ -1680,15 +1680,17 @@ export function ClientOnboarding() {
                       />
                     </div>
 
-                    {/* Cannabis usage */}
-                    <div className="space-y-3">
-                      <h4 className="font-semibold text-base">Cannabis Experience</h4>
+                    {/* Cannabis usage section */}
+                    <div className="space-y-6">
+                      <h4 className="font-semibold text-base">Cannabis History</h4>
+                      
+                      {/* Cannabis frequency */}
                       <FormField
                         control={medicalHistoryForm.control}
                         name="medicalHistory13"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>How often have you used cannabis?</FormLabel>
+                            <FormLabel>How often do you currently use cannabis? *</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
@@ -1707,18 +1709,87 @@ export function ClientOnboarding() {
                           </FormItem>
                         )}
                       />
+
+                      {/* Cannabis usage methods - multi-select */}
+                      <FormField
+                        control={medicalHistoryForm.control}
+                        name="medicalHistory14"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>How have you used cannabis? *</FormLabel>
+                            <FormDescription>Select all that apply</FormDescription>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                              {cannabisMethodOptions.map((method) => (
+                                <label
+                                  key={method.value}
+                                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                                    field.value?.includes(method.value)
+                                      ? 'border-primary bg-primary/10 text-primary'
+                                      : 'border-border/50 hover:border-primary/50 hover:bg-muted/30'
+                                  }`}
+                                >
+                                  <Checkbox
+                                    checked={field.value?.includes(method.value)}
+                                    onCheckedChange={(checked) => {
+                                      const currentValues = field.value || [];
+                                      if (checked) {
+                                        // Remove 'never' if selecting other options
+                                        const newValues = method.value === 'never' 
+                                          ? ['never'] 
+                                          : [...currentValues.filter(v => v !== 'never'), method.value];
+                                        field.onChange(newValues);
+                                      } else {
+                                        const newValues = currentValues.filter((v) => v !== method.value);
+                                        field.onChange(newValues.length ? newValues : ['never']);
+                                      }
+                                    }}
+                                  />
+                                  <span className="font-medium text-sm">{method.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Cannabis amount per day - only show if user has used cannabis */}
+                      {medicalHistoryForm.watch('medicalHistory13') !== 'never' && (
+                        <FormField
+                          control={medicalHistoryForm.control}
+                          name="medicalHistory15"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>How much cannabis do you currently use per day?</FormLabel>
+                              <FormDescription>
+                                Please specify in grams, ounces, or number of joints
+                              </FormDescription>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., 0.5g, 1 joint, 2g"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                     </div>
 
-                    {/* Additional notes */}
+                    {/* Prescriptions and supplements */}
                     <FormField
                       control={medicalHistoryForm.control}
-                      name="medicalHistory15"
+                      name="prescriptionsSupplements"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Additional Medical Notes (Optional)</FormLabel>
+                          <FormLabel>Current Prescriptions & Supplements (Optional)</FormLabel>
+                          <FormDescription>
+                            List any current prescriptions and over the counter supplements, including CBD oils/products
+                          </FormDescription>
                           <FormControl>
                             <Textarea
-                              placeholder="Any other medical information you'd like to share..."
+                              placeholder="e.g., Vitamin D 1000IU daily, CBD oil 10mg..."
                               className="min-h-[80px]"
                               {...field}
                             />
@@ -1727,6 +1798,46 @@ export function ClientOnboarding() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Other medical condition details */}
+                    {medicalHistoryForm.watch('conditions')?.includes('other_medical_condition') && (
+                      <FormField
+                        control={medicalHistoryForm.control}
+                        name="otherMedicalCondition"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Please specify your other medical condition</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Describe your condition..."
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    {/* Other medications details */}
+                    {medicalHistoryForm.watch('medications')?.includes('other_prescribed_medicines_treatments') && (
+                      <FormField
+                        control={medicalHistoryForm.control}
+                        name="otherMedicalTreatments"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Please specify your other medications/treatments</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="List your other medications..."
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     <div className="flex gap-3">
                       <Button
