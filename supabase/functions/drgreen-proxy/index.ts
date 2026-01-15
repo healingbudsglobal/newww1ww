@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as secp256k1 from "https://esm.sh/@noble/secp256k1@2.1.0";
+import { sha256 } from "https://esm.sh/@noble/hashes@1.4.0/sha256";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -230,6 +232,208 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * Extract raw 32-byte private key from PKCS#8 secp256k1 key
+ * PKCS#8 structure for EC keys:
+ *   SEQUENCE {
+ *     INTEGER 0 (version)
+ *     SEQUENCE { OID ecPublicKey, OID secp256k1 }
+ *     OCTET STRING containing SEC1 private key:
+ *       SEQUENCE {
+ *         INTEGER 1
+ *         OCTET STRING (32 bytes - the actual private key)
+ *         ...
+ *       }
+ *   }
+ */
+function extractSecp256k1PrivateKey(pkcs8Der: Uint8Array): Uint8Array {
+  // The 32-byte private key is embedded in the PKCS#8 structure
+  // For secp256k1 PKCS#8 keys, the structure is predictable:
+  // The raw key starts at a known offset in the DER structure
+  
+  // Look for the inner OCTET STRING that contains the 32-byte key
+  // In PKCS#8 EC keys, we need to find the SEC1 structure inside
+  
+  // The key user provided has this structure (decoded from Base64):
+  // SEQUENCE (PKCS#8 wrapper)
+  //   INTEGER 0
+  //   SEQUENCE (algorithm identifier)
+  //     OID 1.2.840.10045.2.1 (ecPublicKey)
+  //     OID 1.3.132.0.10 (secp256k1)
+  //   OCTET STRING containing SEC1 ECPrivateKey:
+  //     SEQUENCE
+  //       INTEGER 1
+  //       OCTET STRING (32 bytes) <- THIS IS WHAT WE WANT
+  //       [0] OID (optional)
+  //       [1] BIT STRING public key (optional)
+  
+  // For a typical secp256k1 PKCS#8 key, the private key bytes are at offset 36
+  // But let's parse properly to be safe
+  
+  let offset = 0;
+  
+  // Helper to read ASN.1 length
+  function readLength(): number {
+    const firstByte = pkcs8Der[offset++];
+    if (firstByte < 0x80) return firstByte;
+    const numBytes = firstByte & 0x7f;
+    let length = 0;
+    for (let i = 0; i < numBytes; i++) {
+      length = (length << 8) | pkcs8Der[offset++];
+    }
+    return length;
+  }
+  
+  // Skip outer SEQUENCE
+  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE');
+  readLength();
+  
+  // Skip version INTEGER
+  if (pkcs8Der[offset++] !== 0x02) throw new Error('Expected INTEGER (version)');
+  const versionLen = readLength();
+  offset += versionLen;
+  
+  // Skip algorithm identifier SEQUENCE
+  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE (algorithm)');
+  const algLen = readLength();
+  offset += algLen;
+  
+  // Now we should be at the OCTET STRING containing the SEC1 private key
+  if (pkcs8Der[offset++] !== 0x04) throw new Error('Expected OCTET STRING');
+  const octetLen = readLength();
+  
+  // Inside this OCTET STRING is the SEC1 ECPrivateKey structure
+  const sec1Start = offset;
+  
+  // Parse SEC1 ECPrivateKey
+  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE (SEC1)');
+  readLength();
+  
+  // Version INTEGER (should be 1)
+  if (pkcs8Der[offset++] !== 0x02) throw new Error('Expected INTEGER (SEC1 version)');
+  const sec1VersionLen = readLength();
+  offset += sec1VersionLen;
+  
+  // Private key OCTET STRING (32 bytes for secp256k1)
+  if (pkcs8Der[offset++] !== 0x04) throw new Error('Expected OCTET STRING (private key)');
+  const keyLen = readLength();
+  
+  if (keyLen !== 32) {
+    throw new Error(`Expected 32-byte private key, got ${keyLen}`);
+  }
+  
+  return pkcs8Der.slice(offset, offset + 32);
+}
+
+/**
+ * Generate secp256k1 ECDSA signature using @noble/secp256k1
+ * This handles the EC key format that WebCrypto doesn't support
+ */
+async function generateSecp256k1Signature(
+  data: string,
+  base64PrivateKey: string
+): Promise<string> {
+  const encoder = new TextEncoder();
+  const secret = (base64PrivateKey || '').trim();
+
+  // Step 1: Base64 decode the secret
+  let decodedSecretBytes: Uint8Array;
+  try {
+    decodedSecretBytes = base64ToBytes(secret);
+  } catch (e) {
+    logError("Failed to decode private key from Base64", { error: String(e) });
+    throw new Error("Invalid private key format - must be Base64-encoded");
+  }
+
+  // Step 2: Check if it's PEM format and extract DER
+  const decodedAsText = new TextDecoder().decode(decodedSecretBytes);
+  let keyDerBytes: Uint8Array;
+
+  if (decodedAsText.includes('-----BEGIN')) {
+    // Extract PEM body
+    const pemBody = decodedAsText
+      .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
+      .replace(/-----END [A-Z0-9 ]+-----/g, '')
+      .replace(/[\r\n\s]/g, '')
+      .trim();
+
+    if (!pemBody || !isBase64(pemBody)) {
+      throw new Error('Invalid private key PEM format');
+    }
+
+    keyDerBytes = base64ToBytes(pemBody);
+    logInfo('secp256k1: Decoded PEM to DER', { derLength: keyDerBytes.length });
+  } else {
+    keyDerBytes = decodedSecretBytes;
+    logInfo('secp256k1: Using raw DER', { derLength: keyDerBytes.length });
+  }
+
+  // Step 3: Extract the 32-byte private key from PKCS#8
+  let privateKeyBytes: Uint8Array;
+  try {
+    privateKeyBytes = extractSecp256k1PrivateKey(keyDerBytes);
+    logInfo('secp256k1: Extracted private key', { 
+      keyLength: privateKeyBytes.length,
+      // Log first 4 bytes (safe, just for debugging format)
+      prefix: Array.from(privateKeyBytes.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(''),
+    });
+  } catch (e) {
+    logError('secp256k1: Failed to extract private key', { error: String(e) });
+    throw new Error(`Failed to parse secp256k1 private key: ${e}`);
+  }
+
+  // Step 4: Hash the data with SHA-256 and sign
+  const dataBytes = encoder.encode(data);
+  const messageHash = sha256(dataBytes);
+  
+  // Sign with secp256k1 - returns SignatureWithRecovery object
+  const signature = secp256k1.sign(messageHash, privateKeyBytes);
+  
+  // Get compact signature (64 bytes: r || s) and convert to DER manually
+  // since toDERBytes may not exist on SignatureWithRecovery type
+  const compactSig = signature.toCompactRawBytes();
+  
+  // Convert compact (r || s) to DER format
+  const r = compactSig.slice(0, 32);
+  const s = compactSig.slice(32, 64);
+  
+  function integerToDER(val: Uint8Array): Uint8Array {
+    // Remove leading zeros but keep at least one byte
+    let start = 0;
+    while (start < val.length - 1 && val[start] === 0) start++;
+    let trimmed = val.slice(start);
+    
+    // If high bit is set, prepend 0x00 to keep it positive
+    const needsPadding = trimmed[0] >= 0x80;
+    const result = new Uint8Array((needsPadding ? 1 : 0) + trimmed.length);
+    if (needsPadding) result[0] = 0x00;
+    result.set(trimmed, needsPadding ? 1 : 0);
+    return result;
+  }
+  
+  const rDer = integerToDER(r);
+  const sDer = integerToDER(s);
+  
+  // DER SEQUENCE: 0x30 length [0x02 rLen r...] [0x02 sLen s...]
+  const innerLen = 2 + rDer.length + 2 + sDer.length;
+  const derSig = new Uint8Array(2 + innerLen);
+  derSig[0] = 0x30; // SEQUENCE
+  derSig[1] = innerLen;
+  derSig[2] = 0x02; // INTEGER
+  derSig[3] = rDer.length;
+  derSig.set(rDer, 4);
+  derSig[4 + rDer.length] = 0x02; // INTEGER
+  derSig[5 + rDer.length] = sDer.length;
+  derSig.set(sDer, 6 + rDer.length);
+  
+  logInfo('secp256k1: Signature generated', {
+    signatureLength: derSig.length,
+    dataLength: data.length,
+  });
+
+  return bytesToBase64(derSig);
+}
+
+/**
  * Generate RSA/EC signature using asymmetric private key
  * Matches the Node.js pattern from Dr Green API docs:
  * 
@@ -247,18 +451,6 @@ async function generatePrivateKeySignature(
   base64PrivateKey: string
 ): Promise<string> {
   const encoder = new TextEncoder();
-
-  // WordPress reference:
-  //   $privateKeyPEM = base64_decode($key);
-  //   $privateKey = openssl_pkey_get_private($privateKeyPEM);
-  //   openssl_sign($payload, $signature, $privateKey, OPENSSL_ALGO_SHA256);
-  //
-  // In our backend function, DRGREEN_PRIVATE_KEY is expected to be a Base64-encoded
-  // PEM file. The WebCrypto API can't import PEM directly, so we must:
-  //  1) Base64-decode the secret → PEM text
-  //  2) Strip PEM header/footer and whitespace
-  //  3) Base64-decode the PEM body → DER bytes (PKCS#8)
-
   const secret = (base64PrivateKey || '').trim();
 
   // Step 1: Base64 decode the secret
@@ -283,20 +475,9 @@ async function generatePrivateKeySignature(
     hasPemHeader,
     pemType,
     decodedLength: decodedSecretBytes.length,
-    firstBytes: Array.from(decodedSecretBytes.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '),
-    textPreview: decodedAsText.substring(0, 50).replace(/[^\x20-\x7E]/g, '.'),
   });
 
   if (hasPemHeader) {
-    // Check if it's PKCS#1 (RSA PRIVATE KEY) vs PKCS#8 (PRIVATE KEY)
-    if (pemType === 'RSA PRIVATE KEY') {
-      logError('PKCS#1 key detected - must convert to PKCS#8 format', {
-        pemType,
-        hint: 'Run: openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in key.pem -out pkcs8_key.pem',
-      });
-      throw new Error('Private key is PKCS#1 format. Please convert to PKCS#8 using: openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in key.pem -out pkcs8_key.pem');
-    }
-    
     // Extract the PEM body (base64 DER)
     const pemBody = decodedAsText
       .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
@@ -316,25 +497,24 @@ async function generatePrivateKeySignature(
     logInfo('Private key decoded from Base64 PEM', {
       pemType,
       derLength: keyDerBytes.length,
-      expectedRsaLength: 'RSA-2048 should be ~1190 bytes, RSA-4096 should be ~2350 bytes',
     });
   } else {
-    // Secret might be Base64(DER) already - check ASN.1 structure
     keyDerBytes = decodedSecretBytes;
-    
-    // PKCS#8 private keys start with SEQUENCE (0x30) followed by length
-    // PKCS#1 RSA keys also start with 0x30 but have different structure
-    const isAsn1Sequence = keyDerBytes[0] === 0x30;
-    
     logInfo('Private key decoded from Base64 DER', {
       derLength: keyDerBytes.length,
-      isAsn1Sequence,
-      firstByte: keyDerBytes[0]?.toString(16),
-      hint: keyDerBytes.length < 500 ? 'Key seems too short for RSA-2048' : 'Length looks reasonable',
     });
   }
 
-  // Step 3: Try to import as PKCS#8 (RSA first, then EC), else fallback to HMAC.
+  // Step 3: Check for secp256k1 OID (1.3.132.0.10 = 06 05 2B 81 04 00 0A)
+  const keyHex = Array.from(keyDerBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const secp256k1OID = '2b8104000a'; // OID 1.3.132.0.10 in hex
+  
+  if (keyHex.includes(secp256k1OID)) {
+    logInfo('secp256k1 key detected, using @noble/secp256k1 for signing');
+    return generateSecp256k1Signature(data, base64PrivateKey);
+  }
+
+  // Step 4: Try WebCrypto for RSA or standard EC curves
   let cryptoKey: CryptoKey;
 
   try {
@@ -350,9 +530,8 @@ async function generatePrivateKeySignature(
     );
     logDebug('Successfully imported RSA private key (PKCS#8)');
   } catch (rsaError) {
-    logDebug('RSA import failed, trying EC', { error: String(rsaError) });
+    logDebug('RSA import failed, trying EC P-256', { error: String(rsaError) });
 
-    // Try EC key (P-256)
     try {
       cryptoKey = await crypto.subtle.importKey(
         'pkcs8',
@@ -368,7 +547,6 @@ async function generatePrivateKeySignature(
     } catch (ecError) {
       logDebug('EC P-256 import failed, trying P-384', { error: String(ecError) });
 
-      // Try EC key (P-384)
       try {
         cryptoKey = await crypto.subtle.importKey(
           'pkcs8',
@@ -382,40 +560,17 @@ async function generatePrivateKeySignature(
         );
         logDebug('Successfully imported EC private key (P-384)');
       } catch (ec384Error) {
-        logDebug('EC P-384 import failed, trying P-521', { error: String(ec384Error) });
-
-        // Try EC key (P-521)
-        try {
-          cryptoKey = await crypto.subtle.importKey(
-            'pkcs8',
-            keyDerBytes.buffer as ArrayBuffer,
-            {
-              name: 'ECDSA',
-              namedCurve: 'P-521',
-            },
-            false,
-            ['sign']
-          );
-          logDebug('Successfully imported EC private key (P-521)');
-        } catch (ec521Error) {
-          // Last resort: try raw HMAC (legacy fallback)
-          logWarn('Private key import failed, falling back to HMAC', {
-            rsaError: String(rsaError),
-            ecError: String(ecError),
-            ec384Error: String(ec384Error),
-            ec521Error: String(ec521Error),
-            keyInfo: {
-              derLength: keyDerBytes.length,
-              hint: 'Key may be secp256k1 (not supported by WebCrypto) or corrupted',
-            },
-          });
-          return generateHmacSignatureFallback(data, base64PrivateKey);
-        }
+        logError('All WebCrypto imports failed', {
+          rsaError: String(rsaError),
+          ecError: String(ecError),
+          ec384Error: String(ec384Error),
+        });
+        throw new Error('Failed to import private key - unsupported format');
       }
     }
   }
 
-  // Step 4: Sign the data
+  // Step 5: Sign the data
   const dataBytes = encoder.encode(data);
 
   let signatureBuffer: ArrayBuffer;
@@ -429,7 +584,7 @@ async function generatePrivateKeySignature(
     signatureBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, dataBytes);
   }
 
-  // Step 5: Return Base64 signature
+  // Step 6: Return Base64 signature
   return bytesToBase64(new Uint8Array(signatureBuffer));
 }
 
