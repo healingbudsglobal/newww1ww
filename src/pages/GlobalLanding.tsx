@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Globe, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RegionSignupModal } from '@/components/RegionSignupModal';
 
 interface Region {
   code: string;
@@ -42,12 +44,20 @@ const regions: Region[] = [
   },
 ];
 
-const RegionCard = ({ region, index }: { region: Region; index: number }) => {
+interface RegionCardProps {
+  region: Region;
+  index: number;
+  onComingSoonClick: (region: Region) => void;
+}
+
+const RegionCard = ({ region, index, onComingSoonClick }: RegionCardProps) => {
   const isLive = region.status === 'live';
 
   const handleClick = () => {
     if (isLive) {
       window.location.href = region.url;
+    } else {
+      onComingSoonClick(region);
     }
   };
 
@@ -89,17 +99,14 @@ const RegionCard = ({ region, index }: { region: Region; index: number }) => {
         {/* Action Button */}
         <Button
           onClick={handleClick}
-          disabled={!isLive}
           className={`w-full group/btn ${
             isLive
               ? 'bg-primary hover:bg-primary/90'
-              : 'bg-white/10 text-white/50 cursor-not-allowed'
+              : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white cursor-pointer'
           }`}
         >
-          {isLive ? 'Enter' : 'Coming Soon'}
-          {isLive && (
-            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
-          )}
+          {isLive ? 'Enter' : 'Get Notified'}
+          <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
         </Button>
 
         {/* Hover Glow Effect */}
@@ -112,6 +119,19 @@ const RegionCard = ({ region, index }: { region: Region; index: number }) => {
 };
 
 const GlobalLanding = () => {
+  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleComingSoonClick = (region: Region) => {
+    setSelectedRegion(region);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedRegion(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#1A2E2A] flex flex-col">
       {/* Header */}
@@ -155,7 +175,12 @@ const GlobalLanding = () => {
           {/* Region Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {regions.map((region, index) => (
-              <RegionCard key={region.code} region={region} index={index} />
+              <RegionCard 
+                key={region.code} 
+                region={region} 
+                index={index}
+                onComingSoonClick={handleComingSoonClick}
+              />
             ))}
           </div>
         </div>
@@ -172,6 +197,15 @@ const GlobalLanding = () => {
           © {new Date().getFullYear()} Healing Buds. All rights reserved.
         </motion.p>
       </footer>
+
+      {/* Region Signup Modal */}
+      {selectedRegion && (
+        <RegionSignupModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          region={selectedRegion}
+        />
+      )}
     </div>
   );
 };
