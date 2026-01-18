@@ -16,6 +16,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { ProtectedNFTRoute } from "@/components/ProtectedNFTRoute";
 import { ComplianceGuard } from "@/components/ComplianceGuard";
 import { RegionalGate } from "@/components/RegionalGate";
+import RegionSwitcher from "@/components/dev/RegionSwitcher";
 
 import { ShopProvider } from "@/context/ShopContext";
 import { CursorProvider } from "@/context/CursorContext";
@@ -137,6 +138,7 @@ const App = () => (
                     <BrowserRouter>
                       <TenantProvider>
                         <RegionalGate>
+                          <RegionSwitcher />
                           <SkipLinks />
                           <ScrollToTop />
                           <RouteProgress />
