@@ -18,11 +18,18 @@ const BackToTop = () => {
         const currentScrollY = window.scrollY;
         const scrollingDown = currentScrollY > lastScrollY.current;
         
+        // Detect if near footer (within 200px of bottom)
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const nearBottom = currentScrollY + windowHeight >= documentHeight - 200;
+        
         // Show conditions:
         // 1. Scrolled past 400px AND
-        // 2. Either scrolling down OR not too close to top (>200px)
+        // 2. Either scrolling down OR not too close to top (>200px) AND
+        // 3. Not near the footer (to avoid overlapping Dr. Green logo)
         const shouldShow = currentScrollY > 400 && 
-          (scrollingDown || currentScrollY > 200);
+          (scrollingDown || currentScrollY > 200) &&
+          !nearBottom;
         
         setIsVisible(shouldShow);
         lastScrollY.current = currentScrollY;

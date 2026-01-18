@@ -69,9 +69,9 @@ export const RegionalGate = ({ children }: RegionalGateProps) => {
     return { countryCode, ...config };
   }, []);
 
-  // Simulation indicator badge (dev only)
+  // Simulation indicator badge (dev only) - positioned bottom-left to avoid BackToTop overlap
   const SimulationBadge = simulatedRegion ? (
-    <div className="fixed bottom-4 right-4 z-[200] bg-yellow-500 text-black px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2">
+    <div className="fixed bottom-4 left-4 z-[200] bg-yellow-500 text-black px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2">
       <span>🔬</span>
       <span>Simulating: {simulatedRegion}</span>
     </div>
