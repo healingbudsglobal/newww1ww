@@ -13,7 +13,6 @@ import {
   Leaf,
   ArrowLeftRight,
   TrendingUp,
-  Settings,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,13 +21,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -36,15 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useApiComparison, DataType, StrainDiff, StrainItem, Environment } from "@/hooks/useApiComparison";
+import { useApiComparison, DataType, StrainDiff } from "@/hooks/useApiComparison";
 import { formatPrice } from "@/lib/currency";
 
 export function ApiComparisonDashboard() {
   const { 
     state, 
     isRefreshing, 
-    stagingEnvironment,
-    setStagingEnvironment,
     fetchComparison, 
     calculateStrainDiffs, 
     getDiffCount 
@@ -54,7 +44,7 @@ export function ApiComparisonDashboard() {
 
   useEffect(() => {
     fetchComparison(activeTab, countryCode);
-  }, [stagingEnvironment]);
+  }, []);
 
   const handleRefresh = () => {
     fetchComparison(activeTab, countryCode);
@@ -66,23 +56,25 @@ export function ApiComparisonDashboard() {
     fetchComparison(dataType, countryCode);
   };
 
-  const handleEnvironmentChange = (value: string) => {
-    setStagingEnvironment(value as 'staging' | 'railway');
-  };
-
   const prodData = state.production.data;
   const stagingData = state.staging.data;
+  const railwayData = state.railway.data;
+  
   const strainDiffs = activeTab === "strains" && prodData?.data && stagingData?.data
-    ? calculateStrainDiffs(prodData.data, stagingData.data)
+    ? calculateStrainDiffs(prodData.data, stagingData.data, railwayData?.data || [])
     : [];
 
   const diffCount = strainDiffs.filter(d => d.hasDiff).length;
   const prodCount = prodData?.itemCount || 0;
   const stagingCount = stagingData?.itemCount || 0;
+  const railwayCount = railwayData?.itemCount || 0;
 
   // Get summary data for comparison
   const prodSummary = prodData?.summary;
   const stagingSummary = stagingData?.summary;
+  const railwaySummary = railwayData?.summary;
+
+  const isLoading = state.production.loading || state.staging.loading || state.railway.loading;
 
   return (
     <Card className="border-2 border-dashed border-primary/20">
@@ -95,24 +87,11 @@ export function ApiComparisonDashboard() {
             <div>
               <CardTitle className="text-xl">API Comparison Dashboard</CardTitle>
               <CardDescription>
-                Compare production and staging environments side-by-side
+                Compare Production, Staging, and Railway environments side-by-side
               </CardDescription>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Environment Selector */}
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-muted-foreground" />
-              <Select value={stagingEnvironment} onValueChange={handleEnvironmentChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select staging env" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="staging">Official Staging</SelectItem>
-                  <SelectItem value="railway">Railway (Dev)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             {state.lastUpdated && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -158,43 +137,56 @@ export function ApiComparisonDashboard() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Side-by-Side Comparison Panels */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
+          {/* Three-Column Environment Panels */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             {/* Production Panel */}
             <EnvironmentPanel
               title="Production"
               badge="🟢"
+              badgeColor="green"
               loading={state.production.loading}
               error={state.production.error}
               data={prodData}
               summary={prodSummary}
-              isProduction
               dataType={activeTab}
             />
 
             {/* Staging Panel */}
             <EnvironmentPanel
-              title={stagingEnvironment === 'staging' ? 'Staging (Official)' : 'Railway (Dev)'}
+              title="Staging (Official)"
               badge="🟠"
+              badgeColor="orange"
               loading={state.staging.loading}
               error={state.staging.error}
               data={stagingData}
               summary={stagingSummary}
-              isProduction={false}
+              dataType={activeTab}
+            />
+
+            {/* Railway Panel */}
+            <EnvironmentPanel
+              title="Railway (Dev)"
+              badge="🟣"
+              badgeColor="purple"
+              loading={state.railway.loading}
+              error={state.railway.error}
+              data={railwayData}
+              summary={railwaySummary}
               dataType={activeTab}
             />
           </div>
 
           {/* Comparison Table Content */}
           <TabsContent value="strains" className="mt-6">
-            <StrainsComparisonTable diffs={strainDiffs} loading={state.production.loading || state.staging.loading} />
+            <StrainsComparisonTable diffs={strainDiffs} loading={isLoading} />
           </TabsContent>
 
           <TabsContent value="clients" className="mt-6">
             <GenericComparisonTable
               prodData={prodData?.data || []}
               stagingData={stagingData?.data || []}
-              loading={state.production.loading || state.staging.loading}
+              railwayData={railwayData?.data || []}
+              loading={isLoading}
               columns={["id", "email", "firstName", "lastName", "isKYCVerified", "adminApproval"]}
               idField="id"
             />
@@ -204,7 +196,8 @@ export function ApiComparisonDashboard() {
             <GenericComparisonTable
               prodData={prodData?.data || []}
               stagingData={stagingData?.data || []}
-              loading={state.production.loading || state.staging.loading}
+              railwayData={railwayData?.data || []}
+              loading={isLoading}
               columns={["id", "orderStatus", "paymentStatus", "totalAmount"]}
               idField="id"
             />
@@ -214,7 +207,8 @@ export function ApiComparisonDashboard() {
             <SalesComparisonTable
               prodData={prodData?.data || []}
               stagingData={stagingData?.data || []}
-              loading={state.production.loading || state.staging.loading}
+              railwayData={railwayData?.data || []}
+              loading={isLoading}
             />
           </TabsContent>
 
@@ -222,18 +216,23 @@ export function ApiComparisonDashboard() {
             <SummaryComparison
               prodSummary={prodSummary}
               stagingSummary={stagingSummary}
-              loading={state.production.loading || state.staging.loading}
+              railwaySummary={railwaySummary}
+              loading={isLoading}
             />
           </TabsContent>
         </Tabs>
 
         {/* Summary Footer */}
-        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-muted/50 border">
           <div className="flex items-center gap-4">
             <Database className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm">
-              <strong>{prodCount}</strong> items (Prod) vs <strong>{stagingCount}</strong> items ({stagingEnvironment === 'staging' ? 'Staging' : 'Railway'})
-            </span>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span><strong>{prodCount}</strong> Prod</span>
+              <span className="text-muted-foreground">|</span>
+              <span><strong>{stagingCount}</strong> Staging</span>
+              <span className="text-muted-foreground">|</span>
+              <span><strong>{railwayCount}</strong> Railway</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {diffCount > 0 ? (
@@ -257,6 +256,7 @@ export function ApiComparisonDashboard() {
 interface EnvironmentPanelProps {
   title: string;
   badge: string;
+  badgeColor: 'green' | 'orange' | 'purple';
   loading: boolean;
   error: string | null;
   data: {
@@ -274,13 +274,17 @@ interface EnvironmentPanelProps {
     CLOSED?: number;
     totalCount?: number;
   } | null;
-  isProduction: boolean;
   dataType: DataType;
 }
 
-function EnvironmentPanel({ title, badge, loading, error, data, summary, isProduction, dataType }: EnvironmentPanelProps) {
-  const bgColor = isProduction ? "bg-green-500/5 border-green-500/20" : "bg-orange-500/5 border-orange-500/20";
-  const textColor = isProduction ? "text-green-600" : "text-orange-600";
+function EnvironmentPanel({ title, badge, badgeColor, loading, error, data, summary, dataType }: EnvironmentPanelProps) {
+  const colorClasses = {
+    green: { bg: "bg-green-500/5 border-green-500/20", text: "text-green-600" },
+    orange: { bg: "bg-orange-500/5 border-orange-500/20", text: "text-orange-600" },
+    purple: { bg: "bg-purple-500/5 border-purple-500/20", text: "text-purple-600" },
+  };
+  
+  const colors = colorClasses[badgeColor];
 
   return (
     <motion.div
@@ -288,12 +292,12 @@ function EnvironmentPanel({ title, badge, loading, error, data, summary, isProdu
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className={`${bgColor} border`}>
+      <Card className={`${colors.bg} border`}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">{badge}</span>
-              <CardTitle className={`text-sm font-medium ${textColor}`}>{title}</CardTitle>
+              <CardTitle className={`text-sm font-medium ${colors.text}`}>{title}</CardTitle>
             </div>
             {loading ? (
               <Skeleton className="h-4 w-16" />
@@ -407,9 +411,9 @@ function StrainsComparisonTable({ diffs, loading }: StrainsComparisonTableProps)
           <TableRow>
             <TableHead>Status</TableHead>
             <TableHead>Name / SKU</TableHead>
-            <TableHead className="text-right">Prod Price</TableHead>
-            <TableHead className="text-right">Staging Price</TableHead>
-            <TableHead>THC/CBD</TableHead>
+            <TableHead className="text-right">Prod</TableHead>
+            <TableHead className="text-right">Staging</TableHead>
+            <TableHead className="text-right">Railway</TableHead>
             <TableHead>Differences</TableHead>
           </TableRow>
         </TableHeader>
@@ -441,21 +445,24 @@ function StrainsComparisonTable({ diffs, loading }: StrainsComparisonTableProps)
                   ? formatPrice(diff.staging.retailPrice, 'ZA')
                   : <span className="text-muted-foreground">—</span>}
               </TableCell>
-              <TableCell>
-                <div className="text-xs">
-                  <span className="text-green-600">{diff.production?.thcContent || diff.staging?.thcContent || 0}% THC</span>
-                  {" / "}
-                  <span className="text-blue-600">{diff.production?.cbdContent || diff.staging?.cbdContent || 0}% CBD</span>
-                </div>
+              <TableCell className="text-right">
+                {diff.railway?.retailPrice != null
+                  ? formatPrice(diff.railway.retailPrice, 'ZA')
+                  : <span className="text-muted-foreground">—</span>}
               </TableCell>
               <TableCell>
                 {diff.diffs.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
-                    {diff.diffs.map((d, i) => (
+                    {diff.diffs.slice(0, 2).map((d, i) => (
                       <Badge key={i} variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
                         {d}
                       </Badge>
                     ))}
+                    {diff.diffs.length > 2 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{diff.diffs.length - 2} more
+                      </Badge>
+                    )}
                   </div>
                 ) : (
                   <span className="text-xs text-muted-foreground">Match</span>
@@ -472,12 +479,13 @@ function StrainsComparisonTable({ diffs, loading }: StrainsComparisonTableProps)
 interface GenericComparisonTableProps {
   prodData: unknown[];
   stagingData: unknown[];
+  railwayData: unknown[];
   loading: boolean;
   columns: string[];
   idField: string;
 }
 
-function GenericComparisonTable({ prodData, stagingData, loading, columns, idField }: GenericComparisonTableProps) {
+function GenericComparisonTable({ prodData, stagingData, railwayData, loading, columns, idField }: GenericComparisonTableProps) {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -489,7 +497,7 @@ function GenericComparisonTable({ prodData, stagingData, loading, columns, idFie
   }
 
   // Simple display of production data for now
-  const data = prodData.length > 0 ? prodData : stagingData;
+  const data = prodData.length > 0 ? prodData : stagingData.length > 0 ? stagingData : railwayData;
 
   if (data.length === 0) {
     return (
@@ -543,10 +551,11 @@ function GenericComparisonTable({ prodData, stagingData, loading, columns, idFie
 interface SalesComparisonTableProps {
   prodData: unknown[];
   stagingData: unknown[];
+  railwayData: unknown[];
   loading: boolean;
 }
 
-function SalesComparisonTable({ prodData, stagingData, loading }: SalesComparisonTableProps) {
+function SalesComparisonTable({ prodData, stagingData, railwayData, loading }: SalesComparisonTableProps) {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -557,7 +566,7 @@ function SalesComparisonTable({ prodData, stagingData, loading }: SalesCompariso
     );
   }
 
-  const data = prodData.length > 0 ? prodData : stagingData;
+  const data = prodData.length > 0 ? prodData : stagingData.length > 0 ? stagingData : railwayData;
 
   if (data.length === 0) {
     return (
@@ -643,10 +652,19 @@ interface SummaryComparisonProps {
     CLOSED?: number;
     totalCount?: number;
   } | null;
+  railwaySummary?: {
+    PENDING?: number;
+    VERIFIED?: number;
+    REJECTED?: number;
+    ONGOING?: number;
+    LEADS?: number;
+    CLOSED?: number;
+    totalCount?: number;
+  } | null;
   loading: boolean;
 }
 
-function SummaryComparison({ prodSummary, stagingSummary, loading }: SummaryComparisonProps) {
+function SummaryComparison({ prodSummary, stagingSummary, railwaySummary, loading }: SummaryComparisonProps) {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -657,7 +675,7 @@ function SummaryComparison({ prodSummary, stagingSummary, loading }: SummaryComp
     );
   }
 
-  if (!prodSummary && !stagingSummary) {
+  if (!prodSummary && !stagingSummary && !railwaySummary) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         No summary data available. Select "Clients Summary" or "Sales Summary" data type.
@@ -684,15 +702,17 @@ function SummaryComparison({ prodSummary, stagingSummary, loading }: SummaryComp
               <TableHead>Metric</TableHead>
               <TableHead className="text-right">Production</TableHead>
               <TableHead className="text-right">Staging</TableHead>
-              <TableHead className="text-center">Match</TableHead>
+              <TableHead className="text-right">Railway</TableHead>
+              <TableHead className="text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {summaryItems.map((item) => {
               const prodValue = prodSummary?.[item.key];
               const stagingValue = stagingSummary?.[item.key];
-              const hasValue = prodValue !== undefined || stagingValue !== undefined;
-              const matches = prodValue === stagingValue;
+              const railwayValue = railwaySummary?.[item.key];
+              const hasValue = prodValue !== undefined || stagingValue !== undefined || railwayValue !== undefined;
+              const allMatch = prodValue === stagingValue && stagingValue === railwayValue;
 
               if (!hasValue) return null;
 
@@ -705,8 +725,11 @@ function SummaryComparison({ prodSummary, stagingSummary, loading }: SummaryComp
                   <TableCell className={`text-right ${item.color}`}>
                     {stagingValue ?? '—'}
                   </TableCell>
+                  <TableCell className={`text-right ${item.color}`}>
+                    {railwayValue ?? '—'}
+                  </TableCell>
                   <TableCell className="text-center">
-                    {matches ? (
+                    {allMatch ? (
                       <CheckCircle className="w-4 h-4 text-green-500 mx-auto" />
                     ) : (
                       <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" />
