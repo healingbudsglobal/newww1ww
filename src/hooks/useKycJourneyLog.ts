@@ -8,6 +8,7 @@ export type KycEventType =
   | 'registration.success'
   | 'registration.error'
   | 'registration.api_error'
+  | 'registration.api_auth_error'
   | 'kyc.link_received'
   | 'kyc.link_clicked'
   | 'kyc.retry_requested'

@@ -708,15 +708,30 @@ export function ClientOnboarding() {
           setIsSubmitting(false);
           return;
         }
-        // Edge function failed - continue with local client ID
-        console.warn('[Registration] Dr Green API unavailable, using local client ID');
-        logEvent('registration.error', 'pending', { error: 'api_unavailable', errorMessage: apiError?.message });
         
-        // Show user feedback about fallback
-        toast({
-          title: 'Registration saved locally',
-          description: 'We saved your details but could not connect to the verification service. Our team will contact you.',
+        // Check for 401 - API permission issue
+        if (apiError?.status === 401 || apiError?.message?.includes('401') || apiError?.message?.includes('Unauthorized')) {
+          console.error('[Registration] API returned 401 - credential permission issue');
+          logEvent('registration.api_auth_error', 'pending', { 
+            error: 'api_permission_denied',
+            message: 'Dr Green API credentials lack required permissions'
+          });
+          
+          toast({
+            title: 'Registration system issue',
+            description: 'We\'ve saved your details. Our team has been notified and will contact you shortly.',
+          });
+        } else {
+          // Edge function failed - continue with local client ID
+          console.warn('[Registration] Dr Green API unavailable, using local client ID');
+          logEvent('registration.error', 'pending', { error: 'api_unavailable', errorMessage: apiError?.message });
+          
+          // Show user feedback about fallback
+          toast({
+            title: 'Registration saved locally',
+            description: 'We saved your details but could not connect to the verification service. Our team will contact you.',
         });
+        }
       }
 
       clearInterval(progressInterval);

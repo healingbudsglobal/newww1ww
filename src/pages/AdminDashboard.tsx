@@ -40,6 +40,7 @@ import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { BatchImageGenerator } from "@/components/admin/BatchImageGenerator";
 import { KYCJourneyViewer } from "@/components/admin/KYCJourneyViewer";
 import { AdminEmailTrigger } from "@/components/admin/AdminEmailTrigger";
+import { AdminClientImport } from "@/components/admin/AdminClientImport";
 import { ApiDebugPanel } from "@/components/admin/ApiDebugPanel";
 import { ApiTestRunner } from "@/components/admin/ApiTestRunner";
 import { ApiComparisonDashboard } from "@/components/admin/ApiComparisonDashboard";
@@ -650,6 +651,11 @@ const AdminDashboard = () => {
         {/* Manual Email Trigger */}
         <div className="mb-12">
           <AdminEmailTrigger />
+        </div>
+
+        {/* Client Import Tool */}
+        <div className="mb-12">
+          <AdminClientImport />
         </div>
 
         {/* API Test Runner */}

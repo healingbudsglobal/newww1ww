@@ -2240,6 +2240,142 @@ serve(async (req) => {
         break;
       }
       
+      // ==========================================
+      // ADMIN CLIENT SYNC/IMPORT ENDPOINTS
+      // ==========================================
+      
+      case "sync-client-by-email": {
+        // Search Dr Green API for client by email and sync to local database
+        const { email, localUserId } = body || {};
+        
+        if (!email || !validateEmail(email)) {
+          throw new Error("Valid email is required for client sync");
+        }
+        
+        logInfo(`Syncing client by email: ${email.slice(0,3)}***`);
+        
+        // Search for client on Dr Green API
+        const searchResponse = await drGreenRequest(
+          `/dapp/clients?search=${encodeURIComponent(email)}&searchBy=email&take=10&page=1`,
+          "GET"
+        );
+        
+        if (!searchResponse.ok) {
+          const errorText = await searchResponse.text();
+          logError("Dr Green API search failed", { status: searchResponse.status, error: errorText });
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Dr Green API error: ${searchResponse.status}`,
+              message: "Could not search for client on Dr Green. Check API permissions.",
+              apiStatus: searchResponse.status
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
+        
+        const searchData = await searchResponse.json();
+        const clients = searchData?.data?.clients || searchData?.clients || [];
+        
+        if (!clients.length) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'not_found',
+              message: `No client found with email: ${email}`,
+              searchResults: 0
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
+        
+        // Find exact email match
+        const matchedClient = clients.find((c: any) => 
+          c.email?.toLowerCase() === email.toLowerCase()
+        ) || clients[0];
+        
+        logInfo("Found client on Dr Green", { 
+          clientId: matchedClient.id || matchedClient.clientId,
+          isKycVerified: matchedClient.isKYCVerified,
+          adminApproval: matchedClient.adminApproval
+        });
+        
+        // If localUserId provided, sync to local database
+        if (localUserId) {
+          const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL')!,
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+          );
+          
+          const clientId = matchedClient.id || matchedClient.clientId;
+          const fullName = matchedClient.fullName || 
+            `${matchedClient.firstName || ''} ${matchedClient.lastName || ''}`.trim();
+          
+          // Upsert to local drgreen_clients table
+          const { error: upsertError } = await supabaseAdmin
+            .from('drgreen_clients')
+            .upsert({
+              user_id: localUserId,
+              drgreen_client_id: clientId,
+              email: matchedClient.email,
+              full_name: fullName || null,
+              country_code: matchedClient.countryCode || matchedClient.country || 'PT',
+              is_kyc_verified: matchedClient.isKYCVerified || false,
+              admin_approval: matchedClient.adminApproval || 'PENDING',
+              kyc_link: matchedClient.kycLink || null,
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'user_id'
+            });
+          
+          if (upsertError) {
+            logError("Failed to upsert client to local DB", { error: upsertError.message });
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'db_error',
+                message: `Found client on Dr Green but failed to sync locally: ${upsertError.message}`,
+                drGreenClient: matchedClient
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+          
+          logInfo("Client synced to local database", { clientId, localUserId });
+        }
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: localUserId ? "Client found and synced to local database" : "Client found on Dr Green",
+            client: matchedClient,
+            synced: !!localUserId
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
+      
+      case "search-clients-drgreen": {
+        // Search clients on Dr Green API without syncing
+        const { search, searchBy, page, take } = body || {};
+        
+        if (!search || !validateStringLength(search, 100)) {
+          throw new Error("Search term is required");
+        }
+        
+        const queryParams = new URLSearchParams({
+          search: String(search).slice(0, 100),
+          searchBy: searchBy || 'email',
+          page: String(page || 1),
+          take: String(take || 20),
+          orderBy: 'desc'
+        });
+        
+        logInfo(`Searching Dr Green clients: ${search.slice(0,10)}***`);
+        response = await drGreenRequest(`/dapp/clients?${queryParams.toString()}`, "GET");
+        break;
+      }
+      
       case "get-client-orders": {
         // GET /dapp/client/:clientId/orders - Get orders for specific client
         if (!validateClientId(body.clientId)) {
