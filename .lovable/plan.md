@@ -1,179 +1,155 @@
 
-# Add Confirmation Dialog for Client Approve/Reject Actions
 
-## Overview
+# Fix Client List Flickering in AdminClientManager
 
-Add an AlertDialog confirmation step before approving or rejecting clients to prevent accidental actions. This is a critical safety feature for a medical cannabis platform where client verification has compliance implications.
+## Problem Summary
 
----
+The client list in the Admin Dashboard flickers (shows skeleton loaders) every time the user:
+- Switches between tabs (All/Pending/Verified/Rejected)
+- Performs a search
+- Changes filters
 
-## Current Behavior
-
-```text
-User clicks [Approve] -> handleApprove() executes immediately -> API call made
-User clicks [Reject]  -> handleReject() executes immediately  -> API call made
-```
-
-## New Behavior
-
-```text
-User clicks [Approve] -> Confirmation Dialog opens -> User confirms -> handleApprove() -> API call
-User clicks [Reject]  -> Confirmation Dialog opens -> User confirms -> handleReject()  -> API call
-```
+This happens because the `fetchData` callback is recreated when state changes, triggering the `useEffect` to re-run and setting `loading` to `true`, which displays skeleton placeholders.
 
 ---
 
-## UI Design
-
-### Approve Confirmation Dialog
+## Root Cause
 
 ```text
-+----------------------------------------------------------+
-|                                                          |
-|   [Shield Icon] Approve Client?                          |
-|                                                          |
-|   Are you sure you want to approve                       |
-|   Kayliegh Moutinho (kayliegh.sm@gmail.com)?             |
-|                                                          |
-|   This will grant them access to purchase medical        |
-|   cannabis products through the platform.                |
-|                                                          |
-|                          [Cancel]  [Yes, Approve Client] |
-+----------------------------------------------------------+
-```
-
-### Reject Confirmation Dialog
-
-```text
-+----------------------------------------------------------+
-|                                                          |
-|   [Alert Icon] Reject Client?                            |
-|                                                          |
-|   Are you sure you want to reject                        |
-|   Kayliegh Moutinho (kayliegh.sm@gmail.com)?             |
-|                                                          |
-|   This will prevent them from purchasing products        |
-|   until they are re-approved.                            |
-|                                                          |
-|                          [Cancel]  [Yes, Reject Client]  |
-+----------------------------------------------------------+
+User clicks tab → filter state changes
+       ↓
+fetchData recreated (filter in deps)
+       ↓
+useEffect([fetchData]) runs
+       ↓
+setLoading(true) → Skeletons shown
+       ↓
+API response arrives
+       ↓
+setLoading(false) → Content shown
+       ↓
+= VISUAL FLICKER
 ```
 
 ---
 
-## Technical Implementation
+## Solution: Separate Initial Load from Refetch
 
-### New State Variables
+Instead of reusing `loading` for both initial load and filter changes, we introduce a smarter loading strategy:
+
+1. **Initial load only** uses the `loading` state (shows skeletons)
+2. **Filter/tab changes** use a `isRefetching` state (shows subtle overlay or no change)
+3. **Manual refresh** uses `refreshing` state (spinner on button only)
+
+---
+
+## Implementation Details
+
+### 1. Add a "refetching" state for non-blocking updates
 
 ```typescript
-// Dialog state
-const [confirmDialog, setConfirmDialog] = useState<{
-  open: boolean;
-  action: 'approve' | 'reject' | null;
-  client: DrGreenClient | null;
-}>({
-  open: false,
-  action: null,
-  client: null,
-});
+const [loading, setLoading] = useState(true);      // Initial load only
+const [refreshing, setRefreshing] = useState(false); // Manual refresh button
+const [isRefetching, setIsRefetching] = useState(false); // Tab/filter changes
 ```
 
-### New Functions
+### 2. Track if initial load is complete
 
 ```typescript
-// Open confirmation dialog
-const openConfirmDialog = (client: DrGreenClient, action: 'approve' | 'reject') => {
-  setConfirmDialog({ open: true, action, client });
-};
+const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+```
 
-// Close confirmation dialog
-const closeConfirmDialog = () => {
-  setConfirmDialog({ open: false, action: null, client: null });
-};
+### 3. Update fetchData logic
 
-// Execute the confirmed action
-const executeConfirmedAction = async () => {
-  if (!confirmDialog.client || !confirmDialog.action) return;
+```typescript
+const fetchData = useCallback(async (options?: { showToast?: boolean; isInitialLoad?: boolean }) => {
+  const { showToast = false, isInitialLoad = false } = options || {};
   
-  const { client, action } = confirmDialog;
-  const clientName = `${client.firstName} ${client.lastName}`;
-  
-  closeConfirmDialog();
-  
-  if (action === 'approve') {
-    await handleApprove(client.id, clientName);
+  if (showToast) {
+    setRefreshing(true);
+  } else if (isInitialLoad) {
+    setLoading(true);
   } else {
-    await handleReject(client.id, clientName);
+    // Filter/tab change - don't show full loading state
+    setIsRefetching(true);
   }
-};
+  
+  // ... fetch logic ...
+  
+  setLoading(false);
+  setRefreshing(false);
+  setIsRefetching(false);
+  setInitialLoadComplete(true);
+}, [/* stable deps only: getDappClients, getClientsSummary, toast */]);
 ```
 
-### Button Changes
-
-Replace direct `onClick` handlers with dialog openers:
+### 4. Fix useEffect to only run on initial load
 
 ```typescript
-// Before
-onClick={() => handleApprove(client.id, `${client.firstName} ${client.lastName}`)}
+// Initial load effect - runs once
+useEffect(() => {
+  fetchData({ isInitialLoad: true });
+}, []); // Empty deps - only on mount
 
-// After
-onClick={() => openConfirmDialog(client, 'approve')}
+// Filter change effect - doesn't show loading state
+useEffect(() => {
+  if (initialLoadComplete) {
+    fetchData(); // No isInitialLoad = uses isRefetching
+  }
+}, [filter, searchQuery]);
+```
+
+### 5. Optional: Show subtle loading indicator for refetching
+
+Instead of skeletons, show a subtle opacity change or spinner overlay:
+
+```typescript
+{/* Client List */}
+<div className={cn(
+  "transition-opacity duration-200",
+  isRefetching && "opacity-60 pointer-events-none"
+)}>
+  <ScrollArea>
+    {clients.map(...)}
+  </ScrollArea>
+</div>
 ```
 
 ---
 
-## Component Dependencies
+## Visual Behavior After Fix
 
-| Component | Source | Already Installed |
-|-----------|--------|-------------------|
-| `AlertDialog` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogAction` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogCancel` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogContent` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogDescription` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogFooter` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogHeader` | `@/components/ui/alert-dialog` | Yes |
-| `AlertDialogTitle` | `@/components/ui/alert-dialog` | Yes |
+| Action | Before | After |
+|--------|--------|-------|
+| Initial page load | Skeletons → Content | Skeletons → Content (unchanged) |
+| Switch tabs | Skeletons → Content (flicker) | Content stays, subtle fade |
+| Search | Skeletons → Content (flicker) | Content stays, subtle fade |
+| Refresh button | Spinner + Skeletons | Spinner only, content stays |
 
 ---
 
-## Changes Summary
+## Files to Modify
 
-### File to Modify
-
-`src/components/admin/AdminClientManager.tsx`
-
-### Modifications
-
-1. **Add import** for AlertDialog components from `@/components/ui/alert-dialog`
-
-2. **Add state** for tracking which client and action is being confirmed
-
-3. **Add helper functions** for opening/closing dialog and executing confirmed action
-
-4. **Replace button onClick handlers** to open confirmation dialog instead of direct execution
-
-5. **Add AlertDialog component** at the end of the JSX return with:
-   - Dynamic title based on action (Approve/Reject)
-   - Client name and email in description
-   - Appropriate warning message about the action's consequences
-   - Cancel button (closes dialog, no action)
-   - Confirm button (styled green for approve, red for reject)
+| File | Changes |
+|------|---------|
+| `src/components/admin/AdminClientManager.tsx` | Add `isRefetching` and `initialLoadComplete` states, refactor `fetchData` and effects |
 
 ---
 
-## Action Button Styling
+## Alternative Approach: Optimistic UI
 
-| Action | Confirm Button Style |
-|--------|---------------------|
-| Approve | `bg-green-600 hover:bg-green-700 text-white` |
-| Reject | `bg-red-600 hover:bg-red-700 text-white` |
+If preferred, we can also implement optimistic filtering where:
+- Tab switches instantly filter the existing data client-side
+- Background refetch updates the data silently
+- Only show loading on initial mount
+
+This would eliminate all perceived loading during navigation.
 
 ---
 
-## Accessibility Considerations
+## Technical Notes
 
-- AlertDialog traps focus automatically
-- Escape key closes the dialog
-- Screen reader announces dialog title and description
-- Cancel action is keyboard accessible
+- The `useCallback` dependency array should only include stable references (API hooks) to prevent unnecessary recreation
+- Using `useRef` for tracking initial load would also work but state is clearer
+- The filter and search logic can remain in `useCallback` if we don't include them in deps (using a ref instead)
+
