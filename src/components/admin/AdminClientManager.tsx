@@ -11,7 +11,6 @@ import {
   ShieldAlert,
   Loader2,
   Copy,
-  ExternalLink,
   AlertTriangle,
   User,
   Mail,
@@ -24,6 +23,16 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 
@@ -57,6 +66,11 @@ export function AdminClientManager() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: 'approve' | 'reject' | null;
+    client: DrGreenClient | null;
+  }>({ open: false, action: null, client: null });
 
   const fetchData = useCallback(async (showToast = false) => {
     if (showToast) setRefreshing(true);
@@ -173,6 +187,29 @@ export function AdminClientManager() {
       title: "Copied",
       description: "Client ID copied to clipboard.",
     });
+  };
+
+  const openConfirmDialog = (client: DrGreenClient, action: 'approve' | 'reject') => {
+    setConfirmDialog({ open: true, action, client });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ open: false, action: null, client: null });
+  };
+
+  const executeConfirmedAction = async () => {
+    if (!confirmDialog.client || !confirmDialog.action) return;
+    
+    const { client, action } = confirmDialog;
+    const clientName = `${client.firstName} ${client.lastName}`;
+    
+    closeConfirmDialog();
+    
+    if (action === 'approve') {
+      await handleApprove(client.id, clientName);
+    } else {
+      await handleReject(client.id, clientName);
+    }
   };
 
   const getStatusBadge = (client: DrGreenClient) => {
@@ -391,7 +428,7 @@ export function AdminClientManager() {
                             <>
                               <Button
                                 size="sm"
-                                onClick={() => handleApprove(client.id, `${client.firstName} ${client.lastName}`)}
+                                onClick={() => openConfirmDialog(client, 'approve')}
                                 disabled={actionLoading === client.id}
                                 className="bg-green-600 hover:bg-green-700 text-white"
                               >
@@ -407,7 +444,7 @@ export function AdminClientManager() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleReject(client.id, `${client.firstName} ${client.lastName}`)}
+                                onClick={() => openConfirmDialog(client, 'reject')}
                                 disabled={actionLoading === client.id}
                                 className="border-red-500/30 text-red-600 hover:bg-red-500/10"
                               >
@@ -432,7 +469,7 @@ export function AdminClientManager() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleApprove(client.id, `${client.firstName} ${client.lastName}`)}
+                              onClick={() => openConfirmDialog(client, 'approve')}
                               disabled={actionLoading === client.id}
                             >
                               {actionLoading === client.id ? (
@@ -454,6 +491,52 @@ export function AdminClientManager() {
             </div>
           </ScrollArea>
         )}
+
+        {/* Confirmation Dialog */}
+        <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && closeConfirmDialog()}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                {confirmDialog.action === 'approve' ? (
+                  <>
+                    <ShieldCheck className="w-5 h-5 text-green-600" />
+                    Approve Client?
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="w-5 h-5 text-red-600" />
+                    Reject Client?
+                  </>
+                )}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Are you sure you want to {confirmDialog.action}{" "}
+                  <strong>{confirmDialog.client?.firstName} {confirmDialog.client?.lastName}</strong>{" "}
+                  ({confirmDialog.client?.email})?
+                </p>
+                <p className="text-muted-foreground">
+                  {confirmDialog.action === 'approve' 
+                    ? "This will grant them access to purchase medical cannabis products through the platform."
+                    : "This will prevent them from purchasing products until they are re-approved."}
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={executeConfirmedAction}
+                className={
+                  confirmDialog.action === 'approve'
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white"
+                }
+              >
+                {confirmDialog.action === 'approve' ? "Yes, Approve Client" : "Yes, Reject Client"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
