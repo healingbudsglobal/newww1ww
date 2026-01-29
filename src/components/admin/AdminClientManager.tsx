@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
+import { cn } from "@/lib/utils";
 
 interface DrGreenClient {
   id: string;
@@ -63,6 +64,8 @@ export function AdminClientManager() {
   const [summary, setSummary] = useState<ClientsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isRefetching, setIsRefetching] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,18 +75,37 @@ export function AdminClientManager() {
     client: DrGreenClient | null;
   }>({ open: false, action: null, client: null });
 
-  const fetchData = useCallback(async (showToast = false) => {
-    if (showToast) setRefreshing(true);
-    else setLoading(true);
+  // Use refs to access current filter/search values without triggering re-creation
+  const filterRef = React.useRef(filter);
+  const searchQueryRef = React.useRef(searchQuery);
+  
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+  
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
+  const fetchData = useCallback(async (options?: { showToast?: boolean; isInitialLoad?: boolean }) => {
+    const { showToast = false, isInitialLoad = false } = options || {};
+    
+    if (showToast) {
+      setRefreshing(true);
+    } else if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setIsRefetching(true);
+    }
 
     try {
-      // Fetch clients with filter
+      // Fetch clients with filter - use refs to get current values
       const clientParams: Record<string, unknown> = { take: 100 };
-      if (filter !== "all") {
-        clientParams.adminApproval = filter;
+      if (filterRef.current !== "all") {
+        clientParams.adminApproval = filterRef.current;
       }
-      if (searchQuery.trim()) {
-        clientParams.search = searchQuery.trim();
+      if (searchQueryRef.current.trim()) {
+        clientParams.search = searchQueryRef.current.trim();
         clientParams.searchBy = "email";
       }
 
@@ -126,12 +148,24 @@ export function AdminClientManager() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsRefetching(false);
+      setInitialLoadComplete(true);
     }
-  }, [filter, searchQuery, getDappClients, getClientsSummary, toast]);
+  }, [getDappClients, getClientsSummary, toast]);
 
+  // Initial load effect - runs once on mount
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData({ isInitialLoad: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Filter/search change effect - doesn't show full loading state
+  useEffect(() => {
+    if (initialLoadComplete) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, searchQuery]);
 
   const handleApprove = async (clientId: string, clientName: string) => {
     setActionLoading(clientId);
@@ -293,7 +327,7 @@ export function AdminClientManager() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchData(true)}
+            onClick={() => fetchData({ showToast: true })}
             disabled={refreshing}
             className="flex items-center gap-2"
           >
@@ -371,8 +405,12 @@ export function AdminClientManager() {
             <p>No clients found</p>
           </div>
         ) : (
-          <ScrollArea className="h-[600px] pr-4">
-            <div className="space-y-4">
+          <div className={cn(
+            "transition-opacity duration-200",
+            isRefetching && "opacity-60 pointer-events-none"
+          )}>
+            <ScrollArea className="h-[600px] pr-4">
+              <div className="space-y-4">
               {clients.map((client, index) => (
                 <motion.div
                   key={client.id}
@@ -490,6 +528,7 @@ export function AdminClientManager() {
               ))}
             </div>
           </ScrollArea>
+          </div>
         )}
 
         {/* Confirmation Dialog */}
