@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { CheckCircle, Clock, AlertTriangle, XCircle, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useShop } from '@/context/ShopContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
@@ -23,6 +24,7 @@ interface StatusConfig {
 
 export function KYCStatusBadge() {
   const { drGreenClient, isLoading } = useShop();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
 
   const status: KYCStatus = useMemo(() => {
     if (!drGreenClient) return 'not_started';
@@ -43,6 +45,11 @@ export function KYCStatusBadge() {
     }
     return 'pending';
   }, [drGreenClient]);
+
+  // Don't show KYC badge for admin users - they don't need patient verification
+  if (isAdmin && !roleLoading) {
+    return null;
+  }
 
   const config: Record<KYCStatus, StatusConfig> = {
     not_started: {

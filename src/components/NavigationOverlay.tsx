@@ -14,6 +14,7 @@ import { User as SupabaseUser } from "@supabase/supabase-js";
 import { useTranslation } from "react-i18next";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useShop } from "@/context/ShopContext";
 import hbLogoWhite from "@/assets/hb-logo-white-full.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeToggle from "./ThemeToggle";
@@ -37,6 +38,10 @@ const NavigationOverlay = ({
   const location = useLocation();
   const { t } = useTranslation('common');
   const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isEligible, drGreenClient } = useShop();
+  
+  // Hide eligibility CTA for: admins, verified clients, or clients with pending registration
+  const shouldHideEligibilityCTA = isAdmin || isEligible || !!drGreenClient;
   
   // Focus trap for accessibility
   const focusTrapRef = useFocusTrap(isOpen);
@@ -301,20 +306,22 @@ const NavigationOverlay = ({
                   </>
                 ) : (
                   <>
-                    {/* Check Eligibility - Primary CTA - HIGH VISIBILITY */}
-                    <button
-                      onClick={handleEligibility}
-                      className={cn(
-                        "w-full flex items-center justify-center gap-3 py-5 px-6 rounded-xl transition-all duration-200",
-                        "touch-manipulation min-h-[60px] active:scale-[0.97]",
-                        "bg-white text-[hsl(178,48%,16%)] font-bold text-lg",
-                        "shadow-xl shadow-white/20 border-2 border-white",
-                        "hover:bg-white/95",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1A2E2A]"
-                      )}
-                    >
-                      Check Eligibility
-                    </button>
+                    {/* Check Eligibility - Primary CTA - Hide for admins and registered clients */}
+                    {!shouldHideEligibilityCTA && (
+                      <button
+                        onClick={handleEligibility}
+                        className={cn(
+                          "w-full flex items-center justify-center gap-3 py-5 px-6 rounded-xl transition-all duration-200",
+                          "touch-manipulation min-h-[60px] active:scale-[0.97]",
+                          "bg-white text-[hsl(178,48%,16%)] font-bold text-lg",
+                          "shadow-xl shadow-white/20 border-2 border-white",
+                          "hover:bg-white/95",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1A2E2A]"
+                        )}
+                      >
+                        Check Eligibility
+                      </button>
+                    )}
                     
                     {/* Patient Login - Secondary CTA - Clear but distinct */}
                     <Link

@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { useTenant } from "@/hooks/useTenant";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useShop } from "@/context/ShopContext";
 import { isMockModeEnabled } from "@/lib/mockMode";
 import EligibilityDialog from "@/components/EligibilityDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -46,6 +47,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isEligible, drGreenClient, isLoading: shopLoading } = useShop();
   const headerRef = useRef<HTMLElement>(null);
   
   const isDark = resolvedTheme === 'dark';
@@ -128,6 +130,9 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const portalLink = isAdmin && !roleLoading ? "/admin" : "/dashboard";
   const portalLabel = isAdmin && !roleLoading ? "Admin" : "Portal";
   const PortalIcon = isAdmin && !roleLoading ? Shield : LayoutDashboard;
+
+  // Hide eligibility CTA for: admins, verified clients, or clients with pending registration
+  const shouldHideEligibilityCTA = isAdmin || isEligible || !!drGreenClient;
 
   return (
     <>
@@ -221,22 +226,24 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                 {/* Wallet Connection Button - dApp Hydration Layer */}
                 <WalletButton className="ml-1" />
 
-                {/* KYC Status Badge - Persistent indicator for logged-in users */}
-                {user && <KYCStatusBadge />}
+                {/* KYC Status Badge - Persistent indicator for logged-in users (not admins) */}
+                {user && !isAdmin && <KYCStatusBadge />}
 
                 <div className="flex items-center gap-2 ml-3">
-                  {/* Check Eligibility - Emerald Green CTA */}
-                  <button
-                    onClick={() => setEligibilityDialogOpen(true)}
-                    className={cn(
-                      "font-semibold px-5 py-2.5 rounded-lg transition-all duration-300",
-                      "bg-emerald-500 text-white hover:bg-emerald-400",
-                      "shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50",
-                      "text-sm whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                    )}
-                  >
-                    {t('nav.checkEligibility')}
-                  </button>
+                  {/* Check Eligibility - Hide for admins and verified/registered clients */}
+                  {!shouldHideEligibilityCTA && (
+                    <button
+                      onClick={() => setEligibilityDialogOpen(true)}
+                      className={cn(
+                        "font-semibold px-5 py-2.5 rounded-lg transition-all duration-300",
+                        "bg-emerald-500 text-white hover:bg-emerald-400",
+                        "shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50",
+                        "text-sm whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                      )}
+                    >
+                      {t('nav.checkEligibility')}
+                    </button>
+                  )}
                   
                   {user ? (
                     <>
