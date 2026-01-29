@@ -54,11 +54,12 @@ const Checkout = () => {
       setPaymentStatus('Initiating payment...');
 
       // Step 2: Create payment via Dr Green API
-      const countryCode = drGreenClient.country_code || 'PT';
+      // Use client's country for payment currency, fallback to shop context country
+      const clientCountry = drGreenClient.country_code || countryCode || 'PT';
       const paymentResult = await createPayment({
         orderId: createdOrderId,
         amount: cartTotal,
-        currency: getCurrencyForCountry(countryCode),
+        currency: getCurrencyForCountry(clientCountry),
         clientId: drGreenClient.drgreen_client_id,
       });
 

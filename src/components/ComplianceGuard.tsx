@@ -17,6 +17,13 @@ export function ComplianceGuard({ children }: ComplianceGuardProps) {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Wait for all loading states to complete
+  const isLoading = !authChecked || shopLoading || roleLoading;
+
+  // Check if user is verified
+  const isVerified = drGreenClient?.is_kyc_verified === true && 
+                    drGreenClient?.admin_approval === 'VERIFIED';
+
   // Check authentication first
   useEffect(() => {
     const checkAuth = async () => {
@@ -33,8 +40,12 @@ export function ComplianceGuard({ children }: ComplianceGuardProps) {
     checkAuth();
   }, [navigate, location.pathname]);
 
-  // Wait for all loading states to complete
-  const isLoading = !authChecked || shopLoading || roleLoading;
+  // Redirect non-verified users to status page (must be after all other hooks)
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !isAdmin && !isVerified) {
+      navigate('/dashboard/status', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, isAdmin, isVerified, navigate]);
 
   // Show loading while checking
   if (isLoading) {
@@ -59,14 +70,8 @@ export function ComplianceGuard({ children }: ComplianceGuardProps) {
     return <>{children}</>;
   }
 
-  // Check if regular user is verified
-  const isVerified = drGreenClient?.is_kyc_verified === true && 
-                    drGreenClient?.admin_approval === 'VERIFIED';
-
-  // If not verified, redirect to status page
+  // Show loading while redirect is happening for non-verified users
   if (!isVerified) {
-    // Use effect to navigate to avoid render-time navigation
-    navigate('/dashboard/status', { replace: true });
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
