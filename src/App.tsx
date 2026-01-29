@@ -15,6 +15,7 @@ import SkipLinks from "@/components/SkipLinks";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ProtectedNFTRoute } from "@/components/ProtectedNFTRoute";
 import { ComplianceGuard } from "@/components/ComplianceGuard";
+import { CheckoutErrorFallback } from "@/components/shop/CheckoutErrorFallback";
 
 import { ShopProvider } from "@/context/ShopContext";
 import { CursorProvider } from "@/context/CursorContext";
@@ -97,7 +98,9 @@ const AnimatedRoutes = () => {
           } />
           <Route path="/checkout" element={
             <ComplianceGuard>
-              <Checkout />
+              <ErrorBoundary fallback={<CheckoutErrorFallback />}>
+                <Checkout />
+              </ErrorBoundary>
             </ComplianceGuard>
           } />
           

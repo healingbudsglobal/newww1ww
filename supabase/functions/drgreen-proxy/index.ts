@@ -1872,20 +1872,16 @@ serve(async (req) => {
         const { clientId, verifyAction } = body || {};
         if (!clientId || !verifyAction) throw new Error("clientId and verifyAction are required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
-        
-        // Use sub-resource endpoints for approval/rejection
-        // Following the same pattern as activate/deactivate
-        const endpoint = verifyAction === 'verify' 
-          ? `/dapp/clients/${clientId}/approve`
-          : `/dapp/clients/${clientId}/reject`;
-        
-        response = await drGreenRequest(endpoint, "PATCH", {});
-        
-        // If 404, try POST instead of PATCH (some APIs prefer POST for actions)
-        if (response.status === 404) {
-          logInfo("PATCH endpoint not found, trying POST", { endpoint });
-          response = await drGreenRequest(endpoint, "POST", {});
-        }
+
+        // NOTE: We have confirmed /approve and /reject sub-resource endpoints return 404.
+        // Use the only known valid update endpoint and pass a status value.
+        // The Dr. Green API is the source of truth for adminApproval eligibility.
+        const status = verifyAction === 'verify' ? 'VERIFIED' : 'REJECTED';
+
+        // PATCH /dapp/clients/{clientId}
+        // The API has previously returned 200 for PATCH with other fields (even if ignored),
+        // so we attempt a status update here.
+        response = await drGreenRequest(`/dapp/clients/${clientId}`, "PATCH", { status });
         break;
       }
       
