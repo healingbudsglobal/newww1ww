@@ -67,3 +67,10 @@ If found in Dr. Green system, use the Admin Client Import tool to sync her recor
 | Stage | LEADS |
 | Created | 2026-01-29T15:22:47.273Z |
 
+## Next Step: Link to Local Database
+Kayleigh's record exists in Dr. Green but cannot be imported without a linked Supabase user_id (foreign key constraint). 
+
+**Options:**
+1. Kayleigh signs up on Healing Buds → her record auto-links during client registration
+2. Admin manually associates her when she logs in for the first time
+
