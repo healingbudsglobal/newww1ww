@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -76,8 +76,8 @@ export function AdminClientManager() {
   }>({ open: false, action: null, client: null });
 
   // Use refs to access current filter/search values without triggering re-creation
-  const filterRef = React.useRef(filter);
-  const searchQueryRef = React.useRef(searchQuery);
+  const filterRef = useRef(filter);
+  const searchQueryRef = useRef(searchQuery);
   
   useEffect(() => {
     filterRef.current = filter;
