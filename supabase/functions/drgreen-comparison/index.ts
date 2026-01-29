@@ -24,6 +24,9 @@ interface EnvConfig {
   name: string;
 }
 
+// Staging URL - hardcoded since env var evaluation happens at module load
+const STAGING_API_URL = 'https://budstack-backend-main-development.up.railway.app/api/v1';
+
 const ENV_CONFIG: Record<string, EnvConfig> = {
   production: {
     apiUrl: 'https://api.drgreennft.com/api/v1',
@@ -32,7 +35,7 @@ const ENV_CONFIG: Record<string, EnvConfig> = {
     name: 'Production',
   },
   staging: {
-    apiUrl: Deno.env.get('DRGREEN_STAGING_API_URL') || 'https://budstack-backend-main-development.up.railway.app/api/v1',
+    apiUrl: STAGING_API_URL,
     apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
     name: 'Staging (Railway)',
@@ -109,23 +112,42 @@ function extractSecp256k1PrivateKey(pkcs8Der: Uint8Array): Uint8Array {
 }
 
 // Generate secp256k1 signature
-async function signPayload(data: string, base64PrivateKey: string): Promise<string> {
+async function signPayload(data: string, privateKeyInput: string): Promise<string> {
   const encoder = new TextEncoder();
-  const secret = (base64PrivateKey || '').trim();
+  const secret = (privateKeyInput || '').trim();
   
-  const decodedSecretBytes = base64ToBytes(secret);
-  const decodedAsText = new TextDecoder().decode(decodedSecretBytes);
   let keyDerBytes: Uint8Array;
-
-  if (decodedAsText.includes('-----BEGIN')) {
-    const pemBody = decodedAsText
+  
+  // Check if the key is already in PEM format (not base64-encoded)
+  if (secret.includes('-----BEGIN')) {
+    // Key is already PEM format, extract the base64 body
+    const pemBody = secret
       .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
       .replace(/-----END [A-Z0-9 ]+-----/g, '')
       .replace(/[\r\n\s]/g, '')
       .trim();
     keyDerBytes = base64ToBytes(pemBody);
   } else {
-    keyDerBytes = decodedSecretBytes;
+    // Try to decode as base64, then check if result is PEM
+    try {
+      const decodedSecretBytes = base64ToBytes(secret);
+      const decodedAsText = new TextDecoder().decode(decodedSecretBytes);
+      
+      if (decodedAsText.includes('-----BEGIN')) {
+        // It was a base64-encoded PEM
+        const pemBody = decodedAsText
+          .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
+          .replace(/-----END [A-Z0-9 ]+-----/g, '')
+          .replace(/[\r\n\s]/g, '')
+          .trim();
+        keyDerBytes = base64ToBytes(pemBody);
+      } else {
+        // It's raw base64-encoded DER
+        keyDerBytes = decodedSecretBytes;
+      }
+    } catch (e) {
+      throw new Error('Failed to decode private key - invalid format');
+    }
   }
 
   const privateKeyBytes = extractSecp256k1PrivateKey(keyDerBytes);
@@ -315,18 +337,40 @@ serve(async (req) => {
       const responseData = result.data as Record<string, unknown>;
       
       switch (dataType) {
-        case 'strains':
-          normalizedData = Array.isArray(responseData.data) ? responseData.data : [];
-          itemCount = normalizedData.length;
+        case 'strains': {
+          // API returns { data: { strains: [...], pageMetaDto: {...} } }
+          const dataObj = responseData.data as Record<string, unknown> | undefined;
+          if (dataObj?.strains && Array.isArray(dataObj.strains)) {
+            normalizedData = dataObj.strains;
+          } else if (Array.isArray(responseData.data)) {
+            normalizedData = responseData.data;
+          }
+          const pageInfo = dataObj?.pageMetaDto as Record<string, unknown> | undefined;
+          itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
           break;
-        case 'clients':
-          normalizedData = Array.isArray(responseData.data) ? responseData.data : [];
+        }
+        case 'clients': {
+          // API returns { data: { clients: [...] }, meta: {...} }
+          const dataObj = responseData.data as Record<string, unknown> | undefined;
+          if (dataObj?.clients && Array.isArray(dataObj.clients)) {
+            normalizedData = dataObj.clients;
+          } else if (Array.isArray(responseData.data)) {
+            normalizedData = responseData.data;
+          }
           itemCount = (responseData.meta as Record<string, number>)?.total || normalizedData.length;
           break;
-        case 'orders':
-          normalizedData = Array.isArray(responseData.data) ? responseData.data : [];
+        }
+        case 'orders': {
+          // API returns { data: { orders: [...] }, meta: {...} }
+          const dataObj = responseData.data as Record<string, unknown> | undefined;
+          if (dataObj?.orders && Array.isArray(dataObj.orders)) {
+            normalizedData = dataObj.orders;
+          } else if (Array.isArray(responseData.data)) {
+            normalizedData = responseData.data;
+          }
           itemCount = (responseData.meta as Record<string, number>)?.total || normalizedData.length;
           break;
+        }
       }
     }
 
