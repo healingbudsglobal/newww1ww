@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export type DataType = 'strains' | 'clients' | 'orders';
-export type Environment = 'production' | 'staging';
+export type DataType = 'strains' | 'clients' | 'orders' | 'sales' | 'clientsSummary' | 'salesSummary';
+export type Environment = 'production' | 'staging' | 'railway';
 
 export interface ComparisonResult {
   environment: Environment;
@@ -14,6 +14,15 @@ export interface ComparisonResult {
   responseTime: number;
   itemCount: number;
   data: unknown[];
+  summary?: {
+    PENDING?: number;
+    VERIFIED?: number;
+    REJECTED?: number;
+    ONGOING?: number;
+    LEADS?: number;
+    CLOSED?: number;
+    totalCount?: number;
+  };
   rawResponse: unknown;
   error?: string;
 }
@@ -57,6 +66,19 @@ export interface OrderItem {
   createdAt?: string;
 }
 
+export interface SalesItem {
+  id: string;
+  stage: string;
+  client?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface StrainDiff {
   id: string;
   sku?: string;
@@ -82,15 +104,17 @@ export function useApiComparison() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+  const [stagingEnvironment, setStagingEnvironment] = useState<'staging' | 'railway'>('staging');
 
   const fetchFromEnvironment = useCallback(async (
     environment: Environment,
     dataType: DataType,
-    countryCode = 'ZAF'
+    countryCode = 'ZAF',
+    stage?: 'LEADS' | 'ONGOING' | 'CLOSED'
   ): Promise<ComparisonResult | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('drgreen-comparison', {
-        body: { environment, dataType, countryCode },
+        body: { environment, dataType, countryCode, stage },
       });
 
       if (error) {
@@ -102,7 +126,7 @@ export function useApiComparison() {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return {
         environment,
-        environmentName: environment === 'production' ? 'Production' : 'Staging',
+        environmentName: environment === 'production' ? 'Production' : environment === 'staging' ? 'Staging (Official)' : 'Railway (Dev)',
         dataType,
         apiUrl: '',
         status: 0,
@@ -118,7 +142,8 @@ export function useApiComparison() {
 
   const fetchComparison = useCallback(async (
     dataType: DataType,
-    countryCode = 'ZAF'
+    countryCode = 'ZAF',
+    stage?: 'LEADS' | 'ONGOING' | 'CLOSED'
   ) => {
     // Debounce: prevent refresh within 5 seconds
     const now = Date.now();
@@ -137,8 +162,8 @@ export function useApiComparison() {
 
     // Fetch from both environments in parallel
     const [prodResult, stagingResult] = await Promise.all([
-      fetchFromEnvironment('production', dataType, countryCode),
-      fetchFromEnvironment('staging', dataType, countryCode),
+      fetchFromEnvironment('production', dataType, countryCode, stage),
+      fetchFromEnvironment(stagingEnvironment, dataType, countryCode, stage),
     ]);
 
     setState({
@@ -156,7 +181,7 @@ export function useApiComparison() {
     });
 
     setIsRefreshing(false);
-  }, [fetchFromEnvironment, lastRefreshTime]);
+  }, [fetchFromEnvironment, lastRefreshTime, stagingEnvironment]);
 
   const calculateStrainDiffs = useCallback((
     prodData: unknown[],
@@ -236,6 +261,8 @@ export function useApiComparison() {
   return {
     state,
     isRefreshing,
+    stagingEnvironment,
+    setStagingEnvironment,
     fetchComparison,
     calculateStrainDiffs,
     getDiffCount,

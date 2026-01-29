@@ -24,9 +24,7 @@ interface EnvConfig {
   name: string;
 }
 
-// Staging URL - hardcoded since env var evaluation happens at module load
-const STAGING_API_URL = 'https://budstack-backend-main-development.up.railway.app/api/v1';
-
+// Environment configurations - supports multiple staging environments
 const ENV_CONFIG: Record<string, EnvConfig> = {
   production: {
     apiUrl: 'https://api.drgreennft.com/api/v1',
@@ -35,12 +33,21 @@ const ENV_CONFIG: Record<string, EnvConfig> = {
     name: 'Production',
   },
   staging: {
-    apiUrl: STAGING_API_URL,
+    apiUrl: 'https://stage-api.drgreennft.com/api/v1', // Official staging URL
     apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
-    name: 'Staging (Railway)',
+    name: 'Staging (Official)',
+  },
+  railway: {
+    apiUrl: 'https://budstack-backend-main-development.up.railway.app/api/v1', // Dev instance
+    apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
+    privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
+    name: 'Railway (Dev)',
   },
 };
+
+// Valid data types for comparison
+type DataType = 'strains' | 'clients' | 'orders' | 'sales' | 'clientsSummary' | 'salesSummary' | 'userNfts';
 
 // Base64 utilities
 function cleanBase64(base64: string): string {
@@ -244,24 +251,187 @@ async function makeApiRequest(
   return { data, responseTime, status: response.status };
 }
 
+// Get endpoint configuration based on data type
+function getEndpointConfig(dataType: DataType, countryCode: string): {
+  endpoint: string;
+  method: string;
+  queryParams?: Record<string, string>;
+} {
+  switch (dataType) {
+    case 'strains':
+      return {
+        endpoint: '/strains',
+        method: 'GET',
+        queryParams: {
+          countryCode: countryCode,
+          orderBy: 'desc',
+          take: '50',
+          page: '1',
+        },
+      };
+    case 'clients':
+      return {
+        endpoint: '/dapp/clients',
+        method: 'GET',
+        queryParams: {
+          orderBy: 'desc',
+          take: '10',
+          page: '1',
+        },
+      };
+    case 'orders':
+      return {
+        endpoint: '/dapp/orders',
+        method: 'GET',
+        queryParams: {
+          orderBy: 'desc',
+          take: '10',
+          page: '1',
+        },
+      };
+    case 'sales':
+      return {
+        endpoint: '/dapp/sales',
+        method: 'GET',
+        queryParams: {
+          orderBy: 'desc',
+          take: '10',
+          page: '1',
+        },
+      };
+    case 'clientsSummary':
+      return {
+        endpoint: '/dapp/clients/summary',
+        method: 'GET',
+      };
+    case 'salesSummary':
+      return {
+        endpoint: '/dapp/sales/summary',
+        method: 'GET',
+      };
+    case 'userNfts':
+      return {
+        endpoint: '/dapp/users/nfts',
+        method: 'GET',
+      };
+    default:
+      throw new Error(`Unknown dataType: ${dataType}`);
+  }
+}
+
+// Normalize response data based on type
+function normalizeResponse(
+  dataType: DataType,
+  responseData: Record<string, unknown>,
+  status: number
+): { normalizedData: unknown[]; itemCount: number; summary?: Record<string, unknown> } {
+  if (status !== 200 || !responseData) {
+    return { normalizedData: [], itemCount: 0 };
+  }
+
+  const dataObj = responseData.data as Record<string, unknown> | undefined;
+  const pageInfo = dataObj?.pageMetaDto as Record<string, unknown> | undefined;
+
+  switch (dataType) {
+    case 'strains': {
+      let normalizedData: unknown[] = [];
+      if (dataObj?.strains && Array.isArray(dataObj.strains)) {
+        normalizedData = dataObj.strains;
+      } else if (Array.isArray(responseData.data)) {
+        normalizedData = responseData.data;
+      }
+      const itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
+      return { normalizedData, itemCount };
+    }
+    case 'clients': {
+      let normalizedData: unknown[] = [];
+      if (dataObj?.clients && Array.isArray(dataObj.clients)) {
+        normalizedData = dataObj.clients;
+      } else if (Array.isArray(responseData.data)) {
+        normalizedData = responseData.data;
+      }
+      const itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
+      return { normalizedData, itemCount };
+    }
+    case 'orders': {
+      let normalizedData: unknown[] = [];
+      if (dataObj?.orders && Array.isArray(dataObj.orders)) {
+        normalizedData = dataObj.orders;
+      } else if (Array.isArray(responseData.data)) {
+        normalizedData = responseData.data;
+      }
+      const itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
+      return { normalizedData, itemCount };
+    }
+    case 'sales': {
+      let normalizedData: unknown[] = [];
+      if (dataObj?.sales && Array.isArray(dataObj.sales)) {
+        normalizedData = dataObj.sales;
+      } else if (Array.isArray(responseData.data)) {
+        normalizedData = responseData.data;
+      }
+      const itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
+      return { normalizedData, itemCount };
+    }
+    case 'clientsSummary': {
+      // Returns summary object, not array
+      const summary = dataObj?.summary as Record<string, unknown> | undefined;
+      return {
+        normalizedData: [],
+        itemCount: Number(summary?.totalCount) || 0,
+        summary: summary,
+      };
+    }
+    case 'salesSummary': {
+      // Returns summary object, not array
+      const summary = dataObj?.summary as Record<string, unknown> | undefined;
+      return {
+        normalizedData: [],
+        itemCount: Number(summary?.totalCount) || Number(dataObj?.count) || 0,
+        summary: summary,
+      };
+    }
+    case 'userNfts': {
+      let normalizedData: unknown[] = [];
+      if (dataObj?.nfts && Array.isArray(dataObj.nfts)) {
+        normalizedData = dataObj.nfts;
+      }
+      const itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
+      return { normalizedData, itemCount };
+    }
+    default:
+      return { normalizedData: [], itemCount: 0 };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { environment, dataType, countryCode = 'ZAF' } = await req.json();
+    const { environment, dataType, countryCode = 'ZAF', stage } = await req.json();
 
-    if (!environment || !['production', 'staging'].includes(environment)) {
+    // Validate environment - now supports 'production', 'staging', 'railway'
+    const validEnvironments = Object.keys(ENV_CONFIG);
+    if (!environment || !validEnvironments.includes(environment)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid environment. Use "production" or "staging".' }),
+        JSON.stringify({ 
+          error: `Invalid environment. Use one of: ${validEnvironments.join(', ')}`,
+          validEnvironments 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!dataType || !['strains', 'clients', 'orders'].includes(dataType)) {
+    // Validate data type
+    const validDataTypes: DataType[] = ['strains', 'clients', 'orders', 'sales', 'clientsSummary', 'salesSummary', 'userNfts'];
+    if (!dataType || !validDataTypes.includes(dataType)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid dataType. Use "strains", "clients", or "orders".' }),
+        JSON.stringify({ 
+          error: `Invalid dataType. Use one of: ${validDataTypes.join(', ')}`,
+          validDataTypes 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -281,98 +451,30 @@ serve(async (req) => {
       );
     }
 
-    let endpoint: string;
-    let method: string;
-    let queryParams: Record<string, string> | undefined;
-    let body: Record<string, unknown> | undefined;
-
-    switch (dataType) {
-      case 'strains':
-        endpoint = '/strains';
-        method = 'GET';
-        queryParams = {
-          countryCode: countryCode,
-          orderBy: 'desc',
-          take: '50',
-          page: '1',
-        };
-        break;
-      case 'clients':
-        endpoint = '/dapp/clients';
-        method = 'GET';
-        queryParams = {
-          orderBy: 'desc',
-          take: '10',
-          page: '1',
-        };
-        break;
-      case 'orders':
-        endpoint = '/dapp/orders';
-        method = 'GET';
-        queryParams = {
-          orderBy: 'desc',
-          take: '10',
-          page: '1',
-        };
-        break;
-      default:
-        throw new Error('Invalid dataType');
+    // Get endpoint configuration
+    const endpointConfig = getEndpointConfig(dataType, countryCode);
+    
+    // Add stage filter for sales if provided
+    if (dataType === 'sales' && stage && ['LEADS', 'ONGOING', 'CLOSED'].includes(stage)) {
+      endpointConfig.queryParams = { ...endpointConfig.queryParams, stage };
     }
 
     const result = await makeApiRequest(
       config,
       apiKey,
       privateKey,
-      endpoint,
-      method,
-      body,
-      queryParams
+      endpointConfig.endpoint,
+      endpointConfig.method,
+      undefined,
+      endpointConfig.queryParams
     );
 
     // Normalize response
-    let normalizedData: unknown[] = [];
-    let itemCount = 0;
-
-    if (result.status === 200 && result.data) {
-      const responseData = result.data as Record<string, unknown>;
-      
-      switch (dataType) {
-        case 'strains': {
-          // API returns { data: { strains: [...], pageMetaDto: {...} } }
-          const dataObj = responseData.data as Record<string, unknown> | undefined;
-          if (dataObj?.strains && Array.isArray(dataObj.strains)) {
-            normalizedData = dataObj.strains;
-          } else if (Array.isArray(responseData.data)) {
-            normalizedData = responseData.data;
-          }
-          const pageInfo = dataObj?.pageMetaDto as Record<string, unknown> | undefined;
-          itemCount = Number(pageInfo?.itemCount) || normalizedData.length;
-          break;
-        }
-        case 'clients': {
-          // API returns { data: { clients: [...] }, meta: {...} }
-          const dataObj = responseData.data as Record<string, unknown> | undefined;
-          if (dataObj?.clients && Array.isArray(dataObj.clients)) {
-            normalizedData = dataObj.clients;
-          } else if (Array.isArray(responseData.data)) {
-            normalizedData = responseData.data;
-          }
-          itemCount = (responseData.meta as Record<string, number>)?.total || normalizedData.length;
-          break;
-        }
-        case 'orders': {
-          // API returns { data: { orders: [...] }, meta: {...} }
-          const dataObj = responseData.data as Record<string, unknown> | undefined;
-          if (dataObj?.orders && Array.isArray(dataObj.orders)) {
-            normalizedData = dataObj.orders;
-          } else if (Array.isArray(responseData.data)) {
-            normalizedData = responseData.data;
-          }
-          itemCount = (responseData.meta as Record<string, number>)?.total || normalizedData.length;
-          break;
-        }
-      }
-    }
+    const { normalizedData, itemCount, summary } = normalizeResponse(
+      dataType,
+      result.data as Record<string, unknown>,
+      result.status
+    );
 
     return new Response(
       JSON.stringify({
@@ -385,6 +487,7 @@ serve(async (req) => {
         responseTime: result.responseTime,
         itemCount,
         data: normalizedData,
+        summary: summary || null,
         rawResponse: result.data,
       }),
       { 

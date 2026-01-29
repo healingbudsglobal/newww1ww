@@ -2196,6 +2196,72 @@ serve(async (req) => {
         break;
       }
       
+      // ==========================================
+      // NEW ENDPOINTS FROM OFFICIAL DOCUMENTATION
+      // ==========================================
+      
+      case "get-clients-summary": {
+        // GET /dapp/clients/summary - Get client summary stats
+        response = await drGreenRequestBody("/dapp/clients/summary", "GET", {});
+        break;
+      }
+      
+      case "get-sales": {
+        // GET /dapp/sales - Get sales data with filtering
+        const { page, take, orderBy, search, searchBy, stage } = body || {};
+        
+        if (!validatePagination(page, take)) {
+          throw new Error("Invalid pagination parameters");
+        }
+        
+        const queryParams: Record<string, string | number> = {
+          orderBy: orderBy || 'desc',
+          take: take || 10,
+          page: page || 1,
+        };
+        if (search) queryParams.search = String(search).slice(0, 100);
+        if (searchBy) queryParams.searchBy = searchBy;
+        if (stage && ['LEADS', 'ONGOING', 'CLOSED'].includes(stage)) {
+          queryParams.stage = stage;
+        }
+        
+        response = await drGreenRequestQuery("/dapp/sales", queryParams);
+        break;
+      }
+      
+      case "get-sales-summary": {
+        // GET /dapp/sales/summary - Get sales summary by stage
+        response = await drGreenRequestBody("/dapp/sales/summary", "GET", {});
+        break;
+      }
+      
+      case "get-client-orders": {
+        // GET /dapp/client/:clientId/orders - Get orders for specific client
+        if (!validateClientId(body.clientId)) {
+          throw new Error("Invalid client ID format");
+        }
+        const { page, take, orderBy } = body || {};
+        
+        if (!validatePagination(page, take)) {
+          throw new Error("Invalid pagination parameters");
+        }
+        
+        const queryParams: Record<string, string | number> = {
+          orderBy: orderBy || 'desc',
+          take: take || 10,
+          page: page || 1,
+        };
+        
+        response = await drGreenRequestQuery(`/dapp/client/${body.clientId}/orders`, queryParams);
+        break;
+      }
+      
+      case "get-user-nfts": {
+        // GET /dapp/users/nfts - Get user's owned NFTs
+        response = await drGreenRequestBody("/dapp/users/nfts", "GET", {});
+        break;
+      }
+      
       default:
         return new Response(
           JSON.stringify({ error: "Unknown action", action }),

@@ -12,6 +12,8 @@ import {
   ShoppingCart,
   Leaf,
   ArrowLeftRight,
+  TrendingUp,
+  Settings,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,17 +36,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useApiComparison, DataType, StrainDiff, StrainItem } from "@/hooks/useApiComparison";
+import { useApiComparison, DataType, StrainDiff, StrainItem, Environment } from "@/hooks/useApiComparison";
 import { formatPrice } from "@/lib/currency";
 
 export function ApiComparisonDashboard() {
-  const { state, isRefreshing, fetchComparison, calculateStrainDiffs, getDiffCount } = useApiComparison();
+  const { 
+    state, 
+    isRefreshing, 
+    stagingEnvironment,
+    setStagingEnvironment,
+    fetchComparison, 
+    calculateStrainDiffs, 
+    getDiffCount 
+  } = useApiComparison();
   const [activeTab, setActiveTab] = useState<DataType>("strains");
   const [countryCode] = useState("ZAF");
 
   useEffect(() => {
     fetchComparison(activeTab, countryCode);
-  }, []);
+  }, [stagingEnvironment]);
 
   const handleRefresh = () => {
     fetchComparison(activeTab, countryCode);
@@ -49,6 +66,10 @@ export function ApiComparisonDashboard() {
     fetchComparison(dataType, countryCode);
   };
 
+  const handleEnvironmentChange = (value: string) => {
+    setStagingEnvironment(value as 'staging' | 'railway');
+  };
+
   const prodData = state.production.data;
   const stagingData = state.staging.data;
   const strainDiffs = activeTab === "strains" && prodData?.data && stagingData?.data
@@ -58,6 +79,10 @@ export function ApiComparisonDashboard() {
   const diffCount = strainDiffs.filter(d => d.hasDiff).length;
   const prodCount = prodData?.itemCount || 0;
   const stagingCount = stagingData?.itemCount || 0;
+
+  // Get summary data for comparison
+  const prodSummary = prodData?.summary;
+  const stagingSummary = stagingData?.summary;
 
   return (
     <Card className="border-2 border-dashed border-primary/20">
@@ -75,6 +100,19 @@ export function ApiComparisonDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Environment Selector */}
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-muted-foreground" />
+              <Select value={stagingEnvironment} onValueChange={handleEnvironmentChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select staging env" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="staging">Official Staging</SelectItem>
+                  <SelectItem value="railway">Railway (Dev)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {state.lastUpdated && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -97,7 +135,7 @@ export function ApiComparisonDashboard() {
       <CardContent className="space-y-6">
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="strains" className="flex items-center gap-2">
               <Leaf className="w-4 h-4" />
               Strains
@@ -110,6 +148,14 @@ export function ApiComparisonDashboard() {
               <ShoppingCart className="w-4 h-4" />
               Orders
             </TabsTrigger>
+            <TabsTrigger value="sales" className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Sales
+            </TabsTrigger>
+            <TabsTrigger value="clientsSummary" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Summary
+            </TabsTrigger>
           </TabsList>
 
           {/* Side-by-Side Comparison Panels */}
@@ -121,17 +167,21 @@ export function ApiComparisonDashboard() {
               loading={state.production.loading}
               error={state.production.error}
               data={prodData}
+              summary={prodSummary}
               isProduction
+              dataType={activeTab}
             />
 
             {/* Staging Panel */}
             <EnvironmentPanel
-              title="Staging (Railway)"
+              title={stagingEnvironment === 'staging' ? 'Staging (Official)' : 'Railway (Dev)'}
               badge="🟠"
               loading={state.staging.loading}
               error={state.staging.error}
               data={stagingData}
+              summary={stagingSummary}
               isProduction={false}
+              dataType={activeTab}
             />
           </div>
 
@@ -155,8 +205,24 @@ export function ApiComparisonDashboard() {
               prodData={prodData?.data || []}
               stagingData={stagingData?.data || []}
               loading={state.production.loading || state.staging.loading}
-              columns={["id", "status", "paymentStatus", "totalAmount"]}
+              columns={["id", "orderStatus", "paymentStatus", "totalAmount"]}
               idField="id"
+            />
+          </TabsContent>
+
+          <TabsContent value="sales" className="mt-6">
+            <SalesComparisonTable
+              prodData={prodData?.data || []}
+              stagingData={stagingData?.data || []}
+              loading={state.production.loading || state.staging.loading}
+            />
+          </TabsContent>
+
+          <TabsContent value="clientsSummary" className="mt-6">
+            <SummaryComparison
+              prodSummary={prodSummary}
+              stagingSummary={stagingSummary}
+              loading={state.production.loading || state.staging.loading}
             />
           </TabsContent>
         </Tabs>
@@ -166,7 +232,7 @@ export function ApiComparisonDashboard() {
           <div className="flex items-center gap-4">
             <Database className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm">
-              <strong>{prodCount}</strong> items (Prod) vs <strong>{stagingCount}</strong> items (Staging)
+              <strong>{prodCount}</strong> items (Prod) vs <strong>{stagingCount}</strong> items ({stagingEnvironment === 'staging' ? 'Staging' : 'Railway'})
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -199,10 +265,20 @@ interface EnvironmentPanelProps {
     itemCount: number;
     success: boolean;
   } | null;
+  summary?: {
+    PENDING?: number;
+    VERIFIED?: number;
+    REJECTED?: number;
+    ONGOING?: number;
+    LEADS?: number;
+    CLOSED?: number;
+    totalCount?: number;
+  } | null;
   isProduction: boolean;
+  dataType: DataType;
 }
 
-function EnvironmentPanel({ title, badge, loading, error, data, isProduction }: EnvironmentPanelProps) {
+function EnvironmentPanel({ title, badge, loading, error, data, summary, isProduction, dataType }: EnvironmentPanelProps) {
   const bgColor = isProduction ? "bg-green-500/5 border-green-500/20" : "bg-orange-500/5 border-orange-500/20";
   const textColor = isProduction ? "text-green-600" : "text-orange-600";
 
@@ -224,7 +300,7 @@ function EnvironmentPanel({ title, badge, loading, error, data, isProduction }: 
             ) : data?.success ? (
               <CheckCircle className="w-4 h-4 text-green-500" />
             ) : (
-              <XCircle className="w-4 h-4 text-red-500" />
+              <XCircle className="w-4 h-4 text-destructive" />
             )}
           </div>
         </CardHeader>
@@ -251,6 +327,47 @@ function EnvironmentPanel({ title, badge, loading, error, data, isProduction }: 
                   {data.itemCount} items
                 </Badge>
               </div>
+              {/* Show summary data for summary tabs */}
+              {summary && (dataType === 'clientsSummary' || dataType === 'salesSummary') && (
+                <div className="mt-2 pt-2 border-t space-y-1">
+                  {summary.PENDING !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Pending:</span>
+                      <span className="font-medium">{summary.PENDING}</span>
+                    </div>
+                  )}
+                  {summary.VERIFIED !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Verified:</span>
+                      <span className="font-medium text-green-600">{summary.VERIFIED}</span>
+                    </div>
+                  )}
+                  {summary.REJECTED !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Rejected:</span>
+                      <span className="font-medium text-destructive">{summary.REJECTED}</span>
+                    </div>
+                  )}
+                  {summary.LEADS !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Leads:</span>
+                      <span className="font-medium text-blue-600">{summary.LEADS}</span>
+                    </div>
+                  )}
+                  {summary.ONGOING !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Ongoing:</span>
+                      <span className="font-medium text-amber-600">{summary.ONGOING}</span>
+                    </div>
+                  )}
+                  {summary.CLOSED !== undefined && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Closed:</span>
+                      <span className="font-medium text-green-600">{summary.CLOSED}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : null}
         </CardContent>
@@ -405,7 +522,7 @@ function GenericComparisonTable({ prodData, stagingData, loading, columns, idFie
                       row[col] ? (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-red-500" />
+                        <XCircle className="w-4 h-4 text-destructive" />
                       )
                     ) : typeof row[col] === 'number' ? (
                       formatPrice(row[col] as number, 'ZA')
@@ -420,5 +537,187 @@ function GenericComparisonTable({ prodData, stagingData, loading, columns, idFie
         </TableBody>
       </Table>
     </ScrollArea>
+  );
+}
+
+interface SalesComparisonTableProps {
+  prodData: unknown[];
+  stagingData: unknown[];
+  loading: boolean;
+}
+
+function SalesComparisonTable({ prodData, stagingData, loading }: SalesComparisonTableProps) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  const data = prodData.length > 0 ? prodData : stagingData;
+
+  if (data.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No sales data to display
+      </div>
+    );
+  }
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case 'LEADS':
+        return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'ONGOING':
+        return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+      case 'CLOSED':
+        return 'bg-green-500/10 text-green-600 border-green-500/20';
+      default:
+        return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  return (
+    <ScrollArea className="h-[400px]">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Stage</TableHead>
+            <TableHead>Client</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Created</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.slice(0, 20).map((item, index) => {
+            const sale = item as {
+              id: string;
+              stage: string;
+              client?: { firstName?: string; lastName?: string; email?: string };
+              createdAt: string;
+            };
+            return (
+              <TableRow key={sale.id || index}>
+                <TableCell>
+                  <Badge variant="outline" className={getStageColor(sale.stage)}>
+                    {sale.stage}
+                  </Badge>
+                </TableCell>
+                <TableCell className="font-medium">
+                  {sale.client?.firstName} {sale.client?.lastName}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {sale.client?.email || '—'}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : '—'}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </ScrollArea>
+  );
+}
+
+interface SummaryComparisonProps {
+  prodSummary?: {
+    PENDING?: number;
+    VERIFIED?: number;
+    REJECTED?: number;
+    ONGOING?: number;
+    LEADS?: number;
+    CLOSED?: number;
+    totalCount?: number;
+  } | null;
+  stagingSummary?: {
+    PENDING?: number;
+    VERIFIED?: number;
+    REJECTED?: number;
+    ONGOING?: number;
+    LEADS?: number;
+    CLOSED?: number;
+    totalCount?: number;
+  } | null;
+  loading: boolean;
+}
+
+function SummaryComparison({ prodSummary, stagingSummary, loading }: SummaryComparisonProps) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!prodSummary && !stagingSummary) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No summary data available. Select "Clients Summary" or "Sales Summary" data type.
+      </div>
+    );
+  }
+
+  const summaryItems = [
+    { label: 'Pending Clients', key: 'PENDING' as const, color: 'text-amber-600' },
+    { label: 'Verified Clients', key: 'VERIFIED' as const, color: 'text-green-600' },
+    { label: 'Rejected Clients', key: 'REJECTED' as const, color: 'text-destructive' },
+    { label: 'Sales Leads', key: 'LEADS' as const, color: 'text-blue-600' },
+    { label: 'Sales Ongoing', key: 'ONGOING' as const, color: 'text-amber-600' },
+    { label: 'Sales Closed', key: 'CLOSED' as const, color: 'text-green-600' },
+    { label: 'Total Count', key: 'totalCount' as const, color: 'text-foreground' },
+  ];
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Metric</TableHead>
+              <TableHead className="text-right">Production</TableHead>
+              <TableHead className="text-right">Staging</TableHead>
+              <TableHead className="text-center">Match</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {summaryItems.map((item) => {
+              const prodValue = prodSummary?.[item.key];
+              const stagingValue = stagingSummary?.[item.key];
+              const hasValue = prodValue !== undefined || stagingValue !== undefined;
+              const matches = prodValue === stagingValue;
+
+              if (!hasValue) return null;
+
+              return (
+                <TableRow key={item.key}>
+                  <TableCell className="font-medium">{item.label}</TableCell>
+                  <TableCell className={`text-right ${item.color}`}>
+                    {prodValue ?? '—'}
+                  </TableCell>
+                  <TableCell className={`text-right ${item.color}`}>
+                    {stagingValue ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {matches ? (
+                      <CheckCircle className="w-4 h-4 text-green-500 mx-auto" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" />
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

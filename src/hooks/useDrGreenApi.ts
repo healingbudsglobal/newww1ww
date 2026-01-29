@@ -337,6 +337,127 @@ export function useDrGreenApi() {
     return callProxy<{ success: boolean; deleted: number; failed: number }>('bulk-delete-clients', { clientIds });
   };
 
+  // ==========================================
+  // NEW ENDPOINTS FROM OFFICIAL DOCUMENTATION
+  // ==========================================
+
+  // Pagination metadata type
+  interface PageMetaDto {
+    page: string;
+    take: string;
+    itemCount: number;
+    pageCount: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  }
+
+  // Get client summary (PENDING/VERIFIED/REJECTED counts)
+  const getClientsSummary = async () => {
+    return callProxy<{
+      summary: {
+        PENDING: number;
+        VERIFIED: number;
+        REJECTED: number;
+        totalCount: number;
+      };
+    }>('get-clients-summary');
+  };
+
+  // Get sales with optional stage filter
+  const getSales = async (params?: {
+    stage?: 'LEADS' | 'ONGOING' | 'CLOSED';
+    page?: number;
+    take?: number;
+    orderBy?: 'asc' | 'desc';
+    search?: string;
+    searchBy?: string;
+  }) => {
+    return callProxy<{
+      sales: Array<{
+        id: string;
+        stage: string;
+        description: string | null;
+        orderId: string | null;
+        client: {
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+          phoneCountryCode: string;
+          phoneCode: string;
+          contactNumber: string;
+          isActive: boolean;
+        };
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      pageMetaDto: PageMetaDto;
+    }>('get-sales', params);
+  };
+
+  // Get sales summary by stage
+  const getSalesSummaryNew = async () => {
+    return callProxy<{
+      summary: {
+        ONGOING: number;
+        LEADS: number;
+        CLOSED: number;
+        totalCount: number;
+      };
+      count: number;
+    }>('get-sales-summary');
+  };
+
+  // Get orders for a specific client
+  const getClientOrders = async (clientId: string, params?: {
+    page?: number;
+    take?: number;
+    orderBy?: 'asc' | 'desc';
+  }) => {
+    return callProxy<{
+      orders: Array<{
+        id: string;
+        createdAt: string;
+        updatedAt: string;
+        paymentStatus: string;
+        orderStatus: string;
+        invoiceNumber: string;
+        totalAmount: number;
+        totalOrdered: number;
+        totalQuantity: number;
+        totalPrice: number;
+      }>;
+      pageMetaDto: PageMetaDto;
+    }>('get-client-orders', { clientId, ...params });
+  };
+
+  // Get user's owned NFTs
+  const getUserNfts = async () => {
+    return callProxy<{
+      nfts: Array<{
+        tokenId: number;
+        nftMetadata: {
+          nftName: string;
+          nftType: string;
+          imageUrl: string;
+        };
+        owner: {
+          id: string;
+          walletAddress: string;
+          fullName: string;
+          username: string;
+          email: string;
+          phoneCountryCode: string | null;
+          phoneCode: string | null;
+          phoneNumber: string | null;
+          profileUrl: string;
+          isActive: boolean;
+        };
+      }>;
+      pageMetaDto: PageMetaDto;
+    }>('get-user-nfts');
+  };
+
   return {
     // Existing methods
     createOrder,
@@ -365,5 +486,11 @@ export function useDrGreenApi() {
     activateClient,
     deactivateClient,
     bulkDeleteClients,
+    // New endpoints from official documentation
+    getClientsSummary,
+    getSales,
+    getSalesSummaryNew,
+    getClientOrders,
+    getUserNfts,
   };
 }
