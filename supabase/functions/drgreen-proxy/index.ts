@@ -1479,11 +1479,13 @@ serve(async (req) => {
           // Required shipping object (with required fields)
           shipping: {
             address1: String(shipping.address1 || "").trim(),
+            address2: String(shipping.address2 || "").trim(), // API requires this as string, even if empty
             city: String(shipping.city || "").trim(),
             state: String(shipping.state || shipping.city || "").trim(),
             country: String(shipping.country || "Portugal").trim(),
             countryCode: String(shipping.countryCode || "PRT").toUpperCase(),
             postalCode: String(shipping.postalCode || "").trim(),
+            landmark: String(shipping.landmark || "").trim(), // API may require this as string too
           } as Record<string, string>,
           
           // Required medicalRecord object
@@ -1511,14 +1513,6 @@ serve(async (req) => {
             medicalHistory13: String(medicalRecord.medicalHistory13 || "never").toLowerCase(),
           } as Record<string, unknown>,
         };
-        
-        // Add optional shipping fields only if present (per API note: omit empty optional fields)
-        if (shipping.address2 && String(shipping.address2).trim()) {
-          (dappPayload.shipping as Record<string, string>).address2 = String(shipping.address2).trim();
-        }
-        if (shipping.landmark && String(shipping.landmark).trim()) {
-          (dappPayload.shipping as Record<string, string>).landmark = String(shipping.landmark).trim();
-        }
         
         // Add optional medicalRecord fields only if present
         const mr = dappPayload.medicalRecord as Record<string, unknown>;
