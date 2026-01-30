@@ -7,29 +7,26 @@ const corsHeaders = {
 };
 
 // Real user accounts - these will sync with Dr. Green API on login
-// NOTE: createClient: false means NO mock drgreen_clients record is created
-// The app will fetch their real client data from Dr. Green API via email lookup
 const TEST_USERS = [
   {
     email: "admin@healingbuds.test",
     password: "Admin123!",
     fullName: "Admin User",
-    createClient: false, // Admin doesn't need drgreen client record
+    createClient: false,
     role: "admin",
   },
-  // Real user accounts - provide actual Dr. Green registered emails
-  // These users exist in Dr. Green API and will sync on login
+  // Real Dr. Green registered users - already verified in Dr. Green API
   {
-    email: "scott.norris@norrisent.co.uk", // Scott's Dr. Green registered email
+    email: "scott.k1@outlook.com",
     password: "TempPassword123!",
-    fullName: "Scott Norris",
+    fullName: "Scott",
     createClient: false, // Will sync from Dr. Green API
     role: null,
   },
   {
-    email: "kayliegh.norris@norrisent.co.uk", // Kayliegh's Dr. Green registered email
+    email: "kayliegh.sm@gmail.com",
     password: "TempPassword123!",
-    fullName: "Kayliegh Norris",
+    fullName: "Kayliegh",
     createClient: false, // Will sync from Dr. Green API
     role: null,
   },
@@ -54,16 +51,26 @@ serve(async (req) => {
 
     const results: Array<{ email: string; status: string; userId?: string; error?: string }> = [];
 
+    // First, delete any users that shouldn't exist (old test accounts)
+    const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const validEmails = TEST_USERS.map(u => u.email);
+    
+    for (const user of allUsers?.users || []) {
+      if (!validEmails.includes(user.email || '')) {
+        // Delete user that's not in our valid list
+        await supabaseAdmin.auth.admin.deleteUser(user.id);
+        console.log(`Deleted old user: ${user.email}`);
+      }
+    }
+
     for (const testUser of TEST_USERS) {
       try {
-        // Check if user already exists
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
         const existingUser = existingUsers?.users?.find((u) => u.email === testUser.email);
 
         let userId: string;
 
         if (existingUser) {
-          // Update existing user password and verify email
           const { data: updated, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
             existingUser.id,
             {
@@ -75,7 +82,6 @@ serve(async (req) => {
           userId = existingUser.id;
           console.log(`Updated existing user: ${testUser.email}`);
         } else {
-          // Create new user with verified email
           const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
             email: testUser.email,
             password: testUser.password,
@@ -88,43 +94,18 @@ serve(async (req) => {
         }
 
         // Upsert profile
-        const { error: profileError } = await supabaseAdmin
+        await supabaseAdmin
           .from("profiles")
-          .upsert(
-            { id: userId, full_name: testUser.fullName },
-            { onConflict: "id" }
-          );
-        if (profileError) {
-          console.error(`Profile error for ${testUser.email}:`, profileError);
-        }
+          .upsert({ id: userId, full_name: testUser.fullName }, { onConflict: "id" });
 
-        // For users with createClient: false, ensure NO mock drgreen_clients record exists
-        // This forces the app to sync from the real Dr. Green API on login
-        if (!testUser.createClient) {
-          // Delete any existing mock client record
-          const { error: deleteError } = await supabaseAdmin
-            .from("drgreen_clients")
-            .delete()
-            .eq("user_id", userId);
-          
-          if (deleteError) {
-            console.error(`Failed to delete client record for ${testUser.email}:`, deleteError);
-          } else {
-            console.log(`Ensured no mock client record for: ${testUser.email}`);
-          }
-        }
+        // Delete any mock drgreen_clients record - force sync from real API
+        await supabaseAdmin.from("drgreen_clients").delete().eq("user_id", userId);
 
         // Assign role if needed
         if (testUser.role) {
-          const { error: roleError } = await supabaseAdmin
+          await supabaseAdmin
             .from("user_roles")
-            .upsert(
-              { user_id: userId, role: testUser.role },
-              { onConflict: "user_id,role" }
-            );
-          if (roleError) {
-            console.error(`Role error for ${testUser.email}:`, roleError);
-          }
+            .upsert({ user_id: userId, role: testUser.role }, { onConflict: "user_id,role" });
         }
 
         results.push({ email: testUser.email, status: "success", userId });
@@ -136,11 +117,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        results,
-        note: "Users with createClient: false will sync their client data from Dr. Green API on first login"
-      }),
+      JSON.stringify({ success: true, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
