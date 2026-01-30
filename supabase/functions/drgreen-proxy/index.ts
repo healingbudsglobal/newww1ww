@@ -87,7 +87,8 @@ const ADMIN_ACTIONS = [
   'dapp-orders', 'dapp-order-details', 'dapp-update-order',
   'dapp-carts', 'dapp-nfts', 'dapp-strains', 'dapp-clients-list',
   'update-order', 'update-client', 'delete-client', 'patch-client',
-  'activate-client', 'deactivate-client', 'bulk-delete-clients'
+  'activate-client', 'deactivate-client', 'bulk-delete-clients',
+  'admin-list-all-clients', // List all clients for debugging
 ];
 
 // Actions that require ownership verification (user must own the resource)
@@ -98,7 +99,7 @@ const OWNERSHIP_ACTIONS = [
 ];
 
 // Public actions that don't require authentication (minimal - only webhooks/health)
-const PUBLIC_ACTIONS: string[] = [];
+const PUBLIC_ACTIONS: string[] = ['debug-list-all-clients'];
 
 // Country-gated actions: open countries (ZA, TH) don't require auth, restricted (GB, PT) do
 const COUNTRY_GATED_ACTIONS = [
@@ -2361,6 +2362,228 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ success: false, found: false, error: 'Search failed' }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      
+      // Admin action: Search clients by name (for finding spelling variations)
+      case "admin-search-clients-by-name": {
+        const searchTerm = body.search || body.name || '';
+        if (!searchTerm) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Search term required' }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        logInfo("Admin searching clients by name", { searchTerm: searchTerm.slice(0, 3) + '***' });
+        
+        try {
+          // Fetch ALL clients and filter by name (search supports clientName)
+          const queryParams: Record<string, string | number> = {
+            take: 100,
+            page: 1,
+            orderBy: 'desc',
+            search: searchTerm,
+            searchBy: 'clientName',
+          };
+          
+          const searchResponse = await drGreenRequestQuery("/dapp/clients", queryParams);
+          
+          if (!searchResponse.ok) {
+            const errorBody = await searchResponse.text();
+            logWarn("Name search failed", { status: searchResponse.status, errorBody: errorBody.slice(0, 200) });
+            return new Response(
+              JSON.stringify({ success: false, error: 'Search failed', status: searchResponse.status }),
+              { status: searchResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          
+          const searchData = await searchResponse.json();
+          
+          // Parse response
+          let clients: any[] = [];
+          if (Array.isArray(searchData.data)) {
+            clients = searchData.data;
+          } else if (searchData.data?.items) {
+            clients = searchData.data.items;
+          } else if (Array.isArray(searchData)) {
+            clients = searchData;
+          }
+          
+          // Return full client details for admin debugging
+          const results = clients.map((c: any) => ({
+            id: c.id || c.clientId,
+            firstName: c.firstName || c.first_name,
+            lastName: c.lastName || c.last_name,
+            email: c.email,
+            isKYCVerified: c.isKYCVerified ?? c.is_kyc_verified,
+            adminApproval: c.adminApproval || c.admin_approval,
+          }));
+          
+          logInfo(`Found ${results.length} clients matching "${searchTerm}"`, {
+            resultCount: results.length,
+            emails: results.map((r: any) => r.email?.slice(0, 5) + '***'),
+          });
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              results, 
+              count: results.length,
+              searchTerm,
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (e) {
+          logError("Name search error", { error: String(e) });
+          return new Response(
+            JSON.stringify({ success: false, error: String(e) }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      
+      // Admin action: List ALL clients for debugging
+      case "admin-list-all-clients": {
+        logInfo("Admin listing all clients for debugging");
+        
+        try {
+          const allClients: any[] = [];
+          const MAX_PAGES = 5;
+          const PAGE_SIZE = 100;
+          
+          for (let page = 1; page <= MAX_PAGES; page++) {
+            const queryParams: Record<string, string | number> = {
+              take: PAGE_SIZE,
+              page,
+              orderBy: 'desc',
+            };
+            
+            const response = await drGreenRequestQuery("/dapp/clients", queryParams);
+            
+            if (!response.ok) {
+              logWarn(`Failed to fetch page ${page}`, { status: response.status });
+              break;
+            }
+            
+            const data = await response.json();
+            let clients: any[] = [];
+            
+            if (Array.isArray(data.data)) {
+              clients = data.data;
+            } else if (data.data?.items) {
+              clients = data.data.items;
+            } else if (Array.isArray(data)) {
+              clients = data;
+            }
+            
+            if (clients.length === 0) break;
+            
+            allClients.push(...clients);
+            
+            if (clients.length < PAGE_SIZE) break;
+          }
+          
+          // Return full details for admin debugging
+          const results = allClients.map((c: any) => ({
+            id: c.id || c.clientId,
+            firstName: c.firstName || c.first_name || '(no first name)',
+            lastName: c.lastName || c.last_name || '(no last name)',
+            email: c.email || '(no email)',
+            isKYCVerified: c.isKYCVerified ?? c.is_kyc_verified,
+            adminApproval: c.adminApproval || c.admin_approval,
+            createdAt: c.createdAt || c.created_at,
+          }));
+          
+          logInfo(`Listed ${results.length} total clients`);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              clients: results, 
+              totalCount: results.length,
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (e) {
+          logError("List all clients error", { error: String(e) });
+          return new Response(
+            JSON.stringify({ success: false, error: String(e) }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      
+      // Debug action: List ALL clients (public for debugging - no auth required)
+      case "debug-list-all-clients": {
+        logInfo("Debug: Listing all Dr. Green clients");
+        
+        try {
+          const allClients: any[] = [];
+          const MAX_PAGES = 5;
+          const PAGE_SIZE = 100;
+          
+          for (let page = 1; page <= MAX_PAGES; page++) {
+            const queryParams: Record<string, string | number> = {
+              take: PAGE_SIZE,
+              page,
+              orderBy: 'desc',
+            };
+            
+            const response = await drGreenRequestQuery("/dapp/clients", queryParams);
+            
+            if (!response.ok) {
+              logWarn(`Failed to fetch page ${page}`, { status: response.status });
+              break;
+            }
+            
+            const data = await response.json();
+            let clients: any[] = [];
+            
+            if (Array.isArray(data.data)) {
+              clients = data.data;
+            } else if (data.data?.items) {
+              clients = data.data.items;
+            } else if (Array.isArray(data)) {
+              clients = data;
+            }
+            
+            if (clients.length === 0) break;
+            
+            allClients.push(...clients);
+            
+            if (clients.length < PAGE_SIZE) break;
+          }
+          
+          // Return summary for debugging
+          const results = allClients.map((c: any) => ({
+            id: c.id || c.clientId,
+            firstName: c.firstName || c.first_name || '(no first name)',
+            lastName: c.lastName || c.last_name || '(no last name)',
+            email: c.email || '(no email)',
+            isKYCVerified: c.isKYCVerified ?? c.is_kyc_verified,
+            adminApproval: c.adminApproval || c.admin_approval,
+          }));
+          
+          logInfo(`Debug: Found ${results.length} total clients`, {
+            firstNames: results.map((r: any) => r.firstName).slice(0, 10),
+            emails: results.map((r: any) => (r.email || '').slice(0, 5) + '***').slice(0, 10),
+          });
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              clients: results, 
+              totalCount: results.length,
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (e) {
+          logError("Debug list clients error", { error: String(e) });
+          return new Response(
+            JSON.stringify({ success: false, error: String(e) }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
