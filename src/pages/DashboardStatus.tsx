@@ -143,6 +143,26 @@ export default function DashboardStatus() {
     }
   }, [drGreenClient, isLoading, navigate]);
 
+  // Auto-redirect unregistered users to registration after 5 seconds
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (!isLoading && !drGreenClient && isAuthenticated) {
+      setRedirectCountdown(5);
+      const interval = setInterval(() => {
+        setRedirectCountdown(prev => {
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            navigate('/shop/register', { replace: true });
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [drGreenClient, isLoading, isAuthenticated, navigate]);
+
   if (isAuthenticated === null || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -274,6 +294,34 @@ export default function DashboardStatus() {
                 </CardHeader>
 
                 <CardContent className="pt-6">
+                  {/* No Profile Found - Auto Redirect Notice */}
+                  {!hasClient && redirectCountdown !== null && (
+                    <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-700 dark:text-amber-400">No Medical Profile Found</AlertTitle>
+                      <AlertDescription className="text-amber-600 dark:text-amber-300">
+                        We couldn't find a registered profile for your email address.
+                        Redirecting to registration in {redirectCountdown} seconds...
+                      </AlertDescription>
+                      <div className="mt-3 flex gap-2">
+                        <Button 
+                          asChild 
+                          size="sm" 
+                          className="bg-amber-600 hover:bg-amber-500"
+                        >
+                          <Link to="/shop/register">Register Now</Link>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setRedirectCountdown(null)}
+                        >
+                          Cancel Redirect
+                        </Button>
+                      </div>
+                    </Alert>
+                  )}
+
                   {/* Manual Lookup Section */}
                   {!hasClient && (
                     <div className="mb-6 p-4 rounded-xl border border-border bg-muted/30">

@@ -65,9 +65,14 @@ export function EligibilityGate({ children }: EligibilityGateProps) {
     >
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Medical Verification Required</CardTitle>
+          <CardTitle className="text-2xl">
+            {!drGreenClient ? 'No Medical Profile Found' : 'Medical Verification Required'}
+          </CardTitle>
           <p className="text-muted-foreground">
-            To purchase medical cannabis, you must complete our verification process.
+            {!drGreenClient 
+              ? 'We couldn\'t find a registered profile for your email. Please complete registration to access the dispensary.'
+              : 'To purchase medical cannabis, you must complete our verification process.'
+            }
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
