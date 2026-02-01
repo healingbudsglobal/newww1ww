@@ -43,7 +43,7 @@ async function retryOperation<T>(
 }
 
 const Checkout = () => {
-  const { cart, cartTotal, clearCart, drGreenClient, countryCode } = useShop();
+  const { cart, cartTotal, cartTotalConverted, clearCart, drGreenClient, countryCode, convertFromEUR } = useShop();
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
   const { toast } = useToast();
@@ -406,11 +406,11 @@ const Checkout = () => {
                               {item.strain_name}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Qty: {item.quantity} × {formatPrice(item.unit_price, countryCode)}
+                              Qty: {item.quantity} × {formatPrice(convertFromEUR(item.unit_price), countryCode)}
                             </p>
                           </div>
                           <p className="font-semibold text-foreground">
-                            {formatPrice(item.quantity * item.unit_price, countryCode)}
+                            {formatPrice(convertFromEUR(item.quantity * item.unit_price), countryCode)}
                           </p>
                         </div>
                       ))}
@@ -419,7 +419,7 @@ const Checkout = () => {
 
                       <div className="flex items-center justify-between text-lg font-bold">
                         <span>Total</span>
-                        <span className="text-primary">{formatPrice(cartTotal, countryCode)}</span>
+                        <span className="text-primary">{formatPrice(cartTotalConverted, countryCode)}</span>
                       </div>
                     </CardContent>
                   </Card>
