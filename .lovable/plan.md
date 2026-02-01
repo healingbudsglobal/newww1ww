@@ -1,56 +1,67 @@
 
-# Plan: Update Migration to Use Correct External Supabase Project
+# Plan: Insert Client Records to Enable Checkout
 
 ## Problem
-The migration function is currently hardcoded to query an empty project (`swjifcjdrqtbupoibyfn`). You've provided credentials for a different project (`vczjjhmypsyvpnymijwz`) which likely contains the actual client data including Kayliegh's records.
+The `drgreen_clients` table is **empty** - this is why checkout fails. The client linking for Kayliegh and Scott was never actually executed.
 
 ## Solution
+Execute a single database INSERT to link both users to their Dr. Green client IDs.
 
-### Step 1: Update the Migration Edge Function
-**File:** `supabase/functions/migrate-external-clients/index.ts`
+## Database Migration
 
-Change the hardcoded external URL from:
-```typescript
-const externalUrl = "https://swjifcjdrqtbupoibyfn.supabase.co";
+**SQL to Execute:**
+```sql
+INSERT INTO public.drgreen_clients (
+  user_id,
+  drgreen_client_id,
+  email,
+  full_name,
+  country_code,
+  is_kyc_verified,
+  admin_approval
+) VALUES 
+(
+  '7b4c7b03-7630-46e3-9337-4c56cad600c8',  -- Kayliegh's Supabase user ID
+  '47542db8-3982-4204-bd32-2f36617c5d3d',  -- Her Dr. Green client ID
+  'kayliegh.sm@gmail.com',
+  'Kayliegh Moutinho',
+  'ZA',
+  true,
+  'VERIFIED'
+),
+(
+  'f9ceca52-abd4-4da7-a747-e8fa1e971867',  -- Scott's Supabase user ID
+  'fb70d208-8f12-4444-9b1b-e92bd68f675f',  -- His Dr. Green client ID  
+  'scott@healingbuds.global',
+  'Healing Buds',
+  'ZA',
+  true,
+  'VERIFIED'
+);
 ```
 
-To:
-```typescript
-const externalUrl = "https://vczjjhmypsyvpnymijwz.supabase.co";
-```
+## What This Enables
 
-### Step 2: Update the External Service Key Secret
-The `EXTERNAL_SUPABASE_SERVICE_KEY` secret currently contains the service role key for the wrong project. It needs to be updated with the service role key for `vczjjhmypsyvpnymijwz`.
+Once inserted:
+- ✅ Kayliegh can browse shop (country_code = ZA)
+- ✅ Kayliegh can add items to cart
+- ✅ Checkout will find her `drgreen_client_id` for order creation
+- ✅ Shipping address fetched from Dr. Green API (or fallback form shown)
+- ✅ Same for Scott
 
-**Note:** You provided the anon key in your message. For migration to work (bypassing RLS), we need the **service role key** for this project, not the anon key.
+## Files Modified
 
-### Step 3: Run the Migration
-After updating:
-1. Deploy the updated edge function
-2. Call the migration endpoint
-3. Verify Kayliegh's data is migrated (drgreen_client_id, KYC status, admin approval)
-
-### Step 4: Verify Dr. Green API Integration
-Once client data is migrated, test the checkout flow to ensure:
-- Client details are fetched correctly
-- Shipping address is retrieved
-- Order creation works end-to-end
-
-## Required Input From You
-To complete this migration, please provide:
-- **The service role key** for project `vczjjhmypsyvpnymijwz` (not the anon key you shared)
-
-The anon key cannot bypass Row Level Security policies, which is required to read all client records.
-
-## Files to Modify
-| File | Change |
+| Type | Change |
 |------|--------|
-| `supabase/functions/migrate-external-clients/index.ts` | Update `externalUrl` to new project |
-| Supabase Secrets | Update `EXTERNAL_SUPABASE_SERVICE_KEY` with new service role key |
+| Database | INSERT 2 records into `drgreen_clients` |
 
-## Testing Checklist
-After implementation:
-1. Invoke `migrate-external-clients` function
-2. Verify Kayliegh's record appears in local `drgreen_clients` table
-3. Test checkout flow with Kayliegh's account
-4. Confirm shipping address loads from Dr. Green API
+## Testing After Insert
+
+1. Kayliegh logs in via MetaMask/wallet
+2. Navigates to `/shop` 
+3. Adds products to cart (prices show in ZAR - ~R190)
+4. Proceeds to checkout
+5. Enters shipping address (fallback form)
+6. Places order
+
+No code changes needed - this is a one-time data fix.
