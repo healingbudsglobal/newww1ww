@@ -1,14 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Header from '@/layout/Header';
 import Footer from '@/components/Footer';
 import { useShop } from '@/context/ShopContext';
 import { EligibilityGate } from '@/components/shop/EligibilityGate';
+import { ShippingAddressForm, type ShippingAddress } from '@/components/shop/ShippingAddressForm';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
@@ -45,12 +47,55 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
   const { toast } = useToast();
-  const { createPayment, getPayment, addToCart, emptyCart, placeOrder, createOrder } = useDrGreenApi();
+  const { createPayment, getPayment, addToCart, emptyCart, placeOrder, createOrder, getClientDetails } = useDrGreenApi();
   const { saveOrder } = useOrderTracking();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
+  
+  // Shipping address state
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+  const [needsShippingAddress, setNeedsShippingAddress] = useState(false);
+
+  // Fetch client details to check for shipping address
+  useEffect(() => {
+    const checkShippingAddress = async () => {
+      if (!drGreenClient?.drgreen_client_id) {
+        setIsLoadingAddress(false);
+        return;
+      }
+
+      try {
+        const result = await getClientDetails(drGreenClient.drgreen_client_id);
+        
+        if (result.data?.shipping && result.data.shipping.address1) {
+          setShippingAddress(result.data.shipping);
+          setNeedsShippingAddress(false);
+        } else {
+          setNeedsShippingAddress(true);
+        }
+      } catch (error) {
+        console.error('Failed to fetch client details:', error);
+        // Assume address is needed if we can't verify
+        setNeedsShippingAddress(true);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    };
+
+    checkShippingAddress();
+  }, [drGreenClient, getClientDetails]);
+
+  const handleShippingAddressSaved = (address: ShippingAddress) => {
+    setShippingAddress(address);
+    setNeedsShippingAddress(false);
+    toast({
+      title: 'Shipping Address Saved',
+      description: 'You can now proceed with your order.',
+    });
+  };
 
   const handlePlaceOrder = async () => {
     if (!drGreenClient || cart.length === 0) return;
@@ -381,57 +426,96 @@ const Checkout = () => {
                 </div>
 
                 {/* Payment Section */}
-                <div className="lg:col-span-1">
-                  <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5" />
-                        Payment
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Shipping info */}
-                      <div className="p-4 rounded-lg bg-muted/30">
-                        <p className="text-sm font-medium text-foreground mb-1">
-                          Shipping to
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {drGreenClient?.country_code || 'PT'}
-                        </p>
-                      </div>
+                <div className="lg:col-span-1 space-y-6">
+                  {/* Shipping Address Check */}
+                  {isLoadingAddress ? (
+                    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+                      <CardContent className="pt-6 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-muted-foreground">Checking shipping address...</span>
+                      </CardContent>
+                    </Card>
+                  ) : needsShippingAddress ? (
+                    <div className="space-y-4">
+                      <Alert variant="destructive" className="bg-destructive/10 border-destructive/30">
+                        <MapPin className="h-4 w-4" />
+                        <AlertTitle>Shipping Address Required</AlertTitle>
+                        <AlertDescription>
+                          Please add your shipping address before placing an order.
+                        </AlertDescription>
+                      </Alert>
+                      
+                      {drGreenClient && (
+                        <ShippingAddressForm
+                          clientId={drGreenClient.drgreen_client_id}
+                          defaultCountry={drGreenClient.country_code || countryCode || 'PT'}
+                          onSuccess={handleShippingAddressSaved}
+                          submitLabel="Save & Continue"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5" />
+                          Payment
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Shipping info */}
+                        <div className="p-4 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            Shipping to
+                          </p>
+                          {shippingAddress ? (
+                            <div className="text-sm text-muted-foreground">
+                              <p>{shippingAddress.address1}</p>
+                              {shippingAddress.address2 && <p>{shippingAddress.address2}</p>}
+                              <p>{shippingAddress.city}, {shippingAddress.postalCode}</p>
+                              <p>{shippingAddress.country}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              {drGreenClient?.country_code || 'PT'}
+                            </p>
+                          )}
+                        </div>
 
-                      {/* Notice */}
-                      <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
-                        <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-muted-foreground">
-                          Payment will be processed securely through our payment provider.
+                        {/* Notice */}
+                        <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                          <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                          <p className="text-sm text-muted-foreground">
+                            Payment will be processed securely through our payment provider.
+                          </p>
+                        </div>
+
+                        <Button
+                          className="w-full"
+                          size="lg"
+                          onClick={handlePlaceOrder}
+                          disabled={isProcessing || needsShippingAddress}
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {paymentStatus || 'Processing...'}
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="mr-2 h-4 w-4" />
+                              Place Order - {formatPrice(cartTotal, countryCode)}
+                            </>
+                          )}
+                        </Button>
+
+                        <p className="text-xs text-center text-muted-foreground">
+                          By placing this order, you agree to our terms of service and confirm that you are a verified medical patient.
                         </p>
-                      </div>
-
-                      <Button
-                        className="w-full"
-                        size="lg"
-                        onClick={handlePlaceOrder}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {paymentStatus || 'Processing...'}
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Place Order - {formatPrice(cartTotal, countryCode)}
-                          </>
-                        )}
-                      </Button>
-
-                      <p className="text-xs text-center text-muted-foreground">
-                        By placing this order, you agree to our terms of service and confirm that you are a verified medical patient.
-                      </p>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
             </motion.div>

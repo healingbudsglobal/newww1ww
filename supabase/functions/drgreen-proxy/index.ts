@@ -2711,6 +2711,56 @@ serve(async (req) => {
         break;
       }
       
+      // Update shipping address specifically for a client
+      case "update-shipping-address": {
+        if (!validateClientId(body.clientId)) {
+          throw new Error("Invalid client ID format");
+        }
+        
+        const shipping = body.shipping;
+        if (!shipping || !shipping.address1 || !shipping.city || !shipping.postalCode || !shipping.countryCode) {
+          throw new Error("Invalid shipping address: address1, city, postalCode, and countryCode are required");
+        }
+        
+        // Country code conversion map (Alpha-2 to Alpha-3)
+        const countryCodeMap: Record<string, string> = {
+          PT: 'PRT',
+          GB: 'GBR',
+          ZA: 'ZAF',
+          TH: 'THA',
+          US: 'USA',
+        };
+        
+        // Ensure country code is Alpha-3
+        let alpha3CountryCode = shipping.countryCode;
+        if (countryCodeMap[shipping.countryCode]) {
+          alpha3CountryCode = countryCodeMap[shipping.countryCode];
+        }
+        
+        // Build the shipping object per Dr. Green API spec
+        const shippingPayload = {
+          shipping: {
+            address1: String(shipping.address1).slice(0, 200),
+            address2: String(shipping.address2 || '').slice(0, 200),
+            landmark: String(shipping.landmark || '').slice(0, 100),
+            city: String(shipping.city).slice(0, 100),
+            state: String(shipping.state || shipping.city).slice(0, 100),
+            country: String(shipping.country || '').slice(0, 100),
+            countryCode: alpha3CountryCode,
+            postalCode: String(shipping.postalCode).slice(0, 20),
+          }
+        };
+        
+        logInfo("Updating client shipping address", {
+          clientId: body.clientId,
+          city: shippingPayload.shipping.city,
+          countryCode: shippingPayload.shipping.countryCode,
+        });
+        
+        response = await drGreenRequest(`/dapp/clients/${body.clientId}`, "PATCH", shippingPayload);
+        break;
+      }
+      
       case "activate-client": {
         // PATCH /dapp/clients/:clientId/activate - Activate a client
         if (!validateClientId(body.clientId)) {

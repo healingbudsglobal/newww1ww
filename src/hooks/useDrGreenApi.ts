@@ -340,8 +340,57 @@ export function useDrGreenApi() {
     email?: string;
     phone?: string;
     status?: string;
+    shipping?: {
+      address1: string;
+      address2?: string;
+      landmark?: string;
+      city: string;
+      state?: string;
+      country: string;
+      countryCode: string;
+      postalCode: string;
+    };
   }) => {
     return callProxy<{ success: boolean; client: object }>('patch-client', { clientId, data });
+  };
+
+  // Update client shipping address specifically
+  const updateShippingAddress = async (clientId: string, shipping: {
+    address1: string;
+    address2?: string;
+    landmark?: string;
+    city: string;
+    state?: string;
+    country: string;
+    countryCode: string;
+    postalCode: string;
+  }) => {
+    return callProxy<{ success: boolean; message?: string }>('update-shipping-address', { 
+      clientId, 
+      shipping 
+    });
+  };
+
+  // Get client details including shipping address
+  const getClientDetails = async (clientId: string) => {
+    return callProxy<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      isKYCVerified: boolean;
+      adminApproval: string;
+      shipping?: {
+        address1: string;
+        address2?: string;
+        landmark?: string;
+        city: string;
+        state?: string;
+        country: string;
+        countryCode: string;
+        postalCode: string;
+      };
+    }>('dapp-client-details', { clientId });
   };
 
   // Activate a client (admin only)
@@ -549,5 +598,8 @@ export function useDrGreenApi() {
     getSalesSummaryNew,
     getClientOrders,
     getUserNfts,
+    // Shipping address management
+    updateShippingAddress,
+    getClientDetails,
   };
 }

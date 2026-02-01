@@ -1,0 +1,363 @@
+import { useState } from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { MapPin, Loader2, Save, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useDrGreenApi } from '@/hooks/useDrGreenApi';
+
+// Country code mapping for Dr. Green API (Alpha-2 to Alpha-3)
+const countryCodeMap: Record<string, string> = {
+  PT: 'PRT',
+  GB: 'GBR',
+  ZA: 'ZAF',
+  TH: 'THA',
+  US: 'USA',
+};
+
+// Country options for the dropdown
+const countries = [
+  { code: 'PT', name: 'Portugal', alpha3: 'PRT' },
+  { code: 'ZA', name: 'South Africa', alpha3: 'ZAF' },
+  { code: 'TH', name: 'Thailand', alpha3: 'THA' },
+  { code: 'GB', name: 'United Kingdom', alpha3: 'GBR' },
+];
+
+// Country-specific postal code validation
+const postalCodePatterns: Record<string, { pattern: RegExp; example: string }> = {
+  PT: { pattern: /^\d{4}(-\d{3})?$/, example: '1000-001' },
+  GB: { pattern: /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i, example: 'SW1A 1AA' },
+  ZA: { pattern: /^\d{4}$/, example: '0001' },
+  TH: { pattern: /^\d{5}$/, example: '10110' },
+};
+
+// Country name mapping
+const getCountryName = (code: string): string => {
+  const country = countries.find(c => c.code === code || c.alpha3 === code);
+  return country?.name || code;
+};
+
+// Create address schema with country-specific validation
+const createAddressSchema = (countryCode: string) => {
+  const postalPattern = postalCodePatterns[countryCode];
+  
+  return z.object({
+    address1: z.string()
+      .min(5, 'Address must be at least 5 characters')
+      .max(200, 'Address is too long'),
+    address2: z.string().max(200).optional().or(z.literal('')),
+    landmark: z.string().max(100).optional().or(z.literal('')),
+    city: z.string()
+      .min(2, 'City is required')
+      .max(100, 'City name is too long'),
+    state: z.string().max(100).optional().or(z.literal('')),
+    postalCode: z.string()
+      .min(4, 'Postal code is required')
+      .refine(
+        (val) => !postalPattern || postalPattern.pattern.test(val.trim()),
+        { message: `Invalid postal code format (e.g., ${postalPattern?.example || '12345'})` }
+      ),
+    country: z.string().min(2, 'Country is required'),
+  });
+};
+
+type AddressFormData = z.infer<ReturnType<typeof createAddressSchema>>;
+
+export interface ShippingAddress {
+  address1: string;
+  address2?: string;
+  landmark?: string;
+  city: string;
+  state?: string;
+  country: string;
+  countryCode: string;
+  postalCode: string;
+}
+
+interface ShippingAddressFormProps {
+  clientId: string;
+  initialAddress?: ShippingAddress | null;
+  defaultCountry?: string;
+  onSuccess?: (address: ShippingAddress) => void;
+  onCancel?: () => void;
+  variant?: 'card' | 'inline';
+  submitLabel?: string;
+}
+
+export function ShippingAddressForm({
+  clientId,
+  initialAddress,
+  defaultCountry = 'PT',
+  onSuccess,
+  onCancel,
+  variant = 'card',
+  submitLabel = 'Save Address',
+}: ShippingAddressFormProps) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const { toast } = useToast();
+  const { updateShippingAddress } = useDrGreenApi();
+
+  // Determine initial country from address or default
+  const initialCountry = initialAddress?.countryCode
+    ? Object.entries(countryCodeMap).find(([, v]) => v === initialAddress.countryCode)?.[0] || defaultCountry
+    : defaultCountry;
+
+  const form = useForm<AddressFormData>({
+    resolver: zodResolver(createAddressSchema(initialCountry)),
+    defaultValues: {
+      address1: initialAddress?.address1 || '',
+      address2: initialAddress?.address2 || '',
+      landmark: initialAddress?.landmark || '',
+      city: initialAddress?.city || '',
+      state: initialAddress?.state || '',
+      postalCode: initialAddress?.postalCode || '',
+      country: initialCountry,
+    },
+  });
+
+  const selectedCountry = form.watch('country');
+
+  const handleSubmit = async (data: AddressFormData) => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      // Convert country code to Alpha-3 for API
+      const alpha3CountryCode = countryCodeMap[data.country] || data.country;
+      
+      const shippingData: ShippingAddress = {
+        address1: data.address1.trim(),
+        address2: data.address2?.trim() || '',
+        landmark: data.landmark?.trim() || '',
+        city: data.city.trim(),
+        state: data.state?.trim() || data.city.trim(), // Default state to city if not provided
+        country: getCountryName(data.country),
+        countryCode: alpha3CountryCode,
+        postalCode: data.postalCode.trim(),
+      };
+
+      const result = await updateShippingAddress(clientId, shippingData);
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setSaveSuccess(true);
+      toast({
+        title: 'Address Saved',
+        description: 'Your shipping address has been updated successfully.',
+      });
+
+      onSuccess?.(shippingData);
+    } catch (error) {
+      console.error('Failed to save shipping address:', error);
+      toast({
+        title: 'Failed to Save Address',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {/* Address Line 1 */}
+        <FormField
+          control={form.control}
+          name="address1"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Street Address *</FormLabel>
+              <FormControl>
+                <Input placeholder="123 Main Street" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Address Line 2 */}
+        <FormField
+          control={form.control}
+          name="address2"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Apartment / Suite (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="Apt 4B" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* City and State in a row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="city"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>City *</FormLabel>
+                <FormControl>
+                  <Input placeholder="Lisbon" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State / Province</FormLabel>
+                <FormControl>
+                  <Input placeholder="Lisbon" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Postal Code and Country in a row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="postalCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Postal Code *</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder={postalCodePatterns[selectedCountry]?.example || '12345'} 
+                    {...field} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="country"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Country *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Landmark (Optional) */}
+        <FormField
+          control={form.control}
+          name="landmark"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Landmark (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="Near the park" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+              Cancel
+            </Button>
+          )}
+          <Button 
+            type="submit" 
+            disabled={isSaving} 
+            className="flex-1"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                {submitLabel}
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  if (variant === 'inline') {
+    return formContent;
+  }
+
+  return (
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MapPin className="h-5 w-5" />
+          Shipping Address
+        </CardTitle>
+        <CardDescription>
+          Enter your delivery address for medical cannabis shipments
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {formContent}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default ShippingAddressForm;

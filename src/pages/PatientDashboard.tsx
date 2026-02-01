@@ -10,7 +10,9 @@ import {
   Shield,
   FileText,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  MapPin,
+  Pencil
 } from 'lucide-react';
 import PrescriptionManager from '@/components/dashboard/PrescriptionManager';
 import DosageTracker from '@/components/dashboard/DosageTracker';
@@ -18,12 +20,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import Header from '@/layout/Header';
 import Footer from '@/components/Footer';
 import HBIcon from '@/components/HBIcon';
 import HBLoader from '@/components/HBLoader';
+import { ShippingAddressForm, type ShippingAddress } from '@/components/shop/ShippingAddressForm';
 import { useShop } from '@/context/ShopContext';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
+import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -33,8 +45,12 @@ const PatientDashboard = () => {
   const navigate = useNavigate();
   const { drGreenClient, isEligible, isLoading: clientLoading, cart, cartTotal } = useShop();
   const { orders, isLoading: ordersLoading } = useOrderTracking();
+  const { getClientDetails } = useDrGreenApi();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(true);
+  const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -53,6 +69,34 @@ const PatientDashboard = () => {
 
     fetchUserData();
   }, []);
+
+  // Fetch shipping address
+  useEffect(() => {
+    const fetchShippingAddress = async () => {
+      if (!drGreenClient?.drgreen_client_id) {
+        setIsLoadingAddress(false);
+        return;
+      }
+
+      try {
+        const result = await getClientDetails(drGreenClient.drgreen_client_id);
+        if (result.data?.shipping && result.data.shipping.address1) {
+          setShippingAddress(result.data.shipping);
+        }
+      } catch (error) {
+        console.error('Failed to fetch shipping address:', error);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    };
+
+    fetchShippingAddress();
+  }, [drGreenClient, getClientDetails]);
+
+  const handleAddressSaved = (address: ShippingAddress) => {
+    setShippingAddress(address);
+    setIsAddressDialogOpen(false);
+  };
 
   const getKYCProgress = () => {
     if (!drGreenClient) return 0;
@@ -352,7 +396,7 @@ const PatientDashboard = () => {
                   <CardHeader>
                     <CardTitle className="text-lg">Account</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Email</p>
                       <p className="font-medium truncate">{user.email}</p>
@@ -363,6 +407,65 @@ const PatientDashboard = () => {
                         <p className="font-medium">{drGreenClient.country_code}</p>
                       </div>
                     )}
+                    
+                    {/* Shipping Address Section */}
+                    <div className="pt-2 border-t border-border/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" />
+                          Shipping Address
+                        </p>
+                        {drGreenClient && (
+                          <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <Pencil className="h-3.5 w-3.5 mr-1" />
+                                {shippingAddress ? 'Edit' : 'Add'}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px]">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                  <MapPin className="h-5 w-5" />
+                                  {shippingAddress ? 'Edit Shipping Address' : 'Add Shipping Address'}
+                                </DialogTitle>
+                                <DialogDescription>
+                                  Update your delivery address for medical cannabis shipments.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <ShippingAddressForm
+                                clientId={drGreenClient.drgreen_client_id}
+                                initialAddress={shippingAddress}
+                                defaultCountry={drGreenClient.country_code || 'PT'}
+                                onSuccess={handleAddressSaved}
+                                onCancel={() => setIsAddressDialogOpen(false)}
+                                variant="inline"
+                              />
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
+                      
+                      {isLoadingAddress ? (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <HBLoader size="sm" />
+                          <span className="ml-2">Loading...</span>
+                        </div>
+                      ) : shippingAddress ? (
+                        <div className="text-sm">
+                          <p className="font-medium">{shippingAddress.address1}</p>
+                          {shippingAddress.address2 && <p className="text-muted-foreground">{shippingAddress.address2}</p>}
+                          <p className="text-muted-foreground">
+                            {shippingAddress.city}, {shippingAddress.postalCode}
+                          </p>
+                          <p className="text-muted-foreground">{shippingAddress.country}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          No shipping address on file
+                        </p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
