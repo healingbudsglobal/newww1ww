@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
@@ -15,12 +15,37 @@ import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
 import { formatPrice, getCurrencyForCountry } from '@/lib/currency';
 
+// Retry utility with exponential backoff
+async function retryOperation<T>(
+  operation: () => Promise<{ data: T | null; error: string | null }>,
+  operationName: string,
+  maxRetries: number = 3
+): Promise<{ data: T | null; error: string | null }> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const result = await operation();
+    if (!result.error) return result;
+    
+    // Don't retry on client errors (400-level validation issues)
+    if (result.error.includes('400') || result.error.includes('validation') || result.error.includes('required')) {
+      console.warn(`${operationName}: Non-retryable error`, result.error);
+      return result;
+    }
+    
+    if (attempt < maxRetries) {
+      const delay = Math.pow(2, attempt) * 500; // 1s, 2s, 4s
+      console.log(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return { data: null, error: `${operationName} failed after ${maxRetries} attempts` };
+}
+
 const Checkout = () => {
   const { cart, cartTotal, clearCart, drGreenClient, countryCode } = useShop();
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
   const { toast } = useToast();
-  const { createPayment, getPayment, addToCart, emptyCart, placeOrder } = useDrGreenApi();
+  const { createPayment, getPayment, addToCart, emptyCart, placeOrder, createOrder } = useDrGreenApi();
   const { saveOrder } = useOrderTracking();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -35,50 +60,98 @@ const Checkout = () => {
 
     try {
       const clientId = drGreenClient.drgreen_client_id;
+      let createdOrderId: string | undefined;
 
-      // Step 1: Empty existing Dr. Green cart to ensure clean state
-      setPaymentStatus('Clearing cart...');
-      const emptyResult = await emptyCart(clientId);
-      // Empty cart may return 404/502 if cart doesn't exist - that's OK
-      if (emptyResult.error && !emptyResult.error.includes('404') && !emptyResult.error.includes('not found') && !emptyResult.error.includes('Cart not found')) {
-        console.warn('Cart empty warning:', emptyResult.error);
-      }
-
-      // Step 2: Add each item to Dr. Green server-side cart
-      setPaymentStatus('Syncing cart items...');
-      for (const item of cart) {
-        const cartResult = await addToCart({
-          clientId: clientId,
-          strainId: item.strain_id,
-          quantity: item.quantity,
-        });
-
-        if (cartResult.error) {
-          throw new Error(`Failed to add ${item.strain_name} to cart: ${cartResult.error}`);
+      // Try cart-based flow first, with fallback to direct order creation
+      try {
+        // Step 1: Empty existing Dr. Green cart to ensure clean state
+        setPaymentStatus('Clearing cart...');
+        const emptyResult = await retryOperation(
+          () => emptyCart(clientId),
+          'Empty cart',
+          2 // Fewer retries since cart may not exist
+        );
+        // Empty cart may return 404/502 if cart doesn't exist - that's OK
+        if (emptyResult.error && !emptyResult.error.includes('404') && !emptyResult.error.includes('not found') && !emptyResult.error.includes('Cart not found')) {
+          console.warn('Cart empty warning:', emptyResult.error);
         }
+
+        // Step 2: Add each item to Dr. Green server-side cart with retry logic
+        setPaymentStatus('Syncing cart items...');
+        let cartSyncFailed = false;
+        for (const item of cart) {
+          const cartResult = await retryOperation(
+            () => addToCart({
+              clientId: clientId,
+              strainId: item.strain_id,
+              quantity: item.quantity,
+            }),
+            `Add ${item.strain_name} to cart`
+          );
+
+          if (cartResult.error) {
+            console.error('Cart sync failed for item:', item.strain_name, cartResult.error);
+            cartSyncFailed = true;
+            break;
+          }
+        }
+
+        // Step 3: Create order from server-side cart (if cart sync succeeded)
+        if (!cartSyncFailed) {
+          setPaymentStatus('Creating order...');
+          const orderResult = await retryOperation(
+            () => placeOrder({ clientId }),
+            'Place order'
+          );
+
+          if (!orderResult.error && orderResult.data?.orderId) {
+            createdOrderId = orderResult.data.orderId;
+          } else {
+            console.warn('Cart-based order failed:', orderResult.error);
+            // Will fall through to direct order creation
+          }
+        }
+      } catch (cartFlowError) {
+        console.warn('Cart flow exception, trying direct order:', cartFlowError);
       }
 
-      // Step 3: Create order from server-side cart
-      setPaymentStatus('Creating order...');
-      const orderResult = await placeOrder({
-        clientId: clientId,
-      });
+      // Fallback: Try direct order creation with items if cart flow failed
+      if (!createdOrderId) {
+        setPaymentStatus('Creating order directly...');
+        console.log('Attempting direct order creation with items...');
+        
+        const directOrderResult = await retryOperation(
+          () => createOrder({
+            clientId: clientId,
+            items: cart.map(item => ({
+              productId: item.strain_id,
+              quantity: item.quantity,
+              price: item.unit_price,
+            })),
+          }),
+          'Direct order creation'
+        );
 
-      if (orderResult.error || !orderResult.data) {
-        throw new Error(orderResult.error || 'Failed to create order');
+        if (directOrderResult.error || !directOrderResult.data?.orderId) {
+          throw new Error(directOrderResult.error || 'Failed to create order via both cart and direct methods');
+        }
+        
+        createdOrderId = directOrderResult.data.orderId;
       }
 
-      const createdOrderId = orderResult.data.orderId;
       setPaymentStatus('Initiating payment...');
 
       // Step 4: Create payment via Dr Green API
       const clientCountry = drGreenClient.country_code || countryCode || 'PT';
-      const paymentResult = await createPayment({
-        orderId: createdOrderId,
-        amount: cartTotal,
-        currency: getCurrencyForCountry(clientCountry),
-        clientId: drGreenClient.drgreen_client_id,
-      });
+      const paymentResult = await retryOperation(
+        () => createPayment({
+          orderId: createdOrderId!,
+          amount: cartTotal,
+          currency: getCurrencyForCountry(clientCountry),
+          clientId: drGreenClient.drgreen_client_id,
+        }),
+        'Create payment'
+      );
 
       if (paymentResult.error || !paymentResult.data) {
         throw new Error(paymentResult.error || 'Failed to initiate payment');

@@ -1735,15 +1735,9 @@ serve(async (req) => {
         break;
       }
       
-      // Add to cart (Method A - Body Sign) - uses /dapp/carts endpoint
-      case "add-to-cart": {
-        const cartData = body?.data;
-        if (!cartData) throw new Error("Cart data is required");
-        
-        logInfo("API request: POST /dapp/carts");
-        response = await drGreenRequestBody("/dapp/carts", "POST", cartData);
-        break;
-      }
+      // NOTE: add-to-cart is defined later in the switch statement (around line 2163)
+      // with proper payload formatting (clientId, productId)
+      
       
       // Remove from cart (Method A - Body Sign for signature, query for strainId) - uses /dapp/carts endpoint
       case "remove-from-cart": {
@@ -2145,8 +2139,8 @@ serve(async (req) => {
         break;
       }
       
-      // Add item to cart - POST /dapp/carts with clientCartId and items array
-      // Per API error: expects clientCartId (UUID) and items array with [{strainId, quantity}]
+      // Add item to cart - POST /dapp/carts with clientId and items array
+      // Updated per API docs: use productId (not strainId), clientId (not clientCartId)
       case "add-to-cart": {
         const cartData = body.data || {};
         const clientId = cartData.clientId || cartData.cartId;
@@ -2159,18 +2153,41 @@ serve(async (req) => {
         if (!cartData.quantity || cartData.quantity < 1) {
           throw new Error("quantity must be at least 1");
         }
-        // POST /dapp/carts - API expects clientCartId (UUID) and items array
+        
+        // POST /dapp/carts - API requires:
+        // - clientCartId (UUID) - the client's ID to add items to their cart
+        // - items[].strainId (UUID) - the strain/product ID
+        // - items[].quantity (number)
         const cartPayload = {
-          clientCartId: clientId,
+          clientCartId: clientId, // API expects clientCartId, NOT clientId
           items: [
             {
-              strainId: cartData.strainId,
+              strainId: cartData.strainId, // API expects strainId, NOT productId
               quantity: cartData.quantity,
             }
           ]
         };
-        logInfo("Adding to cart", { clientId, strainId: cartData.strainId, quantity: cartData.quantity });
+        
+        logInfo("Adding to cart", { 
+          clientCartId: clientId, 
+          strainId: cartData.strainId, 
+          quantity: cartData.quantity,
+          payload: JSON.stringify(cartPayload),
+        });
+        
         response = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
+        
+        // Log the response for debugging
+        const cartResponseStatus = response.status;
+        if (!response.ok) {
+          const errorBody = await response.clone().text();
+          logWarn("Cart add failed", { 
+            status: cartResponseStatus,
+            error: errorBody,
+          });
+        } else {
+          logInfo("Cart add successful", { status: cartResponseStatus });
+        }
         break;
       }
       
