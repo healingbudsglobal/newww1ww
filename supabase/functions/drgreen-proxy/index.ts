@@ -918,20 +918,23 @@ async function drGreenRequestBody(
 }
 
 /**
- * Make authenticated request to Dr Green API with query string signing (Method B)
- * Used for: GET list endpoints (strains list, carts list, etc.)
+ * Make authenticated GET request to Dr Green API with EMPTY OBJECT signing
+ * Per official API docs: GET requests sign an empty object {} as payload
+ * The signature is generated from JSON.stringify({}) = "{}"
+ * 
+ * Used for: All GET endpoints (both singular resource and list endpoints)
  * Includes automatic retry with exponential backoff for transient failures
  */
-async function drGreenRequestQuery(
+async function drGreenRequestGet(
   endpoint: string,
-  queryParams: Record<string, string | number>,
+  queryParams: Record<string, string | number> = {},
   enableDetailedLogging = false
 ): Promise<Response> {
   const apiKey = Deno.env.get("DRGREEN_API_KEY");
   const secretKey = Deno.env.get("DRGREEN_PRIVATE_KEY");
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] ========== QUERY REQUEST PREPARATION ==========");
+    console.log("[API-DEBUG] ========== GET REQUEST (EMPTY OBJECT SIGNING) ==========");
     console.log("[API-DEBUG] Endpoint:", endpoint);
     console.log("[API-DEBUG] Query params:", JSON.stringify(queryParams));
   }
@@ -940,18 +943,23 @@ async function drGreenRequestQuery(
     throw new Error("Dr Green API credentials not configured");
   }
   
-  // Build query string exactly like WordPress: http_build_query
+  // Build query string for URL
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(queryParams)) {
-    params.append(key, String(value));
+    if (value !== undefined && value !== null && value !== '') {
+      params.append(key, String(value));
+    }
   }
   const queryString = params.toString();
   
-  // Sign the query string (not the body)
-  const signature = await signQueryString(queryString, secretKey);
+  // Per API docs: For GET requests, sign an empty JSON object "{}"
+  // This matches the TypeScript example: getAuthHeaders(payload || {})
+  const emptyPayload = "{}";
+  const signature = await signPayload(emptyPayload, secretKey);
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] Query string:", queryString);
+    console.log("[API-DEBUG] Signing empty object: '{}'");
+    console.log("[API-DEBUG] Query string for URL:", queryString);
     console.log("[API-DEBUG] Signature length:", signature.length);
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
@@ -963,8 +971,11 @@ async function drGreenRequestQuery(
     "x-auth-signature": signature,
   };
   
-  const url = `${DRGREEN_API_URL}${endpoint}?${queryString}`;
-  logInfo(`API request: GET ${endpoint}`);
+  const url = queryString 
+    ? `${DRGREEN_API_URL}${endpoint}?${queryString}`
+    : `${DRGREEN_API_URL}${endpoint}`;
+    
+  logInfo(`API request: GET ${endpoint}`, { hasQueryParams: !!queryString });
   
   // Wrap the fetch in retry logic
   return withRetry(
@@ -982,7 +993,7 @@ async function drGreenRequestQuery(
         clearTimeout(timeoutId);
         
         if (response.status === 401 && enableDetailedLogging) {
-          console.log("[API-DEBUG] ========== QUERY 401 ANALYSIS ==========");
+          console.log("[API-DEBUG] ========== GET 401 ANALYSIS ==========");
           console.log("[API-DEBUG] Status:", response.status);
           const errorBody = await response.clone().text();
           console.log("[API-DEBUG] Error body:", errorBody);
@@ -1000,6 +1011,20 @@ async function drGreenRequestQuery(
     `GET ${endpoint}`,
     (response: Response) => isRetryable(null, response.status)
   );
+}
+
+/**
+ * Make authenticated request to Dr Green API with query string signing (Method B)
+ * DEPRECATED: Use drGreenRequestGet instead - it correctly signs an empty object
+ * Kept for backwards compatibility during migration
+ */
+async function drGreenRequestQuery(
+  endpoint: string,
+  queryParams: Record<string, string | number>,
+  enableDetailedLogging = false
+): Promise<Response> {
+  // Redirect to new implementation that signs empty object correctly
+  return drGreenRequestGet(endpoint, queryParams, enableDetailedLogging);
 }
 
 /**
