@@ -155,24 +155,32 @@ export function ShippingAddressForm({
         postalCode: data.postalCode.trim(),
       };
 
-      const result = await updateShippingAddress(clientId, shippingData);
-
-      if (result.error) {
-        throw new Error(result.error);
+      // Try to update address in Dr. Green API (optional - don't block on failure)
+      try {
+        const result = await updateShippingAddress(clientId, shippingData);
+        if (result.error) {
+          console.warn('Could not sync address to Dr. Green API:', result.error);
+          // Continue anyway - address will be included in order payload
+        }
+      } catch (apiError) {
+        console.warn('Address sync to API failed:', apiError);
+        // Continue anyway
       }
 
+      // Always succeed and pass address to checkout
       setSaveSuccess(true);
       toast({
-        title: 'Address Saved',
-        description: 'Your shipping address has been updated successfully.',
+        title: 'Address Confirmed',
+        description: 'Your shipping address is ready for checkout.',
       });
 
       onSuccess?.(shippingData);
     } catch (error) {
-      console.error('Failed to save shipping address:', error);
+      // Only fail if there's a form validation error
+      console.error('Failed to process shipping address:', error);
       toast({
-        title: 'Failed to Save Address',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Please check your address.',
         variant: 'destructive',
       });
     } finally {
