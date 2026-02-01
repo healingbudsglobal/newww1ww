@@ -6,8 +6,8 @@
 ### Changes Made
 
 **1. API Key Encoding Fix (supabase/functions/drgreen-proxy/index.ts)**
-- Updated `drGreenRequestBody` (line 856+) to Base64-encode the API key using `btoa(apiKey)`
-- Updated `drGreenRequestGet` (line 967+) with the same fix
+- Updated `drGreenRequestBody` to Base64-encode the API key using `btoa(apiKey)`
+- Updated `drGreenRequestGet` with the same fix
 - Added diagnostic logging for encoding details
 
 **2. Graceful Fallback (src/pages/Checkout.tsx)**
@@ -15,16 +15,21 @@
 - When `getClientDetails` fails, user is prompted to confirm/enter shipping address
 - Added user-friendly toast notification for address verification
 
-## Testing Status
+## ✅ READY FOR TESTING
 
-- Edge function deployed ✅
-- Waiting for user to test checkout flow with Kayliegh logged in
+The implementation is complete. To test:
 
-## Next Steps
+1. **Log in as Kayliegh** using wallet connection (NFT/MetaMask)
+2. **Add products to cart** from the Shop page
+3. **Navigate to Checkout** 
+4. **Verify** either:
+   - Shipping address loads correctly (API fix worked), OR
+   - Address form appears with "Address Verification" toast (fallback working)
+5. **Complete order placement**
 
-1. Have Kayliegh navigate to checkout with items in cart
-2. Verify the shipping address check either:
-   - Returns 200 OK with address data, OR
-   - Shows address form gracefully with toast notification
-3. Complete a test order placement
+## Notes
+
+- Browser automation cannot test wallet-based authentication
+- Manual testing by Kayliegh required for full verification
+- Admin dashboard features will be addressed in next phase
 
