@@ -1942,6 +1942,8 @@ serve(async (req) => {
       }
       
       // User fetching their own client details (ownership verified via clientId match)
+      // This endpoint has SPECIAL HANDLING because Dr Green API may not allow regular users
+      // to access /dapp/clients/:clientId - we fall back to local data if API returns 401
       case "get-my-details": {
         const clientId = body.clientId || body.data?.clientId;
         if (!clientId) {
@@ -1950,10 +1952,94 @@ serve(async (req) => {
         if (!validateClientId(clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // GET /dapp/clients/:clientId returns full client details including shipping
-        // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
-        break;
+        
+        // First, get local client data from Supabase as fallback
+        // We use service role here because we've already verified ownership in the auth check above
+        const supabaseAdmin = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        
+        const { data: localClient, error: localError } = await supabaseAdmin
+          .from('drgreen_clients')
+          .select('*')
+          .eq('drgreen_client_id', clientId)
+          .maybeSingle();
+        
+        // Try to get fresh data from Dr. Green API
+        let apiResponse: Response | null = null;
+        let apiData: Record<string, unknown> | null = null;
+        
+        try {
+          apiResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
+          
+          if (apiResponse.ok) {
+            apiData = await apiResponse.json() as Record<string, unknown>;
+            logInfo("Got client details from Dr. Green API", { clientId });
+          } else if (apiResponse.status === 401) {
+            logInfo("Dr. Green API returned 401 for client details, using local fallback", { clientId });
+            // API credentials don't have access - this is expected for non-admin keys
+          } else {
+            logWarn("Dr. Green API error for client details", { 
+              status: apiResponse.status, 
+              clientId 
+            });
+          }
+        } catch (apiErr) {
+          logWarn("Failed to fetch from Dr. Green API, using local fallback", { 
+            error: apiErr instanceof Error ? apiErr.message : 'Unknown' 
+          });
+        }
+        
+        // If we have API data, return it
+        if (apiData) {
+          return new Response(JSON.stringify(apiData), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // Fall back to local client data
+        if (localClient) {
+          // Build a response that matches what the checkout expects
+          const fallbackResponse = {
+            id: localClient.drgreen_client_id,
+            clientId: localClient.drgreen_client_id,
+            email: localClient.email,
+            fullName: localClient.full_name,
+            firstName: localClient.full_name?.split(' ')[0] || '',
+            lastName: localClient.full_name?.split(' ').slice(1).join(' ') || '',
+            isKYCVerified: localClient.is_kyc_verified || false,
+            adminApproval: localClient.admin_approval || 'PENDING',
+            countryCode: localClient.country_code,
+            kycLink: localClient.kyc_link,
+            // Note: shipping address may not be in local DB - checkout should handle this
+            shipping: null,
+            _source: 'local_fallback',
+            _note: 'Dr. Green API access restricted. Shipping address may need to be entered.',
+          };
+          
+          logInfo("Returning local client data as fallback", { 
+            clientId: localClient.drgreen_client_id,
+            hasEmail: !!localClient.email,
+          });
+          
+          return new Response(JSON.stringify(fallbackResponse), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // No data anywhere
+        logWarn("Client not found in API or local DB", { clientId });
+        return new Response(
+          JSON.stringify({ 
+            error: 'Client not found', 
+            clientId,
+            message: 'Could not fetch client details from API or local database.' 
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       
       case "dapp-verify-client": {
