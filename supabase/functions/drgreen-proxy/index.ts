@@ -843,6 +843,12 @@ async function drGreenRequestBody(
     throw new Error("Dr Green API credentials not configured");
   }
   
+  // Validate API key format - should be Base64-encoded, not raw PEM
+  if (apiKey.startsWith('-----BEGIN')) {
+    console.error('[API-ERROR] DRGREEN_API_KEY contains raw PEM format. It should be Base64-encoded.');
+    throw new Error('API key misconfigured - contact administrator');
+  }
+  
   const payload = body ? JSON.stringify(body) : "";
   const signature = await signPayload(payload, secretKey);
   
@@ -853,15 +859,14 @@ async function drGreenRequestBody(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // Per official docs: API key must be Base64 encoded before sending
-  // Buffer.from(apiKey).toString('base64') in Node.js = btoa(apiKey) in Deno
-  const encodedApiKey = btoa(apiKey);
+  // API key from secrets is already Base64-encoded per Dr. Green spec
+  // DO NOT re-encode with btoa() - that causes double-encoding and 401 errors
+  const encodedApiKey = apiKey;
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] API Key encoding:", {
-      originalLength: apiKey.length,
-      encodedLength: encodedApiKey.length,
-      encodedPrefix: encodedApiKey.slice(0, 16) + "...",
+    console.log("[API-DEBUG] API Key (already Base64):", {
+      keyLength: apiKey.length,
+      keyPrefix: apiKey.slice(0, 16) + "...",
     });
   }
   
@@ -954,6 +959,12 @@ async function drGreenRequestGet(
     throw new Error("Dr Green API credentials not configured");
   }
   
+  // Validate API key format - should be Base64-encoded, not raw PEM
+  if (apiKey.startsWith('-----BEGIN')) {
+    console.error('[API-ERROR] DRGREEN_API_KEY contains raw PEM format. It should be Base64-encoded.');
+    throw new Error('API key misconfigured - contact administrator');
+  }
+  
   // Build query string for URL
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(queryParams)) {
@@ -975,15 +986,14 @@ async function drGreenRequestGet(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // Per official docs: API key must be Base64 encoded before sending
-  // Buffer.from(apiKey).toString('base64') in Node.js = btoa(apiKey) in Deno
-  const encodedApiKey = btoa(apiKey);
+  // API key from secrets is already Base64-encoded per Dr. Green spec
+  // DO NOT re-encode with btoa() - that causes double-encoding and 401 errors
+  const encodedApiKey = apiKey;
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] API Key encoding:", {
-      originalLength: apiKey.length,
-      encodedLength: encodedApiKey.length,
-      encodedPrefix: encodedApiKey.slice(0, 16) + "...",
+    console.log("[API-DEBUG] API Key (already Base64):", {
+      keyLength: apiKey.length,
+      keyPrefix: apiKey.slice(0, 16) + "...",
     });
   }
   
