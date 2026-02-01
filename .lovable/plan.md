@@ -1,195 +1,173 @@
 
-
-# Fix Checkout Flow - Dr. Green API Cart Sync
+# Plan: Fix Dr. Green Order Creation to Match Official API
 
 ## Problem Summary
 
-The checkout is failing with a **409 Conflict: "Client does not have any item in the cart"** error because the Dr. Green API requires items to be added to its server-side cart before placing an order.
+Based on the official Dr. Green API documentation provided, the current checkout implementation is using an incorrect order creation pattern. The API documentation clearly shows that orders should be created by **passing items directly in the request body**, not by syncing to a server-side cart first.
 
-**Current (broken) flow:**
-Local cart → Create Order → ERROR
-
-**Required flow:**
-Local cart → Sync to Dr. Green Cart → Create Order → Success
-
----
-
-## Solution: Sync Cart Before Order
-
-### Phase 1: Add Cart Sync Function
-
-**File: `src/hooks/useDrGreenApi.ts`**
-
-Add a new `addToCart` function to expose the existing `add-to-cart` action:
-
-```typescript
-// Add item to Dr. Green cart
-const addToCart = async (cartData: {
-  cartId: string;
-  strainId: string;
-  quantity: number;
-}) => {
-  return callProxy<{
-    cartId: string;
-    items: Array<{ strainId: string; quantity: number }>;
-  }>('add-to-cart', { data: cartData });
-};
+**Current (incorrect) flow:**
+```
+Local cart → Empty API cart → Add items to API cart → Create order (no items) → ERROR
 ```
 
-Also add `emptyCart` function to clear the Dr. Green cart before syncing:
-
-```typescript
-// Empty the Dr. Green cart
-const emptyCart = async (cartId: string) => {
-  return callProxy<{ success: boolean }>('empty-cart', { cartId });
-};
+**Correct flow (per documentation):**
+```
+Local cart → Create order with items in body → Success
 ```
 
 ---
 
-### Phase 2: Update Checkout Flow
+## Technical Changes Required
 
-**File: `src/pages/Checkout.tsx`**
+### 1. Update Edge Function Proxy
+**File:** `supabase/functions/drgreen-proxy/index.ts`
 
-Modify `handlePlaceOrder` to sync cart items before creating the order:
+Update the `create-order` and `place-order` actions to properly format the request per documentation:
 
-```text
-1. Get or create Dr. Green cart ID (use client ID as cart ID)
-2. Empty existing cart to ensure clean state
-3. Add each local cart item to Dr. Green cart
-4. Create order (without sending items - they're already in cart)
-5. Process payment as before
+```typescript
+case "create-order": {
+  const orderData = body.data || {};
+  if (!orderData.clientId) throw new Error("clientId is required");
+  if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
+    throw new Error("items array is required and must not be empty");
+  }
+  
+  // Format per API documentation
+  const payload = {
+    clientId: orderData.clientId,
+    items: orderData.items.map(item => ({
+      productId: item.strainId || item.productId,
+      quantity: item.quantity,
+      price: item.price || item.unit_price
+    })),
+    shippingAddress: orderData.shippingAddress,
+    notes: orderData.notes
+  };
+  
+  response = await drGreenRequestBody("/dapp/orders", "POST", payload);
+  break;
+}
 ```
 
-Updated flow in `handlePlaceOrder`:
+### 2. Update Checkout Component
+**File:** `src/pages/Checkout.tsx`
+
+Simplify `handlePlaceOrder` to pass items directly to order creation instead of syncing cart:
 
 ```typescript
 const handlePlaceOrder = async () => {
   if (!drGreenClient || cart.length === 0) return;
 
   setIsProcessing(true);
-  setPaymentStatus('Syncing cart...');
+  setPaymentStatus('Creating order...');
 
   try {
     const clientId = drGreenClient.drgreen_client_id;
     
-    // Step 1: Empty existing Dr. Green cart to ensure clean state
-    await emptyCart(clientId);
-    
-    // Step 2: Add each item to Dr. Green cart
-    for (const item of cart) {
-      const result = await addToCart({
-        cartId: clientId,
-        strainId: item.strain_id,
-        quantity: item.quantity,
-      });
-      
-      if (result.error) {
-        throw new Error(`Failed to add ${item.strain_name} to cart: ${result.error}`);
-      }
-    }
-    
-    setPaymentStatus('Creating order...');
-    
-    // Step 3: Create order (items are now in Dr. Green cart)
+    // Create order with items directly (per API documentation)
     const orderResult = await createOrder({
       clientId: clientId,
+      items: cart.map(item => ({
+        productId: item.strain_id,
+        quantity: item.quantity,
+        price: item.unit_price,
+      })),
+      shippingAddress: drGreenClient.shipping_address || undefined,
     });
-    
+
+    if (orderResult.error || !orderResult.data) {
+      throw new Error(orderResult.error || 'Failed to create order');
+    }
+
+    const createdOrderId = orderResult.data.orderId;
     // ... rest of payment flow unchanged
   } catch (error) {
-    // Error handling
+    // ... existing error handling
   }
 };
 ```
 
----
+### 3. Update API Hook
+**File:** `src/hooks/useDrGreenApi.ts`
 
-### Phase 3: Verify Cart API Actions Work
+Update `createOrder` function signature to match documentation schema:
 
-The `drgreen-proxy` edge function already has the required actions:
-
-| Action | Endpoint | Purpose |
-|--------|----------|---------|
-| `add-to-cart` | `POST /dapp/carts` | Add item to cart |
-| `empty-cart` | `DELETE /dapp/carts/:cartId` | Clear cart |
-| `place-order` | `POST /dapp/orders` | Create order from cart |
-
-Note: The `create-order` action uses `drGreenRequest` (query signing) while `place-order` uses `drGreenRequestBody` (body signing). We may need to use `place-order` instead.
-
----
-
-## Technical Details
-
-### API Flow Diagram
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                      User Clicks "Place Order"              │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Step 1: Empty existing Dr. Green cart                       │
-│ DELETE /dapp/carts/{clientId}                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Step 2: For each local cart item, add to Dr. Green cart     │
-│ POST /dapp/carts { cartId, strainId, quantity }             │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Step 3: Create order from Dr. Green cart                    │
-│ POST /dapp/orders { clientId }                              │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Step 4: Create payment                                      │
-│ POST /dapp/payments { orderId, amount, currency, clientId } │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Step 5: Poll payment status or await webhook                │
-│ GET /dapp/payments/{paymentId}                              │
-└─────────────────────────────────────────────────────────────┘
+```typescript
+const createOrder = async (orderData: {
+  clientId: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    price: number;
+  }>;
+  shippingAddress?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+  };
+  notes?: string;
+}) => {
+  return callProxy<{
+    orderId: string;
+    orderNumber?: string;
+    status: string;
+    totalAmount: number;
+  }>('create-order', { data: orderData });
+};
 ```
 
-### Files to Modify
+### 4. Remove Cart Sync Logic
+**File:** `src/pages/Checkout.tsx`
+
+Remove the now-unnecessary cart sync steps:
+- Remove `emptyCart` call
+- Remove `addToCart` loop
+- Remove `placeOrder` call (replace with `createOrder`)
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useDrGreenApi.ts` | Add `addToCart()` and `emptyCart()` functions |
-| `src/pages/Checkout.tsx` | Update `handlePlaceOrder` to sync cart before order |
-
-### Edge Cases to Handle
-
-1. **Cart sync failure**: If adding an item fails, abort and show error
-2. **Partial sync**: If some items sync but order fails, items remain in Dr. Green cart
-3. **Stock changes**: Stock may have changed between browsing and checkout
+| `supabase/functions/drgreen-proxy/index.ts` | Update `create-order` action to accept items in body |
+| `src/pages/Checkout.tsx` | Simplify order creation, remove cart sync logic |
+| `src/hooks/useDrGreenApi.ts` | Update `createOrder` interface to match API schema |
 
 ---
 
-## Expected Outcome
+## API Payload Mapping
+
+**Local Cart Item → API Order Item**
+| Local Field | API Field |
+|-------------|-----------|
+| `strain_id` | `productId` |
+| `quantity` | `quantity` |
+| `unit_price` | `price` |
+
+---
+
+## Error Handling Improvements
+
+Enhance error messages for common API responses:
+
+| API Error | User-Friendly Message |
+|-----------|----------------------|
+| `Client is not active` | "Your account is pending verification. Please contact support." |
+| 400 Bad Request | "Unable to process your order. Please verify your cart and try again." |
+| 401 Unauthorized | "Session expired. Please log in again." |
+| 409 Conflict | "There was a conflict with your order. Please refresh and try again." |
+
+---
+
+## Testing Plan
 
 After implementation:
-1. **Kayliegh** can complete checkout: Items sync to Dr. Green cart → Order created successfully
-2. **Scott** can complete checkout: Same flow works for all verified clients
-3. Error handling provides clear feedback if cart sync or order creation fails
-
----
-
-## Test Plan
-
 1. Login as Kayliegh (`kayliegh.sm@gmail.com` / `HB2024Test!`)
-2. Add a product to cart
+2. Add product to cart
 3. Proceed to checkout
 4. Click "Place Order"
-5. Verify order is created successfully (no 409 error)
-6. Check order appears in `/orders` page
-7. Repeat with Scott to confirm both users work
-
+5. Verify no more 400/409 cart errors
+6. Check if order is created successfully or if "Client is not active" error appears (which would confirm the client needs activation in Dr. Green portal)
