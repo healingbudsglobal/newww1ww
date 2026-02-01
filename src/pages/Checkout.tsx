@@ -1,11 +1,13 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2, MapPin, Home, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import Header from '@/layout/Header';
 import Footer from '@/components/Footer';
 import { useShop } from '@/context/ShopContext';
@@ -47,7 +49,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
   const { toast } = useToast();
-  const { createPayment, getPayment, addToCart, emptyCart, placeOrder, createOrder, getClientDetails } = useDrGreenApi();
+  const { createPayment, getPayment, createOrder, getClientDetails } = useDrGreenApi();
   const { saveOrder } = useOrderTracking();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -56,8 +58,10 @@ const Checkout = () => {
   
   // Shipping address state
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [savedAddress, setSavedAddress] = useState<ShippingAddress | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [needsShippingAddress, setNeedsShippingAddress] = useState(false);
+  const [addressMode, setAddressMode] = useState<'saved' | 'custom'>('saved');
 
   // Fetch client details to check for shipping address
   useEffect(() => {
@@ -74,13 +78,12 @@ const Checkout = () => {
           console.warn('Could not fetch client details from API:', result.error);
           // Graceful fallback: prompt for address confirmation
           setNeedsShippingAddress(true);
-          toast({
-            title: 'Address Verification',
-            description: 'Please confirm your shipping address to continue.',
-          });
         } else if (result.data?.shipping && result.data.shipping.address1) {
-          setShippingAddress(result.data.shipping);
+          const addr = result.data.shipping;
+          setSavedAddress(addr);
+          setShippingAddress(addr); // Use saved by default
           setNeedsShippingAddress(false);
+          setAddressMode('saved');
         } else {
           setNeedsShippingAddress(true);
         }
@@ -88,10 +91,6 @@ const Checkout = () => {
         console.error('Failed to fetch client details:', error);
         // Graceful fallback: prompt for address instead of blocking
         setNeedsShippingAddress(true);
-        toast({
-          title: 'Address Verification',
-          description: 'Please confirm your shipping address to continue.',
-        });
       } finally {
         setIsLoadingAddress(false);
       }
@@ -99,6 +98,14 @@ const Checkout = () => {
 
     checkShippingAddress();
   }, [drGreenClient, getClientDetails]);
+
+  // Handle address mode toggle
+  const handleAddressModeChange = (mode: 'saved' | 'custom') => {
+    setAddressMode(mode);
+    if (mode === 'saved' && savedAddress) {
+      setShippingAddress(savedAddress);
+    }
+  };
 
   const handleShippingAddressSaved = (address: ShippingAddress) => {
     setShippingAddress(address);
@@ -112,97 +119,50 @@ const Checkout = () => {
   const handlePlaceOrder = async () => {
     if (!drGreenClient || cart.length === 0) return;
 
+    // Validate shipping address exists
+    if (!shippingAddress || !shippingAddress.address1) {
+      toast({
+        title: 'Shipping Address Required',
+        description: 'Please provide a shipping address before placing your order.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsProcessing(true);
-    setPaymentStatus('Preparing order...');
+    setPaymentStatus('Creating order...');
 
     try {
       const clientId = drGreenClient.drgreen_client_id;
-      let createdOrderId: string | undefined;
 
-      // Try cart-based flow first, with fallback to direct order creation
-      try {
-        // Step 1: Empty existing Dr. Green cart to ensure clean state
-        setPaymentStatus('Clearing cart...');
-        const emptyResult = await retryOperation(
-          () => emptyCart(clientId),
-          'Empty cart',
-          2 // Fewer retries since cart may not exist
-        );
-        // Empty cart may return 404/502 if cart doesn't exist - that's OK
-        if (emptyResult.error && !emptyResult.error.includes('404') && !emptyResult.error.includes('not found') && !emptyResult.error.includes('Cart not found')) {
-          console.warn('Cart empty warning:', emptyResult.error);
-        }
+      // Use direct order creation with items + shipping (guaranteed to include address)
+      const orderResult = await retryOperation(
+        () => createOrder({
+          clientId: clientId,
+          items: cart.map(item => ({
+            productId: item.strain_id,
+            quantity: item.quantity,
+            price: item.unit_price,
+          })),
+          // Always include shipping address in order payload
+          shippingAddress: {
+            street: shippingAddress.address1,
+            address2: shippingAddress.address2 || '',
+            city: shippingAddress.city,
+            state: shippingAddress.state || shippingAddress.city,
+            zipCode: shippingAddress.postalCode,
+            country: shippingAddress.country,
+            countryCode: shippingAddress.countryCode,
+          },
+        }),
+        'Create order'
+      );
 
-        // Step 2: Add each item to Dr. Green server-side cart with retry logic
-        setPaymentStatus('Syncing cart items...');
-        let cartSyncFailed = false;
-        for (const item of cart) {
-          const cartResult = await retryOperation(
-            () => addToCart({
-              clientId: clientId,
-              strainId: item.strain_id,
-              quantity: item.quantity,
-            }),
-            `Add ${item.strain_name} to cart`
-          );
-
-          if (cartResult.error) {
-            console.error('Cart sync failed for item:', item.strain_name, cartResult.error);
-            cartSyncFailed = true;
-            break;
-          }
-        }
-
-        // Step 3: Create order from server-side cart (if cart sync succeeded)
-        if (!cartSyncFailed) {
-          setPaymentStatus('Creating order...');
-          const orderResult = await retryOperation(
-            () => placeOrder({ clientId }),
-            'Place order'
-          );
-
-          if (!orderResult.error && orderResult.data?.orderId) {
-            createdOrderId = orderResult.data.orderId;
-          } else {
-            console.warn('Cart-based order failed:', orderResult.error);
-            // Will fall through to direct order creation
-          }
-        }
-      } catch (cartFlowError) {
-        console.warn('Cart flow exception, trying direct order:', cartFlowError);
+      if (orderResult.error || !orderResult.data?.orderId) {
+        throw new Error(orderResult.error || 'Failed to create order');
       }
 
-      // Fallback: Try direct order creation with items if cart flow failed
-      if (!createdOrderId) {
-        setPaymentStatus('Creating order directly...');
-        console.log('Attempting direct order creation with items...');
-        
-        const directOrderResult = await retryOperation(
-          () => createOrder({
-            clientId: clientId,
-            items: cart.map(item => ({
-              productId: item.strain_id,
-              quantity: item.quantity,
-              price: item.unit_price,
-            })),
-            // Include shipping address if available (maps to Dr. Green API format)
-            shippingAddress: shippingAddress ? {
-              street: shippingAddress.address1,
-              city: shippingAddress.city,
-              state: shippingAddress.state || shippingAddress.city,
-              zipCode: shippingAddress.postalCode,
-              country: shippingAddress.country,
-            } : undefined,
-          }),
-          'Direct order creation'
-        );
-
-        if (directOrderResult.error || !directOrderResult.data?.orderId) {
-          throw new Error(directOrderResult.error || 'Failed to create order via both cart and direct methods');
-        }
-        
-        createdOrderId = directOrderResult.data.orderId;
-      }
+      const createdOrderId = orderResult.data.orderId;
 
       setPaymentStatus('Initiating payment...');
 
@@ -445,7 +405,7 @@ const Checkout = () => {
                   </Card>
                 </div>
 
-                {/* Payment Section */}
+                {/* Shipping & Payment Section */}
                 <div className="lg:col-span-1 space-y-6">
                   {/* Shipping Address Check */}
                   {isLoadingAddress ? (
@@ -456,85 +416,157 @@ const Checkout = () => {
                       </CardContent>
                     </Card>
                   ) : needsShippingAddress ? (
+                    // No saved address - show form directly
                     <div className="space-y-4">
-                      <Alert variant="destructive" className="bg-destructive/10 border-destructive/30">
+                      <Alert className="bg-muted/30 border-border/50">
                         <MapPin className="h-4 w-4" />
                         <AlertTitle>Shipping Address Required</AlertTitle>
                         <AlertDescription>
-                          Please add your shipping address before placing an order.
+                          Please add your shipping address to continue.
                         </AlertDescription>
                       </Alert>
                       
                       {drGreenClient && (
                         <ShippingAddressForm
                           clientId={drGreenClient.drgreen_client_id}
-                          defaultCountry={drGreenClient.country_code || countryCode || 'PT'}
+                          defaultCountry={drGreenClient.country_code || countryCode || 'ZA'}
                           onSuccess={handleShippingAddressSaved}
                           submitLabel="Save & Continue"
                         />
                       )}
                     </div>
                   ) : (
-                    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <CreditCard className="h-5 w-5" />
-                          Payment
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {/* Shipping info */}
-                        <div className="p-4 rounded-lg bg-muted/30">
-                          <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            Shipping to
-                          </p>
-                          {shippingAddress ? (
-                            <div className="text-sm text-muted-foreground">
-                              <p>{shippingAddress.address1}</p>
-                              {shippingAddress.address2 && <p>{shippingAddress.address2}</p>}
-                              <p>{shippingAddress.city}, {shippingAddress.postalCode}</p>
-                              <p>{shippingAddress.country}</p>
+                    <>
+                      {/* Delivery Address Selection */}
+                      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5" />
+                            Delivery Address
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <RadioGroup 
+                            value={addressMode} 
+                            onValueChange={(v) => handleAddressModeChange(v as 'saved' | 'custom')}
+                            className="space-y-3"
+                          >
+                            {/* Option 1: Use saved address */}
+                            {savedAddress && (
+                              <div 
+                                className={`flex items-start gap-3 p-4 rounded-lg border transition-colors cursor-pointer ${
+                                  addressMode === 'saved' 
+                                    ? 'border-primary bg-primary/5' 
+                                    : 'border-border/50 hover:border-border'
+                                }`}
+                                onClick={() => handleAddressModeChange('saved')}
+                              >
+                                <RadioGroupItem value="saved" id="addr-saved" className="mt-1" />
+                                <Label htmlFor="addr-saved" className="flex-1 cursor-pointer">
+                                  <div className="flex items-center gap-2 font-medium">
+                                    <Home className="h-4 w-4 text-muted-foreground" />
+                                    Use saved address
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    {savedAddress.address1}<br />
+                                    {savedAddress.city}, {savedAddress.postalCode}<br />
+                                    {savedAddress.country}
+                                  </div>
+                                </Label>
+                              </div>
+                            )}
+                            
+                            {/* Option 2: Different address */}
+                            <div 
+                              className={`flex items-start gap-3 p-4 rounded-lg border transition-colors cursor-pointer ${
+                                addressMode === 'custom' 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-border/50 hover:border-border'
+                              }`}
+                              onClick={() => handleAddressModeChange('custom')}
+                            >
+                              <RadioGroupItem value="custom" id="addr-custom" className="mt-1" />
+                              <Label htmlFor="addr-custom" className="flex-1 cursor-pointer">
+                                <div className="flex items-center gap-2 font-medium">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  Ship to a different address
+                                </div>
+                                <span className="text-sm text-muted-foreground">
+                                  Work, pickup point, or alternative location
+                                </span>
+                              </Label>
                             </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">
-                              {drGreenClient?.country_code || 'PT'}
+                          </RadioGroup>
+                          
+                          {/* Show form when custom selected */}
+                          {addressMode === 'custom' && drGreenClient && (
+                            <div className="pt-4 border-t border-border/50">
+                              <ShippingAddressForm
+                                clientId={drGreenClient.drgreen_client_id}
+                                initialAddress={savedAddress}
+                                defaultCountry={savedAddress?.countryCode || drGreenClient.country_code || countryCode || 'ZA'}
+                                onSuccess={handleShippingAddressSaved}
+                                submitLabel="Confirm Address"
+                                variant="inline"
+                              />
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Payment Card */}
+                      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5" />
+                            Payment
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Shipping summary */}
+                          <div className="p-3 rounded-lg bg-muted/30 text-sm">
+                            <p className="font-medium text-foreground flex items-center gap-2 mb-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              Shipping to:
                             </p>
-                          )}
-                        </div>
+                            <p className="text-muted-foreground">
+                              {shippingAddress?.address1}, {shippingAddress?.city}
+                            </p>
+                          </div>
 
-                        {/* Notice */}
-                        <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
-                          <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                          <p className="text-sm text-muted-foreground">
-                            Payment will be processed securely through our payment provider.
+                          {/* Notice */}
+                          <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                            <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-muted-foreground">
+                              Payment will be processed securely through our payment provider.
+                            </p>
+                          </div>
+
+                          <Button
+                            className="w-full"
+                            size="lg"
+                            onClick={handlePlaceOrder}
+                            disabled={isProcessing || !shippingAddress}
+                          >
+                            {isProcessing ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {paymentStatus || 'Processing...'}
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Place Order - {formatPrice(cartTotalConverted, countryCode)}
+                              </>
+                            )}
+                          </Button>
+
+                          <p className="text-xs text-center text-muted-foreground">
+                            By placing this order, you agree to our terms of service and confirm that you are a verified medical patient.
                           </p>
-                        </div>
-
-                        <Button
-                          className="w-full"
-                          size="lg"
-                          onClick={handlePlaceOrder}
-                          disabled={isProcessing || needsShippingAddress}
-                        >
-                          {isProcessing ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {paymentStatus || 'Processing...'}
-                            </>
-                          ) : (
-                            <>
-                              <CreditCard className="mr-2 h-4 w-4" />
-                              Place Order - {formatPrice(cartTotal, countryCode)}
-                            </>
-                          )}
-                        </Button>
-
-                        <p className="text-xs text-center text-muted-foreground">
-                          By placing this order, you agree to our terms of service and confirm that you are a verified medical patient.
-                        </p>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    </>
                   )}
                 </div>
               </div>
