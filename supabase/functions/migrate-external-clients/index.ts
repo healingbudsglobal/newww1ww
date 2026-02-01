@@ -15,19 +15,41 @@ serve(async (req) => {
   try {
     console.log('[MIGRATE] Starting external client migration...');
 
-    // External Supabase credentials (source)
+    // External Supabase credentials (source) - using service role key to bypass RLS
     const externalUrl = "https://swjifcjdrqtbupoibyfn.supabase.co";
-    const externalAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3amlmY2pkcnF0YnVwb2lieWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3MDM1NDUsImV4cCI6MjA4MjI3OTU0NX0.wUnHxyeIaoVgE_al7nS6nUpABtsTZLFPcezekLp8ofc";
+    const externalServiceKey = Deno.env.get('EXTERNAL_SUPABASE_SERVICE_KEY');
+    
+    if (!externalServiceKey) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'EXTERNAL_SUPABASE_SERVICE_KEY not configured' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
 
     // Current project credentials (destination)
     const currentUrl = Deno.env.get('SUPABASE_URL')!;
     const currentServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Create clients
-    const externalClient = createClient(externalUrl, externalAnonKey);
+    // Create clients - using service role keys to bypass RLS on both ends
+    const externalClient = createClient(externalUrl, externalServiceKey);
     const currentClient = createClient(currentUrl, currentServiceKey);
 
     console.log('[MIGRATE] Fetching clients from external project...');
+
+    // First, try to diagnose what data exists
+    // Check profiles table first as a connectivity test
+    const { data: profileTest, error: profileTestError } = await externalClient
+      .from('profiles')
+      .select('id, full_name')
+      .limit(5);
+    
+    console.log('[MIGRATE] Profile test result:', { 
+      found: profileTest?.length || 0, 
+      error: profileTestError?.message 
+    });
 
     // Fetch all drgreen_clients from external project
     const { data: externalClients, error: fetchError } = await externalClient
@@ -36,11 +58,37 @@ serve(async (req) => {
 
     if (fetchError) {
       console.error('[MIGRATE] Error fetching external clients:', fetchError);
+      
+      // Check if the table doesn't exist
+      if (fetchError.message?.includes('does not exist') || fetchError.code === '42P01') {
+        // Try alternative table names
+        console.log('[MIGRATE] drgreen_clients table not found, checking alternatives...');
+        
+        // Check for 'clients' table
+        const { data: altClients, error: altError } = await externalClient
+          .from('clients')
+          .select('*');
+        
+        if (altClients && altClients.length > 0) {
+          console.log(`[MIGRATE] Found ${altClients.length} clients in 'clients' table`);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Table name mismatch',
+              message: `Found 'clients' table with ${altClients.length} records instead of 'drgreen_clients'`,
+              sampleClient: altClients[0]
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Failed to fetch from external project',
-          details: fetchError.message 
+          details: fetchError.message,
+          code: fetchError.code
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
@@ -49,11 +97,18 @@ serve(async (req) => {
     console.log(`[MIGRATE] Found ${externalClients?.length || 0} clients in external project`);
 
     if (!externalClients || externalClients.length === 0) {
+      // Check if there are profiles but no clients
+      const { data: allProfiles } = await externalClient.from('profiles').select('*');
+      
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'No clients found in external project',
-          migrated: 0 
+          message: 'No clients found in external project drgreen_clients table',
+          migrated: 0,
+          diagnostics: {
+            profilesFound: allProfiles?.length || 0,
+            tableChecked: 'drgreen_clients'
+          }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
