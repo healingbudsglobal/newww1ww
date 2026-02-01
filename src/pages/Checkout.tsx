@@ -70,7 +70,15 @@ const Checkout = () => {
       try {
         const result = await getClientDetails(drGreenClient.drgreen_client_id);
         
-        if (result.data?.shipping && result.data.shipping.address1) {
+        if (result.error) {
+          console.warn('Could not fetch client details from API:', result.error);
+          // Graceful fallback: prompt for address confirmation
+          setNeedsShippingAddress(true);
+          toast({
+            title: 'Address Verification',
+            description: 'Please confirm your shipping address to continue.',
+          });
+        } else if (result.data?.shipping && result.data.shipping.address1) {
           setShippingAddress(result.data.shipping);
           setNeedsShippingAddress(false);
         } else {
@@ -78,8 +86,12 @@ const Checkout = () => {
         }
       } catch (error) {
         console.error('Failed to fetch client details:', error);
-        // Assume address is needed if we can't verify
+        // Graceful fallback: prompt for address instead of blocking
         setNeedsShippingAddress(true);
+        toast({
+          title: 'Address Verification',
+          description: 'Please confirm your shipping address to continue.',
+        });
       } finally {
         setIsLoadingAddress(false);
       }

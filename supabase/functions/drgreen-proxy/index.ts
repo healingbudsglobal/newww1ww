@@ -853,10 +853,21 @@ async function drGreenRequestBody(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // API key is already Base64 encoded - send as-is
+  // Per official docs: API key must be Base64 encoded before sending
+  // Buffer.from(apiKey).toString('base64') in Node.js = btoa(apiKey) in Deno
+  const encodedApiKey = btoa(apiKey);
+  
+  if (enableDetailedLogging) {
+    console.log("[API-DEBUG] API Key encoding:", {
+      originalLength: apiKey.length,
+      encodedLength: encodedApiKey.length,
+      encodedPrefix: encodedApiKey.slice(0, 16) + "...",
+    });
+  }
+  
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-auth-apikey": apiKey,
+    "x-auth-apikey": encodedApiKey,
     "x-auth-signature": signature,
   };
   
@@ -964,10 +975,21 @@ async function drGreenRequestGet(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // API key is already Base64 encoded - send as-is
+  // Per official docs: API key must be Base64 encoded before sending
+  // Buffer.from(apiKey).toString('base64') in Node.js = btoa(apiKey) in Deno
+  const encodedApiKey = btoa(apiKey);
+  
+  if (enableDetailedLogging) {
+    console.log("[API-DEBUG] API Key encoding:", {
+      originalLength: apiKey.length,
+      encodedLength: encodedApiKey.length,
+      encodedPrefix: encodedApiKey.slice(0, 16) + "...",
+    });
+  }
+  
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "x-auth-apikey": apiKey,
+    "x-auth-apikey": encodedApiKey,
     "x-auth-signature": signature,
   };
   
