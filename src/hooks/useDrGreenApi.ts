@@ -482,13 +482,13 @@ export function useDrGreenApi() {
 
   // Add item to Dr. Green server-side cart
   const addToCart = async (cartData: {
-    cartId: string;
+    clientId: string;
     strainId: string;
     quantity: number;
   }) => {
     return callProxy<{
-      cartId: string;
-      items: Array<{ strainId: string; quantity: number }>;
+      success: boolean;
+      cart?: { items: Array<{ strainId: string; quantity: number }> };
     }>('add-to-cart', { data: cartData });
   };
 

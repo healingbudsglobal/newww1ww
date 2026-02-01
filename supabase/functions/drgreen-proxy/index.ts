@@ -2145,6 +2145,57 @@ serve(async (req) => {
         break;
       }
       
+      // Add item to cart - POST /dapp/carts with cart data
+      case "add-to-cart": {
+        const cartData = body.data || {};
+        if (!cartData.clientId && !cartData.cartId) {
+          throw new Error("clientId or cartId is required");
+        }
+        if (!cartData.strainId) {
+          throw new Error("strainId is required");
+        }
+        if (!cartData.quantity || cartData.quantity < 1) {
+          throw new Error("quantity must be at least 1");
+        }
+        // POST /dapp/carts adds an item to the client's cart
+        response = await drGreenRequest("/dapp/carts", "POST", {
+          clientId: cartData.clientId || cartData.cartId,
+          strainId: cartData.strainId,
+          quantity: cartData.quantity,
+        });
+        break;
+      }
+      
+      // Empty/delete cart - DELETE /dapp/carts/:clientId
+      case "empty-cart": {
+        const cartId = body.cartId;
+        if (!cartId) {
+          throw new Error("cartId is required");
+        }
+        if (!validateStringLength(cartId, 100)) {
+          throw new Error("Invalid cart ID format");
+        }
+        // DELETE /dapp/carts/:clientId clears the cart
+        response = await drGreenRequest(`/dapp/carts/${cartId}`, "DELETE");
+        break;
+      }
+      
+      // Place order from cart - POST /dapp/orders with just clientId
+      case "place-order": {
+        const orderData = body.data || {};
+        if (!orderData.clientId) {
+          throw new Error("clientId is required");
+        }
+        if (!validateClientId(orderData.clientId)) {
+          throw new Error("Invalid client ID format");
+        }
+        // POST /dapp/orders creates an order from the cart items
+        response = await drGreenRequest("/dapp/orders", "POST", {
+          clientId: orderData.clientId,
+        });
+        break;
+      }
+      
       case "create-order": {
         response = await drGreenRequest("/dapp/orders", "POST", body.data);
         break;

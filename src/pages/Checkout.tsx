@@ -42,7 +42,7 @@ const Checkout = () => {
       // Step 2: Add each item to Dr. Green server-side cart
       for (const item of cart) {
         const cartResult = await addToCart({
-          cartId: clientId,
+          clientId: clientId,
           strainId: item.strain_id,
           quantity: item.quantity,
         });
@@ -129,9 +129,38 @@ const Checkout = () => {
       });
     } catch (error) {
       console.error('Checkout error:', error);
+      
+      // Parse error message for user-friendly display
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let userFriendlyMessage = 'There was an error processing your order. Please try again.';
+      let errorTitle = 'Order Failed';
+      
+      // Handle specific API error messages
+      if (errorMessage.includes('Client is not active')) {
+        errorTitle = 'Account Not Active';
+        userFriendlyMessage = 'Your account is pending verification. Please wait for admin approval or contact support.';
+      } else if (errorMessage.includes('Client does not have any item in the cart')) {
+        errorTitle = 'Cart Sync Error';
+        userFriendlyMessage = 'There was an issue syncing your cart. Please try again or refresh the page.';
+      } else if (errorMessage.includes('KYC') || errorMessage.includes('kyc')) {
+        errorTitle = 'Verification Required';
+        userFriendlyMessage = 'Your identity verification is incomplete. Please complete the KYC process to continue.';
+      } else if (errorMessage.includes('stock') || errorMessage.includes('Stock') || errorMessage.includes('availability')) {
+        errorTitle = 'Stock Issue';
+        userFriendlyMessage = 'Some items in your cart may no longer be available. Please review your cart and try again.';
+      } else if (errorMessage.includes('payment') || errorMessage.includes('Payment')) {
+        errorTitle = 'Payment Error';
+        userFriendlyMessage = 'There was an issue processing your payment. Please try again or use a different payment method.';
+      } else if (errorMessage.includes('Failed to add')) {
+        errorTitle = 'Cart Error';
+        userFriendlyMessage = errorMessage; // Already descriptive from cart sync
+      } else if (errorMessage) {
+        userFriendlyMessage = errorMessage;
+      }
+      
       toast({
-        title: 'Order Failed',
-        description: error instanceof Error ? error.message : 'There was an error processing your order. Please try again.',
+        title: errorTitle,
+        description: userFriendlyMessage,
         variant: 'destructive',
       });
     } finally {
