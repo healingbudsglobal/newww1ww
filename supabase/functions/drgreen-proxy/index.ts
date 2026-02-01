@@ -1856,7 +1856,8 @@ serve(async (req) => {
         const { clientId } = body || {};
         if (!clientId) throw new Error("clientId is required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
-        response = await drGreenRequest(`/dapp/clients/${clientId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
         break;
       }
       
@@ -1870,7 +1871,8 @@ serve(async (req) => {
           throw new Error("Invalid client ID format");
         }
         // GET /dapp/clients/:clientId returns full client details including shipping
-        response = await drGreenRequest(`/dapp/clients/${clientId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
         break;
       }
       
@@ -1893,7 +1895,8 @@ serve(async (req) => {
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
         
         // GET /dapp/clients/{clientId} returns current adminApproval status
-        response = await drGreenRequest(`/dapp/clients/${clientId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
         break;
       }
       
@@ -1924,7 +1927,8 @@ serve(async (req) => {
         const { orderId } = body || {};
         if (!orderId) throw new Error("orderId is required");
         if (!validateStringLength(orderId, 100)) throw new Error("Invalid order ID format");
-        response = await drGreenRequest(`/dapp/orders/${orderId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/orders/${orderId}`, {});
         break;
       }
       
@@ -2152,7 +2156,8 @@ serve(async (req) => {
         if (!validateStringLength(body.cartId, 100)) {
           throw new Error("Invalid cart ID format");
         }
-        response = await drGreenRequest(`/dapp/carts/${body.cartId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/carts/${body.cartId}`, {});
         break;
       }
       
@@ -2315,7 +2320,8 @@ serve(async (req) => {
         if (!validateStringLength(body.paymentId, 100)) {
           throw new Error("Invalid payment ID format");
         }
-        response = await drGreenRequest(`/dapp/payments/${body.paymentId}`, "GET");
+        // Use query string signing for GET endpoints (fixes 401)
+        response = await drGreenRequestQuery(`/dapp/payments/${body.paymentId}`, {});
         break;
       }
       
