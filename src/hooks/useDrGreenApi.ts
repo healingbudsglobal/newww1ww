@@ -47,11 +47,16 @@ export function useDrGreenApi() {
       price: number;
     }>;
     shippingAddress?: {
-      street?: string;
+      street?: string;     // Maps to address1 in Dr. Green API
+      address1?: string;   // Alternative field name
+      address2?: string;   // Optional secondary address
       city?: string;
       state?: string;
-      zipCode?: string;
+      zipCode?: string;    // Maps to postalCode in Dr. Green API
+      postalCode?: string; // Alternative field name
       country?: string;
+      countryCode?: string; // ISO country code
+      landmark?: string;   // Optional landmark
     };
     notes?: string;
   }) => {

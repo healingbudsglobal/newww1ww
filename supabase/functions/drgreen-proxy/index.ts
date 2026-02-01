@@ -203,6 +203,29 @@ function validateStringLength(value: unknown, maxLength: number): boolean {
 }
 
 /**
+ * Convert country name to ISO 3166-1 alpha-3 code
+ */
+function getCountryCodeFromName(countryName: string | undefined): string {
+  if (!countryName) return '';
+  const name = countryName.toLowerCase().trim();
+  const countryMap: Record<string, string> = {
+    'south africa': 'ZAF',
+    'za': 'ZAF',
+    'portugal': 'PRT',
+    'pt': 'PRT',
+    'united kingdom': 'GBR',
+    'uk': 'GBR',
+    'gb': 'GBR',
+    'thailand': 'THA',
+    'th': 'THA',
+    'united states': 'USA',
+    'usa': 'USA',
+    'us': 'USA',
+  };
+  return countryMap[name] || countryName.toUpperCase();
+}
+
+/**
  * Verify user authentication and return user data
  */
 async function verifyAuthentication(req: Request): Promise<{ user: any; supabaseClient: any } | null> {
@@ -2323,9 +2346,24 @@ serve(async (req) => {
           })),
         };
         
-        // Add optional fields if provided
+        // Add optional fields if provided - normalize shipping address field names
         if (orderData.shippingAddress) {
-          orderPayload.shippingAddress = orderData.shippingAddress;
+          const addr = orderData.shippingAddress;
+          // Handle both frontend naming (street/zipCode) and API naming (address1/postalCode)
+          orderPayload.shippingAddress = {
+            address1: addr.street || addr.address1 || '',
+            address2: addr.address2 || '',
+            landmark: addr.landmark || '',
+            city: addr.city || '',
+            state: addr.state || addr.city || '', // Fallback to city if no state
+            country: addr.country || '',
+            countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+            postalCode: addr.zipCode || addr.postalCode || '',
+          };
+          logInfo("Order includes shipping address", { 
+            city: addr.city, 
+            country: addr.country 
+          });
         }
         if (orderData.notes) {
           orderPayload.notes = orderData.notes;

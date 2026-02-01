@@ -185,6 +185,14 @@ const Checkout = () => {
               quantity: item.quantity,
               price: item.unit_price,
             })),
+            // Include shipping address if available (maps to Dr. Green API format)
+            shippingAddress: shippingAddress ? {
+              street: shippingAddress.address1,
+              city: shippingAddress.city,
+              state: shippingAddress.state || shippingAddress.city,
+              zipCode: shippingAddress.postalCode,
+              country: shippingAddress.country,
+            } : undefined,
           }),
           'Direct order creation'
         );
