@@ -1,79 +1,56 @@
 
+# Plan: Update Migration to Use Correct External Supabase Project
 
-# Fix Dr. Green API Key Double-Encoding Issue
-
-## Problem Identified
-
-The `DRGREEN_API_KEY` secret is correctly stored as a **Base64-encoded public key** (as per Dr. Green API requirements). However, the proxy code is **double-encoding** it:
-
-```
-Current flow:
-1. DRGREEN_API_KEY = "LS0tLS1CRUdJTi..." (232 chars, already Base64)
-2. Code does: btoa(apiKey) → "TFMwdExTMUNS..." (312 chars, double-encoded)
-3. Dr. Green rejects: Cannot decode the double-encoded key
-```
-
-The user-provided credentials are correct:
-- **API Key**: `LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...` (Base64-encoded public key)
-- **Private Key**: `LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t...` (Base64-encoded private key)
-
----
+## Problem
+The migration function is currently hardcoded to query an empty project (`swjifcjdrqtbupoibyfn`). You've provided credentials for a different project (`vczjjhmypsyvpnymijwz`) which likely contains the actual client data including Kayliegh's records.
 
 ## Solution
 
-### 1. Update Secret Value
-Store the provided API key in `DRGREEN_API_KEY`:
-```
-LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUZZd0VBWUhLb1pJemowQ0FRWUZLNEVFQUFvRFFnQUVuN1dKY2l3NEFnSUlKQy9hQnlqdEhnSDEvR0tJWnJwVwo2NnBDcXB1ZndNZzFpUVZuNzdBRTYrTDhDYlZkZHQvQlNURXdLL1ZTT0tPeU1yaGNHUFBnaFE9PQotLS0tLUVORCBQVUJMSUMgS0VZLS0tLS0K
-```
+### Step 1: Update the Migration Edge Function
+**File:** `supabase/functions/migrate-external-clients/index.ts`
 
-### 2. Fix Proxy Code - Remove Double-Encoding
-
-**File: `supabase/functions/drgreen-proxy/index.ts`**
-
-Update both `drGreenRequestBody` (~line 858) and `drGreenRequestGet` (~line 980):
-
+Change the hardcoded external URL from:
 ```typescript
-// BEFORE (wrong - double-encodes)
-const encodedApiKey = btoa(apiKey);
-
-// AFTER (correct - key is already Base64-encoded)
-// The API key from secrets is already Base64-encoded per Dr. Green spec
-const encodedApiKey = apiKey;
+const externalUrl = "https://swjifcjdrqtbupoibyfn.supabase.co";
 ```
 
-Also add a validation check to detect if the key appears to be a raw PEM format (shouldn't happen with correct config):
-
+To:
 ```typescript
-// Validate API key format - should be Base64-encoded, not raw PEM
-if (apiKey.startsWith('-----BEGIN')) {
-  console.error('[API-ERROR] DRGREEN_API_KEY contains raw PEM format. It should be Base64-encoded.');
-  throw new Error('API key misconfigured - contact administrator');
-}
+const externalUrl = "https://vczjjhmypsyvpnymijwz.supabase.co";
 ```
 
----
+### Step 2: Update the External Service Key Secret
+The `EXTERNAL_SUPABASE_SERVICE_KEY` secret currently contains the service role key for the wrong project. It needs to be updated with the service role key for `vczjjhmypsyvpnymijwz`.
+
+**Note:** You provided the anon key in your message. For migration to work (bypassing RLS), we need the **service role key** for this project, not the anon key.
+
+### Step 3: Run the Migration
+After updating:
+1. Deploy the updated edge function
+2. Call the migration endpoint
+3. Verify Kayliegh's data is migrated (drgreen_client_id, KYC status, admin approval)
+
+### Step 4: Verify Dr. Green API Integration
+Once client data is migrated, test the checkout flow to ensure:
+- Client details are fetched correctly
+- Shipping address is retrieved
+- Order creation works end-to-end
+
+## Required Input From You
+To complete this migration, please provide:
+- **The service role key** for project `vczjjhmypsyvpnymijwz` (not the anon key you shared)
+
+The anon key cannot bypass Row Level Security policies, which is required to read all client records.
 
 ## Files to Modify
+| File | Change |
+|------|--------|
+| `supabase/functions/migrate-external-clients/index.ts` | Update `externalUrl` to new project |
+| Supabase Secrets | Update `EXTERNAL_SUPABASE_SERVICE_KEY` with new service role key |
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/drgreen-proxy/index.ts` | Remove `btoa()` calls at lines ~858 and ~980; add format validation |
-
----
-
-## Expected Outcome
-
-After this fix:
-1. API key will be sent as-is (already Base64-encoded): `LS0tLS1CRUdJTi...`
-2. Dr. Green API will correctly decode and validate the public key
-3. DApp endpoints (`/dapp/clients`, `/dapp/orders`, etc.) will return **200 OK** instead of **401 Unauthorized**
-
----
-
-## Testing Plan
-
-1. Deploy updated edge function
-2. Run `api-diagnostics` action to verify both strains AND dapp/clients return 200
-3. Log in as Kayliegh and complete checkout flow
-
+## Testing Checklist
+After implementation:
+1. Invoke `migrate-external-clients` function
+2. Verify Kayliegh's record appears in local `drgreen_clients` table
+3. Test checkout flow with Kayliegh's account
+4. Confirm shipping address loads from Dr. Green API
