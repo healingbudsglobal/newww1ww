@@ -20,7 +20,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
   const { toast } = useToast();
-  const { createOrder, createPayment, getPayment } = useDrGreenApi();
+  const { createOrder, createPayment, getPayment, addToCart, emptyCart, placeOrder } = useDrGreenApi();
   const { saveOrder } = useOrderTracking();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -31,19 +31,32 @@ const Checkout = () => {
     if (!drGreenClient || cart.length === 0) return;
 
     setIsProcessing(true);
-    setPaymentStatus('Creating order...');
+    setPaymentStatus('Syncing cart...');
 
     try {
-      // Step 1: Create order via Dr Green API
-      const orderItems = cart.map((item) => ({
-        strainId: item.strain_id,
-        quantity: item.quantity,
-        unitPrice: item.unit_price,
-      }));
+      const clientId = drGreenClient.drgreen_client_id;
 
-      const orderResult = await createOrder({
-        clientId: drGreenClient.drgreen_client_id,
-        items: orderItems,
+      // Step 1: Empty existing Dr. Green cart to ensure clean state
+      await emptyCart(clientId);
+
+      // Step 2: Add each item to Dr. Green server-side cart
+      for (const item of cart) {
+        const cartResult = await addToCart({
+          cartId: clientId,
+          strainId: item.strain_id,
+          quantity: item.quantity,
+        });
+
+        if (cartResult.error) {
+          throw new Error(`Failed to add ${item.strain_name} to cart: ${cartResult.error}`);
+        }
+      }
+
+      setPaymentStatus('Creating order...');
+
+      // Step 3: Create order from server-side cart
+      const orderResult = await placeOrder({
+        clientId: clientId,
       });
 
       if (orderResult.error || !orderResult.data) {

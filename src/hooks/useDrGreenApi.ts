@@ -476,6 +476,36 @@ export function useDrGreenApi() {
     }>('get-user-nfts');
   };
 
+  // ==========================================
+  // CART MANAGEMENT ENDPOINTS
+  // ==========================================
+
+  // Add item to Dr. Green server-side cart
+  const addToCart = async (cartData: {
+    cartId: string;
+    strainId: string;
+    quantity: number;
+  }) => {
+    return callProxy<{
+      cartId: string;
+      items: Array<{ strainId: string; quantity: number }>;
+    }>('add-to-cart', { data: cartData });
+  };
+
+  // Empty the Dr. Green server-side cart
+  const emptyCart = async (cartId: string) => {
+    return callProxy<{ success: boolean }>('empty-cart', { cartId });
+  };
+
+  // Place order from server-side cart (uses body signing)
+  const placeOrder = async (orderData: { clientId: string }) => {
+    return callProxy<{
+      orderId: string;
+      status: string;
+      totalAmount: number;
+    }>('place-order', { data: orderData });
+  };
+
   return {
     // Existing methods
     createOrder,
@@ -486,6 +516,10 @@ export function useDrGreenApi() {
     getOrders,
     getStrains,
     callProxy,
+    // Cart methods
+    addToCart,
+    emptyCart,
+    placeOrder,
     // Admin methods
     getDashboardSummary,
     getDashboardAnalytics,
