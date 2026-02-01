@@ -371,7 +371,8 @@ export function useDrGreenApi() {
     });
   };
 
-  // Get client details including shipping address
+  // Get client details including shipping address (for the logged-in user)
+  // Uses 'get-my-details' which is ownership-verified (user can only fetch their own data)
   const getClientDetails = async (clientId: string) => {
     return callProxy<{
       id: string;
@@ -390,7 +391,24 @@ export function useDrGreenApi() {
         countryCode: string;
         postalCode: string;
       };
-    }>('dapp-client-details', { clientId });
+    }>('get-my-details', { clientId });
+  };
+
+  // Admin: Update any client's shipping address (bypasses ownership check)
+  const adminUpdateShippingAddress = async (clientId: string, shipping: {
+    address1: string;
+    address2?: string;
+    landmark?: string;
+    city: string;
+    state?: string;
+    country: string;
+    countryCode: string;
+    postalCode: string;
+  }) => {
+    return callProxy<{ success: boolean; message?: string }>('admin-update-shipping-address', { 
+      clientId, 
+      shipping 
+    });
   };
 
   // Activate a client (admin only)
@@ -601,5 +619,6 @@ export function useDrGreenApi() {
     // Shipping address management
     updateShippingAddress,
     getClientDetails,
+    adminUpdateShippingAddress,
   };
 }

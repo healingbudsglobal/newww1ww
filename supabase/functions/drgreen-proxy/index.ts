@@ -89,13 +89,16 @@ const ADMIN_ACTIONS = [
   'update-order', 'update-client', 'delete-client', 'patch-client',
   'activate-client', 'deactivate-client', 'bulk-delete-clients',
   'admin-list-all-clients', // List all clients for debugging
+  'admin-update-shipping-address', // Admin can update any client's address
 ];
 
 // Actions that require ownership verification (user must own the resource)
 const OWNERSHIP_ACTIONS = [
   'get-client', 'get-cart-legacy', 'get-cart',
   'add-to-cart', 'remove-from-cart', 'empty-cart',
-  'place-order', 'get-order', 'get-orders'
+  'place-order', 'get-order', 'get-orders',
+  'get-my-details',           // Users can fetch their own client details
+  'update-shipping-address',  // Users can update their own shipping address
 ];
 
 // Public actions that don't require authentication (minimal - only webhooks/health)
@@ -1857,6 +1860,20 @@ serve(async (req) => {
         break;
       }
       
+      // User fetching their own client details (ownership verified via clientId match)
+      case "get-my-details": {
+        const clientId = body.clientId || body.data?.clientId;
+        if (!clientId) {
+          throw new Error("clientId is required");
+        }
+        if (!validateClientId(clientId)) {
+          throw new Error("Invalid client ID format");
+        }
+        // GET /dapp/clients/:clientId returns full client details including shipping
+        response = await drGreenRequest(`/dapp/clients/${clientId}`, "GET");
+        break;
+      }
+      
       case "dapp-verify-client": {
         // DEPRECATED: The Dr. Green API does NOT support external approval/rejection.
         // The only documented PATCH endpoints are /activate and /deactivate (for isActive status).
@@ -2711,7 +2728,7 @@ serve(async (req) => {
         break;
       }
       
-      // Update shipping address specifically for a client
+      // Update shipping address specifically for a client (ownership-verified action)
       case "update-shipping-address": {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
@@ -2752,6 +2769,56 @@ serve(async (req) => {
         };
         
         logInfo("Updating client shipping address", {
+          clientId: body.clientId,
+          city: shippingPayload.shipping.city,
+          countryCode: shippingPayload.shipping.countryCode,
+        });
+        
+        response = await drGreenRequest(`/dapp/clients/${body.clientId}`, "PATCH", shippingPayload);
+        break;
+      }
+      
+      // Admin: Update any client's shipping address (bypasses ownership check)
+      case "admin-update-shipping-address": {
+        if (!validateClientId(body.clientId)) {
+          throw new Error("Invalid client ID format");
+        }
+        
+        const shipping = body.shipping;
+        if (!shipping || !shipping.address1 || !shipping.city || !shipping.postalCode || !shipping.countryCode) {
+          throw new Error("Invalid shipping address: address1, city, postalCode, and countryCode are required");
+        }
+        
+        // Country code conversion map (Alpha-2 to Alpha-3)
+        const countryCodeMap: Record<string, string> = {
+          PT: 'PRT',
+          GB: 'GBR',
+          ZA: 'ZAF',
+          TH: 'THA',
+          US: 'USA',
+        };
+        
+        // Ensure country code is Alpha-3
+        let alpha3CountryCode = shipping.countryCode;
+        if (countryCodeMap[shipping.countryCode]) {
+          alpha3CountryCode = countryCodeMap[shipping.countryCode];
+        }
+        
+        // Build the shipping object per Dr. Green API spec
+        const shippingPayload = {
+          shipping: {
+            address1: String(shipping.address1).slice(0, 200),
+            address2: String(shipping.address2 || '').slice(0, 200),
+            landmark: String(shipping.landmark || '').slice(0, 100),
+            city: String(shipping.city).slice(0, 100),
+            state: String(shipping.state || shipping.city).slice(0, 100),
+            country: String(shipping.country || '').slice(0, 100),
+            countryCode: alpha3CountryCode,
+            postalCode: String(shipping.postalCode).slice(0, 20),
+          }
+        };
+        
+        logInfo("Admin updating client shipping address", {
           clientId: body.clientId,
           city: shippingPayload.shipping.city,
           countryCode: shippingPayload.shipping.countryCode,
