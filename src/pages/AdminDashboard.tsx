@@ -46,6 +46,8 @@ import { AdminClientManager } from "@/components/admin/AdminClientManager";
 import { ApiDebugPanel } from "@/components/admin/ApiDebugPanel";
 import { ApiTestRunner } from "@/components/admin/ApiTestRunner";
 import { ApiComparisonDashboard } from "@/components/admin/ApiComparisonDashboard";
+import { EnvironmentSelector } from "@/components/admin/EnvironmentSelector";
+import { useApiEnvironment } from "@/context/ApiEnvironmentContext";
 import { useAccount, useDisconnect, useBalance, useChainId } from "wagmi";
 import { useDrGreenKeyOwnership } from "@/hooks/useNFTOwnership";
 import { useWallet } from "@/context/WalletContext";
@@ -80,6 +82,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const { getDashboardSummary, getSalesSummary, getClientsSummary, getDappClients } = useDrGreenApi();
   const { fetchSummary: fetchClientSummary, syncClientsToSupabase, syncing: syncingClients } = useDrGreenClientSync();
+  const { environment, environmentLabel } = useApiEnvironment();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -98,6 +101,13 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadAdminData();
   }, []);
+  
+  // Refresh data when environment changes
+  useEffect(() => {
+    if (!loading) {
+      fetchStats(true);
+    }
+  }, [environment]);
 
   const loadAdminData = async () => {
     try {
@@ -409,15 +419,16 @@ const AdminDashboard = () => {
   return (
     <AdminLayout 
       title="Admin Dashboard" 
-      description="Live data from Dr Green Dapp API • Connected to production"
+      description={`Live data from Dr Green Dapp API • ${environmentLabel}`}
     >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Refresh Button */}
-        <div className="flex justify-end mb-6">
+        {/* Environment Selector & Refresh Button */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <EnvironmentSelector />
           <Button
             variant="outline"
             size="sm"

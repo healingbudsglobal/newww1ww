@@ -22,6 +22,7 @@ import { CursorProvider } from "@/context/CursorContext";
 import { WalletProvider } from "@/providers/WalletProvider";
 import { WalletContextProvider } from "@/context/WalletContext";
 import { TenantProvider } from "@/context/TenantContext";
+import { ApiEnvironmentProvider } from "@/context/ApiEnvironmentContext";
 
 
 // Lazy load pages for better performance
@@ -134,22 +135,24 @@ const App = () => (
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <WalletContextProvider>
-                <ShopProvider>
-                  <CursorFollower>
-                    <Toaster />
-                    <Sonner />
-                    <BrowserRouter>
-                      <TenantProvider>
-                        <SkipLinks />
-                        <ScrollToTop />
-                        <RouteProgress />
-                        <main id="main-content" tabIndex={-1}>
-                          <AnimatedRoutes />
-                        </main>
-                      </TenantProvider>
-                    </BrowserRouter>
-                  </CursorFollower>
-                </ShopProvider>
+                <ApiEnvironmentProvider>
+                  <ShopProvider>
+                    <CursorFollower>
+                      <Toaster />
+                      <Sonner />
+                      <BrowserRouter>
+                        <TenantProvider>
+                          <SkipLinks />
+                          <ScrollToTop />
+                          <RouteProgress />
+                          <main id="main-content" tabIndex={-1}>
+                            <AnimatedRoutes />
+                          </main>
+                        </TenantProvider>
+                      </BrowserRouter>
+                    </CursorFollower>
+                  </ShopProvider>
+                </ApiEnvironmentProvider>
               </WalletContextProvider>
             </TooltipProvider>
           </QueryClientProvider>
