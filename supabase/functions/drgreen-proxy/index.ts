@@ -2427,6 +2427,7 @@ serve(async (req) => {
         }
         
         const clientId = orderData.clientId;
+        let shippingVerified = false;
         
         // Step 1: Update client shipping address (if provided)
         // This is required before adding items to cart
@@ -2455,19 +2456,35 @@ serve(async (req) => {
             const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload);
             if (!shippingResponse.ok) {
               const shippingError = await shippingResponse.clone().text();
-              logWarn("Shipping address update failed (continuing)", { 
+              logWarn("Shipping address update failed", { 
                 status: shippingResponse.status,
                 error: shippingError,
               });
-              // Don't fail - the client may already have shipping on record
             } else {
-              logInfo("Shipping address updated successfully");
+              // Verify the response contains shipping data
+              const responseData = await shippingResponse.clone().json();
+              const returnedShipping = responseData?.data?.shipping || responseData?.shipping;
+              if (returnedShipping && returnedShipping.address1) {
+                logInfo("Shipping address verified in response", { 
+                  address1: returnedShipping.address1,
+                  city: returnedShipping.city,
+                });
+                shippingVerified = true;
+              } else {
+                logWarn("Shipping address not in PATCH response, checking if already saved");
+              }
+              logInfo("Shipping address update successful");
             }
           } catch (shippingErr) {
-            logWarn("Shipping address update threw exception (continuing)", { 
+            logWarn("Shipping address update threw exception", { 
               error: String(shippingErr) 
             });
-            // Continue anyway - address may already exist on client record
+          }
+          
+          // Small delay to ensure API propagation if PATCH succeeded
+          if (shippingVerified) {
+            logInfo("Waiting 500ms for shipping address propagation");
+            await sleep(500);
           }
         }
         
@@ -2488,22 +2505,50 @@ serve(async (req) => {
           itemCount: cartItems.length,
         });
         
-        try {
-          const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
-          if (!cartResponse.ok) {
-            const cartError = await cartResponse.clone().text();
-            logError("Failed to add items to cart", { 
-              status: cartResponse.status,
-              error: cartError,
-            });
-            // If cart fails, we cannot proceed with order
-            response = cartResponse;
-            break;
+        // Retry cart add with backoff in case of propagation delay
+        let cartSuccess = false;
+        let cartAttempts = 0;
+        const maxCartAttempts = 3;
+        
+        while (!cartSuccess && cartAttempts < maxCartAttempts) {
+          cartAttempts++;
+          try {
+            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
+            if (cartResponse.ok) {
+              logInfo("Items added to cart successfully", { attempt: cartAttempts });
+              cartSuccess = true;
+            } else {
+              const cartError = await cartResponse.clone().text();
+              logWarn("Cart add attempt failed", { 
+                attempt: cartAttempts,
+                status: cartResponse.status,
+                error: cartError,
+              });
+              
+              // If shipping address not found and we have more attempts, wait and retry
+              if (cartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
+                const delay = cartAttempts * 1000; // 1s, 2s
+                logInfo(`Waiting ${delay}ms before retry (shipping propagation)`);
+                await sleep(delay);
+              } else {
+                // Final failure
+                response = cartResponse;
+                break;
+              }
+            }
+          } catch (cartErr) {
+            logError("Cart add threw exception", { attempt: cartAttempts, error: String(cartErr) });
+            if (cartAttempts >= maxCartAttempts) {
+              throw new Error(`Failed to add items to cart: ${String(cartErr)}`);
+            }
+            await sleep(1000);
           }
-          logInfo("Items added to cart successfully");
-        } catch (cartErr) {
-          logError("Cart add threw exception", { error: String(cartErr) });
-          throw new Error(`Failed to add items to cart: ${String(cartErr)}`);
+        }
+        
+        // If cart failed after all retries, throw error
+        if (!cartSuccess) {
+          logError("Cart add failed after all retries");
+          throw new Error("Failed to add items to cart after multiple attempts. Client shipping address may not be configured.");
         }
         
         // Step 3: Create order from cart
