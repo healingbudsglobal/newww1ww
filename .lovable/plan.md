@@ -1,97 +1,95 @@
 
-# Fix: Dr. Green API Key Format Handling
 
-## Problem Identified
+# Save Shipping Addresses Locally During Registration
 
-The Dr. Green credentials you provided are in **PEM format wrapped in Base64**:
-- `ApiKey` decodes to: `-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYF...-----END PUBLIC KEY-----`
-- `secretKey` decodes to: `-----BEGIN PRIVATE KEY-----\nMIGE...-----END PRIVATE KEY-----`
+## Overview
+Fix the checkout flow by storing shipping addresses in the local `drgreen_clients` table during patient onboarding. This ensures checkout can always retrieve the address via the local fallback, regardless of Dr. Green API access restrictions.
 
-The current `drgreen-proxy` code sends the `DRGREEN_API_KEY` secret **as-is** to the `x-auth-apikey` header. However, the Dr. Green API rejects this with a `401 Unauthorized` because it's receiving the full Base64-encoded PEM instead of the expected format.
+## Problem
+Currently, the `ClientOnboarding` component:
+1. Collects complete shipping address from the user
+2. Sends it to the Dr. Green API via `buildLegacyClientPayload`
+3. Does NOT save the address to the local `drgreen_clients.shipping_address` column
 
-## Root Cause Analysis
+When checkout tries to fetch client details, the Dr. Green API returns 401 (endpoint-level permission restriction), and the local fallback has no shipping address to return.
 
-The Dr. Green API documentation states:
-> `x-auth-apikey` Type: String (Base64-encoded)
+## Solution
 
-This is ambiguous - it could mean:
-1. The **PEM content** Base64-encoded (what we're sending)
-2. The **raw public key bytes** Base64-encoded (extracted from PEM)
-3. The **PEM body** (just the Base64 part between `-----BEGIN` and `-----END`)
+### File Modified
+`src/components/shop/ClientOnboarding.tsx`
 
-The private key signing is working correctly (the code properly extracts the 32-byte secp256k1 key from the PKCS#8 DER structure). The API key likely needs similar extraction.
+### Changes
 
-## Solution: Extract Public Key from PEM for API Key Header
-
-Modify `drgreen-proxy/index.ts` to detect when `DRGREEN_API_KEY` is Base64-encoded PEM and extract just the PEM body (the inner Base64 content) to send in the header.
-
-### Technical Details
-
-**File: `supabase/functions/drgreen-proxy/index.ts`**
-
-Add logic in `drGreenRequestBody` and `drGreenRequest` functions:
-
+**1. Update Import (Line 7)**
+Add `toAlpha3` to the existing import from `@/lib/drgreenApi`:
 ```typescript
-// Helper to extract PEM body from Base64-encoded PEM
-function extractPemBody(base64EncodedPem: string): string {
-  try {
-    // Decode Base64 to get PEM text
-    const pemText = new TextDecoder().decode(base64ToBytes(base64EncodedPem));
-    
-    if (pemText.includes('-----BEGIN')) {
-      // Extract just the Base64 content between headers
-      const pemBody = pemText
-        .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
-        .replace(/-----END [A-Z0-9 ]+-----/g, '')
-        .replace(/[\r\n\s]/g, '')
-        .trim();
-      return pemBody;
-    }
-    
-    // Not PEM format, return as-is
-    return base64EncodedPem;
-  } catch {
-    // If decoding fails, return as-is
-    return base64EncodedPem;
-  }
-}
+import { buildLegacyClientPayload, toAlpha3 } from '@/lib/drgreenApi';
 ```
 
-Then update the header assignment:
+**2. Add Country Name Helper (After Line 106)**
 ```typescript
-// Before: 
-// const encodedApiKey = apiKey;
-
-// After:
-const encodedApiKey = extractPemBody(apiKey);
+// Map country codes to full names for shipping display
+const getCountryName = (code: string): string => {
+  const countryNames: Record<string, string> = {
+    PT: 'Portugal',
+    GB: 'United Kingdom', 
+    ZA: 'South Africa',
+    TH: 'Thailand',
+  };
+  return countryNames[code] || code;
+};
 ```
 
-This will:
-1. Detect if the stored API key is Base64-encoded PEM
-2. Extract just the inner Base64 key content
-3. Send that to the `x-auth-apikey` header
+**3. Update Supabase Upsert (Lines 806-818)**
+Build shipping address object and include it in the upsert:
 
-### Files to Modify
+```typescript
+// Build shipping address for local storage (ensures checkout fallback works)
+const localShippingAddress = formData.address ? {
+  address1: formData.address.street?.trim() || '',
+  city: formData.address.city?.trim() || '',
+  state: formData.address.state?.trim() || formData.address.city?.trim() || '',
+  country: getCountryName(formData.address.country) || 'Portugal',
+  countryCode: toAlpha3(formData.address.country || 'PT'),
+  postalCode: formData.address.postalCode?.trim() || '',
+} : null;
 
-| File | Change |
-|------|--------|
-| `supabase/functions/drgreen-proxy/index.ts` | Add `extractPemBody()` helper and use it when constructing `x-auth-apikey` header |
+// Store client info locally - only with valid API-provided clientId
+const { error: dbError } = await supabase.from('drgreen_clients').upsert({
+  user_id: user.id,
+  drgreen_client_id: clientId,
+  country_code: formData.address?.country || 'PT',
+  is_kyc_verified: false,
+  admin_approval: 'PENDING',
+  kyc_link: kycLink,
+  email: formData.personal?.email || null,
+  full_name: formData.personal ? `${formData.personal.firstName} ${formData.personal.lastName}`.trim() : null,
+  shipping_address: localShippingAddress,  // NEW: Save address locally
+}, {
+  onConflict: 'user_id',
+});
+```
 
-### Implementation Steps
+## Data Flow After Fix
 
-1. Add `extractPemBody()` helper function near line 200 (with other helper functions)
-2. Modify `drGreenRequestBody()` function (around line 887) to use `extractPemBody(apiKey)` instead of `apiKey` directly
-3. Modify `drGreenRequest()` function (similar logic for GET requests) if it exists with the same pattern
-4. Add logging to confirm the extracted key format for debugging
-5. Deploy and test the checkout flow
+```
+Registration Flow:
+User fills form → API receives data → Local DB stores shipping_address
 
-### Expected Outcome
+Checkout Flow:
+Request client details → API returns 401 → Fallback reads local DB → Returns shipping address ✓
+```
 
-After this change:
-- The `x-auth-apikey` header will contain `MFYwEAYHKoZIzj0CAQYF...` (raw Base64 key)
-- Instead of `LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...` (Base64-encoded PEM)
-- The Dr. Green API should accept the credentials and allow order creation
+## Technical Notes
 
-### Rollback Plan
+- **No database migration needed**: The `shipping_address` JSONB column already exists in `drgreen_clients`
+- **Backwards compatible**: Existing clients (Kayliegh, Scott) already have addresses populated from the manual fix
+- **Proxy unchanged**: The `drgreen-proxy` fallback logic already returns `shipping_address` from local records
+- **Format matches**: Uses same JSONB structure as the API (address1, city, state, country, countryCode, postalCode)
 
-If this doesn't work, the API key format can be reverted by changing `extractPemBody(apiKey)` back to `apiKey`. The secrets don't need to change.
+## Testing Checklist
+- Register a new test patient through the shop
+- Verify `shipping_address` is populated in `drgreen_clients` table
+- Proceed to checkout and confirm address displays correctly
+- Verify existing users (Kayliegh, Scott) still work with their manually-entered addresses
+
