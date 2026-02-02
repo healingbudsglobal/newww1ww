@@ -29,6 +29,32 @@ export function useDrGreenApi() {
         return { data: null, error: error.message };
       }
 
+      // Handle 200-wrapped error responses (for observable error transport)
+      // These have success:false and contain apiStatus/message for debugging
+      if (response && typeof response === 'object' && response.success === false) {
+        const apiStatus = response.apiStatus || response.status;
+        const errorMessage = response.message || response.error || 'Operation failed';
+        const errorCode = response.errorCode || 'UNKNOWN';
+        const requestId = response.requestId || '';
+        
+        // Build detailed error string for debugging
+        const fullError = requestId 
+          ? `${errorMessage} [${errorCode}] (Status ${apiStatus}, Ref: ${requestId})`
+          : `${errorMessage} (Status ${apiStatus})`;
+        
+        console.error('Dr Green API returned error:', {
+          action,
+          apiStatus,
+          errorCode,
+          message: errorMessage,
+          requestId,
+          retryable: response.retryable,
+          stepFailed: response.stepFailed,
+        });
+        
+        return { data: null, error: fullError };
+      }
+
       return { data: response as T, error: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

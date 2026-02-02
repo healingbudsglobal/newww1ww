@@ -99,6 +99,7 @@ const OWNERSHIP_ACTIONS = [
   'place-order', 'get-order', 'get-orders',
   'get-my-details',           // Users can fetch their own client details
   'update-shipping-address',  // Users can update their own shipping address
+  'create-order',             // Users can only create orders for their own clientId
 ];
 
 // Public actions that don't require authentication (minimal - only webhooks/health)
@@ -2472,16 +2473,44 @@ serve(async (req) => {
       // 3. Then order can be created from cart (POST /dapp/orders)
       // This action performs all 3 steps atomically server-side
       case "create-order": {
+        // Generate request ID for traceability
+        const requestId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+        logInfo(`[${requestId}] create-order: Starting order creation flow`);
+        
         const orderData = body.data || {};
         if (!orderData.clientId) {
-          throw new Error("clientId is required");
+          logWarn(`[${requestId}] create-order: Missing clientId`);
+          return new Response(JSON.stringify({
+            success: false,
+            apiStatus: 400,
+            errorCode: 'MISSING_CLIENT_ID',
+            message: 'Client ID is required to create an order',
+            requestId,
+            retryable: false,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
-          throw new Error("items array is required and must not be empty");
+          logWarn(`[${requestId}] create-order: Missing or empty items array`);
+          return new Response(JSON.stringify({
+            success: false,
+            apiStatus: 400,
+            errorCode: 'MISSING_ITEMS',
+            message: 'Items array is required and must not be empty',
+            requestId,
+            retryable: false,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         
         const clientId = orderData.clientId;
+        logInfo(`[${requestId}] create-order: Processing`, { 
+          clientId: clientId.slice(0, 8) + '***',
+          itemCount: orderData.items.length,
+        });
+        
         let shippingVerified = false;
+        let stepFailed = '';
+        let lastStepError = '';
+        let lastStepStatus = 0;
         
         // Step 1: Update client shipping address (if provided)
         // This is required before adding items to cart
@@ -2500,8 +2529,7 @@ serve(async (req) => {
             }
           };
           
-          logInfo("Step 1: Updating client shipping address", { 
-            clientId,
+          logInfo(`[${requestId}] Step 1: Updating client shipping address`, { 
             city: addr.city, 
             country: addr.country 
           });
@@ -2510,49 +2538,39 @@ serve(async (req) => {
             const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload);
             if (!shippingResponse.ok) {
               const shippingError = await shippingResponse.clone().text();
-              logWarn("Shipping address update failed", { 
+              logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
                 status: shippingResponse.status,
-                error: shippingError,
+                error: shippingError.slice(0, 200),
               });
+              // Non-blocking - continue anyway
             } else {
               // Verify the response contains shipping data
               const responseData = await shippingResponse.clone().json();
               const returnedShipping = responseData?.data?.shipping || responseData?.shipping;
               if (returnedShipping && returnedShipping.address1) {
-                logInfo("Shipping address verified in response", { 
+                logInfo(`[${requestId}] Step 1: Shipping verified in response`, { 
                   address1: returnedShipping.address1,
                   city: returnedShipping.city,
                 });
                 shippingVerified = true;
               } else {
-                // Enhanced diagnostic logging for credential scope issues
-                logWarn("Shipping address NOT persisted - likely credential scope issue", {
+                logWarn(`[${requestId}] Step 1: Shipping NOT confirmed in response (credential scope)`, {
                   responseStatus: shippingResponse.status,
-                  responseHasData: !!responseData?.data,
-                  responseKeys: Object.keys(responseData?.data || {}),
-                  clientId: clientId,
-                  shippingVerified: false,
                 });
-                // Log full response for debugging (temporarily for diagnostics)
-                console.log("[DIAGNOSTIC] Full PATCH response:", JSON.stringify(responseData, null, 2));
-                console.log("[DIAGNOSTIC] Sent shipping payload:", JSON.stringify(shippingPayload, null, 2));
               }
-              logInfo("Shipping address update HTTP 200 received");
             }
           } catch (shippingErr) {
-            logWarn("Shipping address update threw exception", { 
-              error: String(shippingErr) 
+            logWarn(`[${requestId}] Step 1: Shipping PATCH exception`, { 
+              error: String(shippingErr).slice(0, 100),
             });
           }
           
           // Always add a delay after PATCH to allow API propagation
-          // Even if shipping wasn't verified in response, the update may still be processing
-          logInfo("Waiting 1500ms for shipping address propagation");
+          logInfo(`[${requestId}] Step 1: Waiting 1500ms for propagation`);
           await sleep(1500);
         }
         
         // Step 2: Add items to server-side cart
-        // The cart must have items before order can be created
         const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number }) => ({
           strainId: item.strainId || item.productId,
           quantity: item.quantity,
@@ -2563,45 +2581,41 @@ serve(async (req) => {
           items: cartItems,
         };
         
-        logInfo("Step 2: Adding items to cart", { 
-          clientId,
-          itemCount: cartItems.length,
-        });
+        logInfo(`[${requestId}] Step 2: Adding items to cart`, { itemCount: cartItems.length });
         
-        // Retry cart add with exponential backoff in case of propagation delay
-        // Use 3 attempts with shorter waits since client may already have shipping from registration
+        // Retry cart add with exponential backoff
         let cartSuccess = false;
         let cartAttempts = 0;
         const maxCartAttempts = 3;
         let lastCartError = "";
+        let lastCartStatus = 0;
         
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
           try {
             const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
+            lastCartStatus = cartResponse.status;
             if (cartResponse.ok) {
-              logInfo("Items added to cart successfully", { attempt: cartAttempts });
+              logInfo(`[${requestId}] Step 2: Cart add success`, { attempt: cartAttempts });
               cartSuccess = true;
             } else {
               lastCartError = await cartResponse.clone().text();
-              logWarn("Cart add attempt failed", { 
+              logWarn(`[${requestId}] Step 2: Cart add failed`, { 
                 attempt: cartAttempts,
                 status: cartResponse.status,
-                error: lastCartError,
+                error: lastCartError.slice(0, 150),
               });
               
-              // If shipping address not found and we have more attempts, wait and retry
               if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1000; // 1s, 2s
-                logInfo(`Waiting ${delay}ms before retry (shipping propagation)`);
+                const delay = cartAttempts * 1000;
+                logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
                 await sleep(delay);
               } else if (cartAttempts >= maxCartAttempts) {
-                // Will try fallback order creation
                 break;
               }
             }
           } catch (cartErr) {
-            logError("Cart add threw exception", { attempt: cartAttempts, error: String(cartErr) });
+            logError(`[${requestId}] Step 2: Cart exception`, { attempt: cartAttempts, error: String(cartErr).slice(0, 100) });
             lastCartError = String(cartErr);
             if (cartAttempts < maxCartAttempts) {
               await sleep(1000);
@@ -2611,84 +2625,119 @@ serve(async (req) => {
         
         // If cart succeeded, create order from cart
         if (cartSuccess) {
-          // Step 3: Create order from cart
-          logInfo("Step 3: Creating order from cart", { clientId });
+          logInfo(`[${requestId}] Step 3: Creating order from cart`);
           
-          const orderPayload = {
+          const orderPayload = { clientId: clientId };
+          
+          try {
+            response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload);
+            
+            if (response.ok) {
+              logInfo(`[${requestId}] Step 3: Order created successfully via cart flow`);
+              // Let normal response handling continue
+              break;
+            } else {
+              const orderError = await response.clone().text();
+              lastStepError = orderError;
+              lastStepStatus = response.status;
+              stepFailed = 'cart-order';
+              logError(`[${requestId}] Step 3: Cart-order creation failed`, { 
+                status: response.status,
+                error: orderError.slice(0, 150),
+              });
+              // Fall through to return wrapped error
+            }
+          } catch (orderErr) {
+            lastStepError = String(orderErr);
+            lastStepStatus = 500;
+            stepFailed = 'cart-order-exception';
+            logError(`[${requestId}] Step 3: Cart-order exception`, { error: lastStepError.slice(0, 100) });
+          }
+        } else {
+          stepFailed = 'cart-add';
+          lastStepError = lastCartError;
+          lastStepStatus = lastCartStatus;
+        }
+        
+        // FALLBACK: Try direct order creation with items
+        if (!cartSuccess || stepFailed) {
+          logInfo(`[${requestId}] Step 3 (Fallback): Attempting direct order creation`, { 
+            cartFailed: !cartSuccess,
+            previousStep: stepFailed,
+          });
+          
+          const directOrderPayload = {
             clientId: clientId,
+            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
+              strainId: item.strainId,
+              quantity: item.quantity,
+            })),
           };
           
-          response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload);
-          
-          if (response.ok) {
-            logInfo("Order created successfully via cart flow");
-          } else {
-            const orderError = await response.clone().text();
-            logError("Order creation failed", { 
-              status: response.status,
-              error: orderError,
-            });
+          try {
+            response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload);
+            
+            if (response.ok) {
+              logInfo(`[${requestId}] Step 3 (Fallback): Direct order created successfully`);
+              break; // Success - let normal response handling continue
+            } else {
+              const directError = await response.clone().text();
+              lastStepError = directError;
+              lastStepStatus = response.status;
+              stepFailed = 'direct-order';
+              logError(`[${requestId}] Step 3 (Fallback): Direct order failed`, { 
+                status: response.status,
+                error: directError.slice(0, 150),
+              });
+            }
+          } catch (directErr) {
+            lastStepError = String(directErr);
+            lastStepStatus = 500;
+            stepFailed = 'direct-order-exception';
+            logError(`[${requestId}] Step 3 (Fallback): Direct order exception`, { error: lastStepError.slice(0, 100) });
           }
-          break;
         }
         
-        // FALLBACK: If cart failed (likely due to shipping permission issue), try direct order creation
-        // Some Dr. Green API configurations support creating orders directly with items
-        logInfo("Step 3 (Fallback): Attempting direct order creation", { 
-          clientId,
-          cartFailed: true,
-          lastError: lastCartError.substring(0, 100),
+        // If we reach here, all attempts failed - return 200-wrapped error for observability
+        const isShippingError = lastStepError.includes("shipping");
+        const isAuthError = lastStepStatus === 401 || lastStepStatus === 403;
+        const isClientInactive = lastStepError.includes("not active") || lastStepError.includes("inactive");
+        
+        let userMessage = 'Order creation failed. Please try again or contact support.';
+        let errorCode = 'ORDER_CREATION_FAILED';
+        let retryable = lastStepStatus >= 500;
+        
+        if (isShippingError) {
+          userMessage = 'Shipping address could not be verified. Please update your address and try again.';
+          errorCode = 'SHIPPING_ADDRESS_REQUIRED';
+          retryable = false;
+        } else if (isAuthError) {
+          userMessage = 'Authorization failed. Your session may have expired or credentials are invalid.';
+          errorCode = 'AUTH_FAILED';
+          retryable = false;
+        } else if (isClientInactive) {
+          userMessage = 'Your account is not active. Please wait for verification or contact support.';
+          errorCode = 'CLIENT_INACTIVE';
+          retryable = false;
+        }
+        
+        logError(`[${requestId}] create-order: All attempts failed`, {
+          stepFailed,
+          lastStepStatus,
+          errorCode,
+          retryable,
         });
         
-        // Build direct order payload with items included
-        const directOrderPayload = {
-          clientId: clientId,
-          items: cartItems.map((item: { strainId: string; quantity: number }) => ({
-            strainId: item.strainId,
-            quantity: item.quantity,
-          })),
-        };
-        
-        try {
-          response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload);
-          
-          if (response.ok) {
-            logInfo("Order created successfully via direct order (fallback)");
-          } else {
-            const directError = await response.clone().text();
-            logWarn("Direct order creation also failed", { 
-              status: response.status,
-              error: directError,
-            });
-            
-            // Check if the error indicates shipping is truly required on their end
-            const isShippingError = lastCartError.includes("shipping") || directError.includes("shipping");
-            
-            // Provide actionable error message
-            if (isShippingError) {
-              throw new Error(
-                "The Dr. Green system requires your shipping address to be set up. " +
-                "This may need to be configured in the Dr. Green portal. " +
-                "Please contact support for assistance."
-              );
-            } else {
-              // Generic order failure
-              throw new Error(`Order creation failed: ${directError.substring(0, 150)}`);
-            }
-          }
-        } catch (directErr) {
-          // If it's already our custom error, re-throw
-          if (directErr instanceof Error && directErr.message.includes("Dr. Green")) {
-            throw directErr;
-          }
-          logError("Direct order creation threw exception", { error: String(directErr) });
-          throw new Error(
-            "Unable to complete your order at this time. " +
-            "The Dr. Green system may be temporarily unavailable. " +
-            "Please try again later or contact support."
-          );
-        }
-        break;
+        return new Response(JSON.stringify({
+          success: false,
+          apiStatus: lastStepStatus || 500,
+          errorCode,
+          message: userMessage,
+          requestId,
+          stepFailed,
+          retryable,
+          upstream: lastStepError.slice(0, 300),
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
       
       case "get-order": {

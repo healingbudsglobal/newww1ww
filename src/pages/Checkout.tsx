@@ -19,29 +19,54 @@ import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
 import { formatPrice, getCurrencyForCountry } from '@/lib/currency';
 
-// Retry utility with exponential backoff
+// Retry utility with exponential backoff - preserves real error messages
 async function retryOperation<T>(
   operation: () => Promise<{ data: T | null; error: string | null }>,
   operationName: string,
   maxRetries: number = 3
 ): Promise<{ data: T | null; error: string | null }> {
+  let lastError: string | null = null;
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const result = await operation();
+    
     if (!result.error) return result;
     
-    // Don't retry on client errors (400-level validation issues)
-    if (result.error.includes('400') || result.error.includes('validation') || result.error.includes('required')) {
-      console.warn(`${operationName}: Non-retryable error`, result.error);
+    // Store the actual error for potential return
+    lastError = result.error;
+    console.log(`[${operationName}] Attempt ${attempt}/${maxRetries} error:`, result.error);
+    
+    // Check for non-retryable status codes and error patterns
+    // Status 400/401/403/422 = client errors, don't retry
+    const nonRetryablePatterns = [
+      'Status 400', 'Status 401', 'Status 403', 'Status 422',
+      'validation', 'required', 'MISSING_', 'AUTH_FAILED',
+      'CLIENT_INACTIVE', 'SHIPPING_ADDRESS_REQUIRED', 'not active',
+      'retryable: false', 'retryable":false'
+    ];
+    
+    const isNonRetryable = nonRetryablePatterns.some(pattern => 
+      result.error?.toLowerCase().includes(pattern.toLowerCase())
+    );
+    
+    if (isNonRetryable) {
+      console.warn(`[${operationName}] Non-retryable error detected:`, result.error);
       return result;
     }
     
+    // Retry for potentially transient errors (5xx, timeouts, network issues)
     if (attempt < maxRetries) {
       const delay = Math.pow(2, attempt) * 500; // 1s, 2s, 4s
-      console.log(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
+      console.log(`[${operationName}] Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  return { data: null, error: `${operationName} failed after ${maxRetries} attempts` };
+  
+  // Return the last real error, not a generic message
+  return { 
+    data: null, 
+    error: lastError || `${operationName} failed after ${maxRetries} attempts` 
+  };
 }
 
 const Checkout = () => {
