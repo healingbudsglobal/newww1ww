@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { buildLegacyClientPayload } from '@/lib/drgreenApi';
+import { buildLegacyClientPayload, toAlpha3 } from '@/lib/drgreenApi';
 import { 
   isMockModeEnabled, 
   createMockClientResponse, 
@@ -103,6 +103,17 @@ const DEFAULT_MINIMUM_AGE = 21; // Conservative fallback
 // Get minimum age for a country
 const getMinimumAge = (countryCode: string): number => {
   return legalAgeByCountry[countryCode] || DEFAULT_MINIMUM_AGE;
+};
+
+// Map country codes to full names for shipping display
+const getCountryName = (code: string): string => {
+  const countryNames: Record<string, string> = {
+    PT: 'Portugal',
+    GB: 'United Kingdom',
+    ZA: 'South Africa',
+    TH: 'Thailand',
+  };
+  return countryNames[code] || code;
 };
 
 // Create personal details schema with country-specific age validation
@@ -803,6 +814,16 @@ export function ClientOnboarding() {
       clearInterval(progressInterval);
       setKycProgress(100);
 
+      // Build shipping address for local storage (ensures checkout fallback works)
+      const localShippingAddress = formData.address ? {
+        address1: formData.address.street?.trim() || '',
+        city: formData.address.city?.trim() || '',
+        state: formData.address.city?.trim() || '', // Use city as state fallback (address form doesn't have state field)
+        country: getCountryName(formData.address.country) || 'Portugal',
+        countryCode: toAlpha3(formData.address.country || 'PT'),
+        postalCode: formData.address.postalCode?.trim() || '',
+      } : null;
+
       // Store client info locally - only with valid API-provided clientId
       const { error: dbError } = await supabase.from('drgreen_clients').upsert({
         user_id: user.id,
@@ -813,6 +834,7 @@ export function ClientOnboarding() {
         kyc_link: kycLink,
         email: formData.personal?.email || null,
         full_name: formData.personal ? `${formData.personal.firstName} ${formData.personal.lastName}`.trim() : null,
+        shipping_address: localShippingAddress,
       }, {
         onConflict: 'user_id',
       });
