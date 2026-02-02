@@ -14,14 +14,32 @@ const countryCodeMap: Record<string, string> = {
   US: 'USA',
 };
 
+// Storage key for persisted environment selection
+const ENV_STORAGE_KEY = 'hb-api-environment';
+
+// Get current environment from localStorage (for non-React contexts)
+function getCurrentEnvironment(): string {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(ENV_STORAGE_KEY);
+    if (stored && ['production', 'staging', 'railway'].includes(stored)) {
+      return stored;
+    }
+  }
+  return 'production';
+}
+
 export function useDrGreenApi() {
   const callProxy = async <T = unknown>(
     action: string,
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
+    overrideEnv?: string
   ): Promise<DrGreenResponse<T>> => {
     try {
+      // Use override env if provided, otherwise get from localStorage
+      const env = overrideEnv || getCurrentEnvironment();
+      
       const { data: response, error } = await supabase.functions.invoke('drgreen-proxy', {
-        body: { action, ...data },
+        body: { action, env, ...data },
       });
 
       if (error) {
@@ -44,6 +62,7 @@ export function useDrGreenApi() {
         
         console.error('Dr Green API returned error:', {
           action,
+          env,
           apiStatus,
           errorCode,
           message: errorMessage,
