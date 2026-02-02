@@ -316,13 +316,13 @@ const Auth = () => {
                     <DropdownMenuContent align="center" className="w-56">
                       <DropdownMenuItem
                         onClick={() => {
-                          setEmail("scott@healingbuds.global");
+                          setEmail("admin@healingbuds.test");
                           setPassword("Healing2025!");
                         }}
                         className="cursor-pointer"
                       >
                         <Shield className="w-4 h-4 mr-2 text-primary" />
-                        Admin (Scott)
+                        Admin (Test)
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
