@@ -1582,8 +1582,17 @@ serve(async (req) => {
       // Create client with legacy payload format - exact Dr. Green API schema
       // Per API docs: POST /dapp/clients with exact field structure
       case "create-client-legacy": {
+        console.log("[create-client-legacy] ========== STARTING HANDLER ==========");
+        console.log("[create-client-legacy] Request received at:", new Date().toISOString());
+        console.log("[create-client-legacy] Has body.payload:", !!body?.payload);
+        console.log("[create-client-legacy] Payload keys:", body?.payload ? Object.keys(body.payload) : "none");
+        
         const legacyPayload = body?.payload;
-        if (!legacyPayload) throw new Error("Payload is required for client creation");
+        if (!legacyPayload) {
+          console.log("[create-client-legacy] ERROR: No payload provided");
+          throw new Error("Payload is required for client creation");
+        }
+        console.log("[create-client-legacy] Payload validation passed, proceeding with email:", legacyPayload.email?.slice(0, 3) + "***");
         
         // Validate required fields
         if (!validateEmail(legacyPayload.email)) {
