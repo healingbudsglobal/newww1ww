@@ -1,105 +1,97 @@
 
+# Fix: Dr. Green API Key Format Handling
 
-# Fix: Dr. Green API Credential Verification for Order Creation
+## Problem Identified
 
-## Problem Summary
+The Dr. Green credentials you provided are in **PEM format wrapped in Base64**:
+- `ApiKey` decodes to: `-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYF...-----END PUBLIC KEY-----`
+- `secretKey` decodes to: `-----BEGIN PRIVATE KEY-----\nMIGE...-----END PRIVATE KEY-----`
 
-The order creation flow is failing because the shipping address PATCH request returns `200 OK` but **does not persist** the data. The subsequent cart and order steps fail with "Client shipping address not found."
+The current `drgreen-proxy` code sends the `DRGREEN_API_KEY` secret **as-is** to the `x-auth-apikey` header. However, the Dr. Green API rejects this with a `401 Unauthorized` because it's receiving the full Base64-encoded PEM instead of the expected format.
 
-**Technical Diagnosis:**
-- PATCH to `/dapp/clients/{clientId}` returns HTTP 200
-- Response body does NOT contain shipping data (`shippingVerified = false`)
-- This indicates the API accepted the request but the credentials lack write permissions for this client record
+## Root Cause Analysis
 
-## Root Cause: NFT-Scoped API Access Control
+The Dr. Green API documentation states:
+> `x-auth-apikey` Type: String (Base64-encoded)
 
-The Dr. Green API enforces **NFT-scoped access control**:
-- Clients are created "against the primary NFT selected in the dApp" (per API docs)
-- Only API credentials tied to the NFT that created the client can modify that client's record
-- The `DRGREEN_API_KEY` and `DRGREEN_PRIVATE_KEY` currently stored in secrets may not match the wallet `0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84`
+This is ambiguous - it could mean:
+1. The **PEM content** Base64-encoded (what we're sending)
+2. The **raw public key bytes** Base64-encoded (extracted from PEM)
+3. The **PEM body** (just the Base64 part between `-----BEGIN` and `-----END`)
 
-The API silently accepts the PATCH but doesn't persist changes because it's a "soft failure" - the request is syntactically valid but the credential scope doesn't authorize the modification.
+The private key signing is working correctly (the code properly extracts the 32-byte secp256k1 key from the PKCS#8 DER structure). The API key likely needs similar extraction.
 
----
+## Solution: Extract Public Key from PEM for API Key Header
 
-## Solution Options
+Modify `drgreen-proxy/index.ts` to detect when `DRGREEN_API_KEY` is Base64-encoded PEM and extract just the PEM body (the inner Base64 content) to send in the header.
 
-### Option A: Verify & Update API Credentials (Recommended)
-
-**Action Required (Non-code change):**
-
-1. Log into the Dr. Green dApp dashboard at [https://dapp.drgreennft.com](https://dapp.drgreennft.com)
-2. Connect wallet `0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84`
-3. Navigate to API Settings / Credentials section
-4. Generate new API Key and Private Key pair
-5. Update the Lovable Cloud secrets:
-   - `DRGREEN_API_KEY` → New Base64-encoded API key
-   - `DRGREEN_PRIVATE_KEY` → New Base64-encoded private key (secp256k1 PKCS#8 format)
-6. Re-test the checkout flow
-
-This is a configuration change, not a code change.
-
----
-
-### Option B: Add Detailed API Credential Diagnostics (Code Change)
-
-If Option A doesn't resolve the issue, add diagnostic logging to identify exactly what the API is returning:
+### Technical Details
 
 **File: `supabase/functions/drgreen-proxy/index.ts`**
 
-Modify the `create-order` PATCH step to log the full response body when shipping is not verified:
+Add logic in `drGreenRequestBody` and `drGreenRequest` functions:
 
 ```typescript
-// After PATCH response
-if (returnedShipping && returnedShipping.address1) {
-  logInfo("Shipping address verified in response");
-  shippingVerified = true;
-} else {
-  // Enhanced diagnostic logging
-  logWarn("Shipping address NOT persisted - likely credential scope issue", {
-    responseStatus: shippingResponse.status,
-    responseHasData: !!responseData?.data,
-    responseKeys: Object.keys(responseData?.data || {}),
-    clientId: clientId,
-  });
-  // Log full response for debugging (temporarily)
-  console.log("[DIAGNOSTIC] Full PATCH response:", JSON.stringify(responseData, null, 2));
+// Helper to extract PEM body from Base64-encoded PEM
+function extractPemBody(base64EncodedPem: string): string {
+  try {
+    // Decode Base64 to get PEM text
+    const pemText = new TextDecoder().decode(base64ToBytes(base64EncodedPem));
+    
+    if (pemText.includes('-----BEGIN')) {
+      // Extract just the Base64 content between headers
+      const pemBody = pemText
+        .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
+        .replace(/-----END [A-Z0-9 ]+-----/g, '')
+        .replace(/[\r\n\s]/g, '')
+        .trim();
+      return pemBody;
+    }
+    
+    // Not PEM format, return as-is
+    return base64EncodedPem;
+  } catch {
+    // If decoding fails, return as-is
+    return base64EncodedPem;
+  }
 }
 ```
 
-This will provide visibility into exactly what the Dr. Green API returns when the shipping update "succeeds" but doesn't persist.
+Then update the header assignment:
+```typescript
+// Before: 
+// const encodedApiKey = apiKey;
 
----
+// After:
+const encodedApiKey = extractPemBody(apiKey);
+```
 
-### Option C: Alternative Order Flow (Fallback)
+This will:
+1. Detect if the stored API key is Base64-encoded PEM
+2. Extract just the inner Base64 key content
+3. Send that to the `x-auth-apikey` header
 
-If credential issues cannot be resolved, implement an alternative flow that:
-1. Uses the Dr. Green Admin Portal to manually update shipping addresses
-2. Stores shipping locally in Supabase and includes it in order notes
-3. Contacts Dr. Green support to investigate the permission model
+### Files to Modify
 
----
+| File | Change |
+|------|--------|
+| `supabase/functions/drgreen-proxy/index.ts` | Add `extractPemBody()` helper and use it when constructing `x-auth-apikey` header |
 
-## Recommended Next Steps
+### Implementation Steps
 
-1. **Immediate**: Verify the `DRGREEN_API_KEY` and `DRGREEN_PRIVATE_KEY` were generated from the wallet `0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84`
+1. Add `extractPemBody()` helper function near line 200 (with other helper functions)
+2. Modify `drGreenRequestBody()` function (around line 887) to use `extractPemBody(apiKey)` instead of `apiKey` directly
+3. Modify `drGreenRequest()` function (similar logic for GET requests) if it exists with the same pattern
+4. Add logging to confirm the extracted key format for debugging
+5. Deploy and test the checkout flow
 
-2. **If credentials are correct**: Add diagnostic logging (Option B) to capture the full API response
+### Expected Outcome
 
-3. **If credentials need updating**: Generate fresh keys from the Dr. Green dashboard while connected with the correct wallet
+After this change:
+- The `x-auth-apikey` header will contain `MFYwEAYHKoZIzj0CAQYF...` (raw Base64 key)
+- Instead of `LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...` (Base64-encoded PEM)
+- The Dr. Green API should accept the credentials and allow order creation
 
----
+### Rollback Plan
 
-## Technical Context
-
-| Item | Value |
-|------|-------|
-| Client ID | `47542db8-3982-4204-bd32-2f36617c5d3d` |
-| Client Email | `kayliegh.sm@gmail.com` |
-| KYC Status | `VERIFIED` |
-| Admin Approval | `VERIFIED` |
-| Expected Wallet | `0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84` |
-| API Endpoint | `https://api.drgreennft.com/api/v1` |
-
-The local Supabase `drgreen_clients` record is correctly linked and verified. The issue is exclusively at the Dr. Green API credential/permission layer.
-
+If this doesn't work, the API key format can be reverted by changing `extractPemBody(apiKey)` back to `apiKey`. The secrets don't need to change.
