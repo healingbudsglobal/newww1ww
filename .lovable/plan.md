@@ -1,51 +1,17 @@
-
 # Plan: Add Railway Environment to drgreen-proxy
+
+## Status: ✅ COMPLETED
 
 ## Objective
 Add a third `railway` environment to `drgreen-proxy` to match the configuration in `drgreen-comparison`, enabling switching between all three API environments.
 
-## Current State
+## Final State
 
 | Environment | Status in drgreen-proxy | Status in drgreen-comparison |
 |-------------|-------------------------|------------------------------|
 | production | ✅ Configured | ✅ Configured |
 | staging | ✅ Configured | ✅ Configured |
-| railway | ❌ Missing | ✅ Configured |
-
-## Changes Required
-
-### File: `supabase/functions/drgreen-proxy/index.ts`
-
-#### 1. Add Railway Environment to ENV_CONFIG (after line 364)
-
-Add the railway configuration matching `drgreen-comparison`:
-
-```typescript
-const ENV_CONFIG: Record<string, EnvConfig> = {
-  production: {
-    apiUrl: 'https://api.drgreennft.com/api/v1',
-    apiKeyEnv: 'DRGREEN_API_KEY',
-    privateKeyEnv: 'DRGREEN_PRIVATE_KEY',
-    name: 'Production',
-  },
-  staging: {
-    apiUrl: getStagingApiUrl(),
-    apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
-    privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
-    name: 'Staging (Official)',
-  },
-  railway: {
-    apiUrl: 'https://budstack-backend-main-development.up.railway.app/api/v1',
-    apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
-    privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
-    name: 'Railway (Dev)',
-  },
-};
-```
-
-#### 2. Update `test-staging` Action
-
-Modify the existing `test-staging` action to test all three environments and report connectivity status for each.
+| railway | ✅ Configured | ✅ Configured |
 
 ## Configuration Details
 
@@ -57,7 +23,7 @@ Modify the existing `test-staging` action to test all three environments and rep
 
 **Note**: Railway uses the same credentials as staging (both are development environments).
 
-## Usage After Implementation
+## Usage
 
 ### Switch environment per request:
 ```json
@@ -71,15 +37,23 @@ Modify the existing `test-staging` action to test all three environments and rep
 {"action": "test-staging"}
 ```
 
-## Testing Plan
-1. Deploy updated edge function
-2. Run `test-staging` action to verify all three environments
-3. Test `get-strains` with each `env` value
-4. Verify `/dapp/clients` endpoints on Railway (may have different permissions)
+The `test-staging` action now tests all three environments and provides a summary of which endpoints work in each.
 
-## File to Modify
+## Changes Made
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/drgreen-proxy/index.ts` | Add railway to ENV_CONFIG, update test-staging action |
-| `.lovable/plan.md` | Update documentation with three-environment support |
+### File: `supabase/functions/drgreen-proxy/index.ts`
+
+1. Added `railway` environment to `ENV_CONFIG`:
+   ```typescript
+   railway: {
+     apiUrl: 'https://budstack-backend-main-development.up.railway.app/api/v1',
+     apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
+     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
+     name: 'Railway (Dev)',
+   },
+   ```
+
+2. Updated `test-staging` action to:
+   - Test all three environments (production, staging, railway)
+   - Test both `/strains` and `/dapp/clients` endpoints per environment
+   - Provide per-environment summary with recommendations

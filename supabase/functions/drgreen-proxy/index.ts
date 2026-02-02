@@ -360,7 +360,13 @@ const ENV_CONFIG: Record<string, EnvConfig> = {
     apiUrl: getStagingApiUrl(),
     apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
-    name: 'Staging',
+    name: 'Staging (Official)',
+  },
+  railway: {
+    apiUrl: 'https://budstack-backend-main-development.up.railway.app/api/v1',
+    apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
+    privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
+    name: 'Railway (Dev)',
   },
 };
 
@@ -1347,14 +1353,17 @@ serve(async (req) => {
       });
     }
     
-    // Test staging environment - verify staging credentials work
+    // Test all environments - verify credentials work for production, staging, and railway
     if (action === 'test-staging') {
-      console.log("[drgreen-proxy] Testing staging environment credentials...");
+      console.log("[drgreen-proxy] Testing all environment credentials...");
       
-      const stagingEnv = ENV_CONFIG.staging;
-      const { apiKey: stagingApiKey, privateKey: stagingPrivateKey } = getEnvCredentials(stagingEnv);
       const prodEnv = ENV_CONFIG.production;
+      const stagingEnv = ENV_CONFIG.staging;
+      const railwayEnv = ENV_CONFIG.railway;
+      
       const { apiKey: prodApiKey, privateKey: prodPrivateKey } = getEnvCredentials(prodEnv);
+      const { apiKey: stagingApiKey, privateKey: stagingPrivateKey } = getEnvCredentials(stagingEnv);
+      const { apiKey: railwayApiKey, privateKey: railwayPrivateKey } = getEnvCredentials(railwayEnv);
       
       const result: Record<string, unknown> = {
         timestamp: new Date().toISOString(),
@@ -1376,43 +1385,61 @@ serve(async (req) => {
             apiKeyLength: stagingApiKey?.length || 0,
             apiKeyPrefix: stagingApiKey ? stagingApiKey.slice(0, 8) + '...' : 'N/A',
           },
+          railway: {
+            name: railwayEnv.name,
+            apiUrl: railwayEnv.apiUrl,
+            apiKeyConfigured: !!railwayApiKey,
+            privateKeyConfigured: !!railwayPrivateKey,
+            apiKeyLength: railwayApiKey?.length || 0,
+            apiKeyPrefix: railwayApiKey ? railwayApiKey.slice(0, 8) + '...' : 'N/A',
+          },
         },
         tests: [] as Record<string, unknown>[],
       };
       
-      // Test staging environment if credentials exist
-      if (stagingApiKey && stagingPrivateKey) {
+      // Helper to test an environment
+      async function testEnvironment(envConfig: EnvConfig, envName: string, apiKey: string | undefined, privateKey: string | undefined) {
+        if (!apiKey || !privateKey) {
+          (result.tests as Record<string, unknown>[]).push({
+            environment: envName,
+            endpoint: 'N/A',
+            error: 'Credentials not configured',
+            success: false,
+          });
+          return;
+        }
+        
         try {
-          console.log("[drgreen-proxy] Testing staging GET /strains...");
-          const stagingResponse = await drGreenRequestGet("/strains", { take: 1, countryCode: 'ZAF' }, true, stagingEnv);
-          const stagingBody = await stagingResponse.clone().text();
+          console.log(`[drgreen-proxy] Testing ${envName} GET /strains...`);
+          const response = await drGreenRequestGet("/strains", { take: 1, countryCode: 'ZAF' }, envName !== 'production', envConfig);
+          const body = await response.clone().text();
           
           (result.tests as Record<string, unknown>[]).push({
-            environment: 'staging',
+            environment: envName,
             endpoint: 'GET /strains',
-            status: stagingResponse.status,
-            success: stagingResponse.ok,
-            responsePreview: stagingBody.slice(0, 300),
+            status: response.status,
+            success: response.ok,
+            responsePreview: body.slice(0, 300),
           });
           
-          // If strains work, try clients summary
-          if (stagingResponse.ok) {
+          // If strains work, try clients endpoint
+          if (response.ok) {
             try {
-              console.log("[drgreen-proxy] Testing staging GET /dapp/clients/summary...");
-              const clientsResponse = await drGreenRequestGet("/dapp/clients/summary", {}, true, stagingEnv);
+              console.log(`[drgreen-proxy] Testing ${envName} GET /dapp/clients...`);
+              const clientsResponse = await drGreenRequestGet("/dapp/clients", { take: 1 }, envName !== 'production', envConfig);
               const clientsBody = await clientsResponse.clone().text();
               
               (result.tests as Record<string, unknown>[]).push({
-                environment: 'staging',
-                endpoint: 'GET /dapp/clients/summary',
+                environment: envName,
+                endpoint: 'GET /dapp/clients',
                 status: clientsResponse.status,
                 success: clientsResponse.ok,
                 responsePreview: clientsBody.slice(0, 300),
               });
             } catch (e) {
               (result.tests as Record<string, unknown>[]).push({
-                environment: 'staging',
-                endpoint: 'GET /dapp/clients/summary',
+                environment: envName,
+                endpoint: 'GET /dapp/clients',
                 error: e instanceof Error ? e.message : String(e),
                 success: false,
               });
@@ -1420,31 +1447,7 @@ serve(async (req) => {
           }
         } catch (e) {
           (result.tests as Record<string, unknown>[]).push({
-            environment: 'staging',
-            endpoint: 'GET /strains',
-            error: e instanceof Error ? e.message : String(e),
-            success: false,
-          });
-        }
-      } else {
-        result.stagingError = 'Staging credentials not configured';
-      }
-      
-      // Also test production for comparison
-      if (prodApiKey && prodPrivateKey) {
-        try {
-          console.log("[drgreen-proxy] Testing production GET /strains for comparison...");
-          const prodResponse = await drGreenRequestGet("/strains", { take: 1, countryCode: 'ZAF' }, false, prodEnv);
-          
-          (result.tests as Record<string, unknown>[]).push({
-            environment: 'production',
-            endpoint: 'GET /strains',
-            status: prodResponse.status,
-            success: prodResponse.ok,
-          });
-        } catch (e) {
-          (result.tests as Record<string, unknown>[]).push({
-            environment: 'production',
+            environment: envName,
             endpoint: 'GET /strains',
             error: e instanceof Error ? e.message : String(e),
             success: false,
@@ -1452,18 +1455,35 @@ serve(async (req) => {
         }
       }
       
-      // Summary
-      const stagingTests = (result.tests as Record<string, unknown>[]).filter(t => t.environment === 'staging');
-      const prodTests = (result.tests as Record<string, unknown>[]).filter(t => t.environment === 'production');
+      // Test all three environments
+      await testEnvironment(prodEnv, 'production', prodApiKey, prodPrivateKey);
+      await testEnvironment(stagingEnv, 'staging', stagingApiKey, stagingPrivateKey);
+      await testEnvironment(railwayEnv, 'railway', railwayApiKey, railwayPrivateKey);
+      
+      // Summary per environment
+      const envSummary = (envName: string) => {
+        const tests = (result.tests as Record<string, unknown>[]).filter(t => t.environment === envName);
+        const strainsTest = tests.find(t => t.endpoint === 'GET /strains');
+        const clientsTest = tests.find(t => t.endpoint === 'GET /dapp/clients');
+        const firstTestError = tests[0]?.error as string | undefined;
+        return {
+          configured: tests.length > 0 && !(firstTestError?.includes('not configured')),
+          strainsWorking: strainsTest?.success === true,
+          clientsWorking: clientsTest?.success === true,
+        };
+      };
       
       result.summary = {
-        stagingWorking: stagingTests.some(t => t.success === true),
-        productionWorking: prodTests.some(t => t.success === true),
-        recommendation: stagingTests.some(t => t.success === true) 
-          ? 'Staging credentials work! You can use env: "staging" in requests.'
-          : stagingApiKey 
-            ? 'Staging credentials configured but API calls failing. Check credentials.'
-            : 'No staging credentials configured. Add DRGREEN_STAGING_API_KEY and DRGREEN_STAGING_PRIVATE_KEY.',
+        production: envSummary('production'),
+        staging: envSummary('staging'),
+        railway: envSummary('railway'),
+        recommendation: (() => {
+          const railway = envSummary('railway');
+          const staging = envSummary('staging');
+          if (railway.strainsWorking) return 'Railway environment working! Use env: "railway" for dev testing.';
+          if (staging.strainsWorking) return 'Staging environment working! Use env: "staging" for testing.';
+          return 'Check credentials - neither staging nor railway environments responding.';
+        })(),
       };
       
       return new Response(JSON.stringify(result, null, 2), { 
