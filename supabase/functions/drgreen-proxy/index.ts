@@ -2049,6 +2049,9 @@ serve(async (req) => {
         
         // Fall back to local client data
         if (localClient) {
+          // Use shipping_address from local DB if available
+          const localShipping = localClient.shipping_address as Record<string, unknown> | null;
+          
           // Build a response that matches what the checkout expects
           const fallbackResponse = {
             id: localClient.drgreen_client_id,
@@ -2061,15 +2064,18 @@ serve(async (req) => {
             adminApproval: localClient.admin_approval || 'PENDING',
             countryCode: localClient.country_code,
             kycLink: localClient.kyc_link,
-            // Note: shipping address may not be in local DB - checkout should handle this
-            shipping: null,
+            // Use local shipping_address if available
+            shipping: localShipping,
             _source: 'local_fallback',
-            _note: 'Dr. Green API access restricted. Shipping address may need to be entered.',
+            _note: localShipping 
+              ? 'Using locally stored shipping address.' 
+              : 'Dr. Green API access restricted. Shipping address may need to be entered.',
           };
           
           logInfo("Returning local client data as fallback", { 
             clientId: localClient.drgreen_client_id,
             hasEmail: !!localClient.email,
+            hasLocalShipping: !!localShipping,
           });
           
           return new Response(JSON.stringify(fallbackResponse), {
