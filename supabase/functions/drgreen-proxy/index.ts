@@ -203,6 +203,50 @@ function validateStringLength(value: unknown, maxLength: number): boolean {
 }
 
 /**
+ * Extract PEM body from Base64-encoded PEM string
+ * When DRGREEN_API_KEY is stored as Base64-encoded PEM (e.g., "LS0tLS1CRUdJTi..."), 
+ * this extracts just the inner key content (e.g., "MFYwEAYH...") for the API header
+ */
+function extractPemBody(base64EncodedPem: string): string {
+  try {
+    // Attempt to decode as Base64
+    const decoded = base64ToBytes(base64EncodedPem);
+    const pemText = new TextDecoder().decode(decoded);
+    
+    // Check if it's PEM format
+    if (pemText.includes('-----BEGIN')) {
+      // Extract just the Base64 content between headers
+      const pemBody = pemText
+        .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
+        .replace(/-----END [A-Z0-9 ]+-----/g, '')
+        .replace(/[\r\n\s]/g, '')
+        .trim();
+      
+      logInfo('extractPemBody: Extracted inner key from PEM', { 
+        originalLength: base64EncodedPem.length,
+        extractedLength: pemBody.length,
+        extractedPrefix: pemBody.slice(0, 12) + '...',
+      });
+      
+      return pemBody;
+    }
+    
+    // Not PEM format, return as-is
+    logInfo('extractPemBody: Not PEM format, using as-is', { 
+      length: base64EncodedPem.length 
+    });
+    return base64EncodedPem;
+  } catch (e) {
+    // If decoding fails, return as-is (assume it's already the correct format)
+    logWarn('extractPemBody: Decode failed, using as-is', { 
+      error: String(e),
+      length: base64EncodedPem.length 
+    });
+    return base64EncodedPem;
+  }
+}
+
+/**
  * Convert country name to ISO 3166-1 alpha-3 code
  */
 function getCountryCodeFromName(countryName: string | undefined): string {
@@ -882,14 +926,16 @@ async function drGreenRequestBody(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // API key from secrets is already Base64-encoded per Dr. Green spec
-  // DO NOT re-encode with btoa() - that causes double-encoding and 401 errors
-  const encodedApiKey = apiKey;
+  // Extract the inner key content if API key is stored as Base64-encoded PEM
+  // The Dr. Green API expects the raw public key Base64, not the full PEM wrapper
+  const encodedApiKey = extractPemBody(apiKey);
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] API Key (already Base64):", {
-      keyLength: apiKey.length,
-      keyPrefix: apiKey.slice(0, 16) + "...",
+    console.log("[API-DEBUG] API Key processing:", {
+      originalLength: apiKey.length,
+      originalPrefix: apiKey.slice(0, 16) + "...",
+      extractedLength: encodedApiKey.length,
+      extractedPrefix: encodedApiKey.slice(0, 16) + "...",
     });
   }
   
@@ -1009,14 +1055,16 @@ async function drGreenRequestGet(
     console.log("[API-DEBUG] Signature prefix:", signature.slice(0, 16) + "...");
   }
   
-  // API key from secrets is already Base64-encoded per Dr. Green spec
-  // DO NOT re-encode with btoa() - that causes double-encoding and 401 errors
-  const encodedApiKey = apiKey;
+  // Extract the inner key content if API key is stored as Base64-encoded PEM
+  // The Dr. Green API expects the raw public key Base64, not the full PEM wrapper
+  const encodedApiKey = extractPemBody(apiKey);
   
   if (enableDetailedLogging) {
-    console.log("[API-DEBUG] API Key (already Base64):", {
-      keyLength: apiKey.length,
-      keyPrefix: apiKey.slice(0, 16) + "...",
+    console.log("[API-DEBUG] API Key processing:", {
+      originalLength: apiKey.length,
+      originalPrefix: apiKey.slice(0, 16) + "...",
+      extractedLength: encodedApiKey.length,
+      extractedPrefix: encodedApiKey.slice(0, 16) + "...",
     });
   }
   
