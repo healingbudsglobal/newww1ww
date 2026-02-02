@@ -2481,11 +2481,10 @@ serve(async (req) => {
             });
           }
           
-          // Small delay to ensure API propagation if PATCH succeeded
-          if (shippingVerified) {
-            logInfo("Waiting 500ms for shipping address propagation");
-            await sleep(500);
-          }
+          // Always add a delay after PATCH to allow API propagation
+          // Even if shipping wasn't verified in response, the update may still be processing
+          logInfo("Waiting 1500ms for shipping address propagation");
+          await sleep(1500);
         }
         
         // Step 2: Add items to server-side cart
@@ -2505,10 +2504,11 @@ serve(async (req) => {
           itemCount: cartItems.length,
         });
         
-        // Retry cart add with backoff in case of propagation delay
+        // Retry cart add with exponential backoff in case of propagation delay
+        // Use 5 attempts with longer waits (1.5s, 3s, 4.5s, 6s)
         let cartSuccess = false;
         let cartAttempts = 0;
-        const maxCartAttempts = 3;
+        const maxCartAttempts = 5;
         
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
@@ -2527,7 +2527,7 @@ serve(async (req) => {
               
               // If shipping address not found and we have more attempts, wait and retry
               if (cartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1000; // 1s, 2s
+                const delay = cartAttempts * 1500; // 1.5s, 3s, 4.5s, 6s
                 logInfo(`Waiting ${delay}ms before retry (shipping propagation)`);
                 await sleep(delay);
               } else {
@@ -2541,14 +2541,18 @@ serve(async (req) => {
             if (cartAttempts >= maxCartAttempts) {
               throw new Error(`Failed to add items to cart: ${String(cartErr)}`);
             }
-            await sleep(1000);
+            await sleep(1500);
           }
         }
         
-        // If cart failed after all retries, throw error
+        // If cart failed after all retries, throw error with detailed message
         if (!cartSuccess) {
           logError("Cart add failed after all retries");
-          throw new Error("Failed to add items to cart after multiple attempts. Client shipping address may not be configured.");
+          // Check if this is likely a permission issue (shipping not being saved)
+          const errorMsg = shippingVerified 
+            ? "Failed to add items to cart. Please try again later."
+            : "Unable to save shipping address. Your account may need additional verification in the Dr. Green portal, or please contact support.";
+          throw new Error(errorMsg);
         }
         
         // Step 3: Create order from cart
