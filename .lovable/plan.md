@@ -1,95 +1,66 @@
 
 
-# Save Shipping Addresses Locally During Registration
-
-## Overview
-Fix the checkout flow by storing shipping addresses in the local `drgreen_clients` table during patient onboarding. This ensures checkout can always retrieve the address via the local fallback, regardless of Dr. Green API access restrictions.
+# Fix Order Creation for Verified Patients
 
 ## Problem
-Currently, the `ClientOnboarding` component:
-1. Collects complete shipping address from the user
-2. Sends it to the Dr. Green API via `buildLegacyClientPayload`
-3. Does NOT save the address to the local `drgreen_clients.shipping_address` column
-
-When checkout tries to fetch client details, the Dr. Green API returns 401 (endpoint-level permission restriction), and the local fallback has no shipping address to return.
+Order placement fails with "Unable to save shipping address" because:
+1. The `create-order` action tries to PATCH the client's shipping address to Dr. Green API
+2. The PATCH returns HTTP 200 but doesn't actually save the data (NFT-scoped permission restriction)
+3. Adding items to cart fails because Dr. Green API says "shipping address not found"
+4. After 5 retries, the proxy throws the error
 
 ## Solution
+Modify the `create-order` action in `drgreen-proxy` to handle the permission restriction gracefully by:
+1. Attempting the PATCH but accepting that it may not persist
+2. Trying the cart add anyway since the client record in Dr. Green may already have shipping (from original registration)
+3. Only failing if the cart API definitively rejects due to missing shipping
 
-### File Modified
-`src/components/shop/ClientOnboarding.tsx`
+### Technical Details
 
-### Changes
+**File Modified:** `supabase/functions/drgreen-proxy/index.ts`
 
-**1. Update Import (Line 7)**
-Add `toAlpha3` to the existing import from `@/lib/drgreenApi`:
-```typescript
-import { buildLegacyClientPayload, toAlpha3 } from '@/lib/drgreenApi';
+**Key Changes:**
+
+1. **Remove dependency on shippingVerified flag** (Lines 2612-2619)
+   - Don't assume failure just because PATCH didn't return shipping in response
+   - The client record may already have shipping from when they were originally created
+
+2. **Improve cart retry logic** (Lines 2577-2610)
+   - If cart fails with "shipping address not found", check if we have a local shipping address
+   - If local shipping exists, include a more specific error message suggesting the Dr. Green portal may need updates
+
+3. **Add fallback order creation** (after line 2610)
+   - If cart repeatedly fails, try creating the order anyway in case the API relaxes the requirement
+   - Return a more actionable error message if all approaches fail
+
+**Updated create-order flow:**
+
+```text
+Step 1: PATCH shipping address (best effort)
+        ↓ (may succeed or silently fail)
+Step 2: POST items to cart
+        ↓ (if fails with "shipping not found")
+        Retry with exponential backoff
+        ↓ (after 5 failures)
+Step 3: Try POST /dapp/orders anyway
+        ↓ (if that also fails)
+Return error: "The Dr. Green system requires shipping address setup.
+              Please contact support or try again later."
 ```
 
-**2. Add Country Name Helper (After Line 106)**
-```typescript
-// Map country codes to full names for shipping display
-const getCountryName = (code: string): string => {
-  const countryNames: Record<string, string> = {
-    PT: 'Portugal',
-    GB: 'United Kingdom', 
-    ZA: 'South Africa',
-    TH: 'Thailand',
-  };
-  return countryNames[code] || code;
-};
-```
+## Alternative Approaches
 
-**3. Update Supabase Upsert (Lines 806-818)**
-Build shipping address object and include it in the upsert:
+If the above doesn't work, these are the escalation options:
 
-```typescript
-// Build shipping address for local storage (ensures checkout fallback works)
-const localShippingAddress = formData.address ? {
-  address1: formData.address.street?.trim() || '',
-  city: formData.address.city?.trim() || '',
-  state: formData.address.state?.trim() || formData.address.city?.trim() || '',
-  country: getCountryName(formData.address.country) || 'Portugal',
-  countryCode: toAlpha3(formData.address.country || 'PT'),
-  postalCode: formData.address.postalCode?.trim() || '',
-} : null;
+1. **Contact Dr. Green support** - Request that the API credentials be updated to allow PATCH on client records, or that an alternative order creation endpoint be provided
 
-// Store client info locally - only with valid API-provided clientId
-const { error: dbError } = await supabase.from('drgreen_clients').upsert({
-  user_id: user.id,
-  drgreen_client_id: clientId,
-  country_code: formData.address?.country || 'PT',
-  is_kyc_verified: false,
-  admin_approval: 'PENDING',
-  kyc_link: kycLink,
-  email: formData.personal?.email || null,
-  full_name: formData.personal ? `${formData.personal.firstName} ${formData.personal.lastName}`.trim() : null,
-  shipping_address: localShippingAddress,  // NEW: Save address locally
-}, {
-  onConflict: 'user_id',
-});
-```
+2. **Mock mode fallback** - In development/testing, allow orders to be created locally without Dr. Green API if it consistently fails
 
-## Data Flow After Fix
+3. **Admin intervention** - Add an admin action to manually set shipping addresses via a different credential set
 
-```
-Registration Flow:
-User fills form → API receives data → Local DB stores shipping_address
-
-Checkout Flow:
-Request client details → API returns 401 → Fallback reads local DB → Returns shipping address ✓
-```
-
-## Technical Notes
-
-- **No database migration needed**: The `shipping_address` JSONB column already exists in `drgreen_clients`
-- **Backwards compatible**: Existing clients (Kayliegh, Scott) already have addresses populated from the manual fix
-- **Proxy unchanged**: The `drgreen-proxy` fallback logic already returns `shipping_address` from local records
-- **Format matches**: Uses same JSONB structure as the API (address1, city, state, country, countryCode, postalCode)
-
-## Testing Checklist
-- Register a new test patient through the shop
-- Verify `shipping_address` is populated in `drgreen_clients` table
-- Proceed to checkout and confirm address displays correctly
-- Verify existing users (Kayliegh, Scott) still work with their manually-entered addresses
+## Testing After Fix
+- Redeploy the `drgreen-proxy` edge function
+- Navigate to checkout as Kayliegh
+- Click "Place Order"
+- Verify order is created or a clear, actionable error is shown
 
