@@ -1812,6 +1812,13 @@ serve(async (req) => {
     // ROUTE PROCESSING
     // ==========================================
     
+    // Extract requested environment from body (supports production, staging, railway)
+    const requestedEnv = body?.env as string | undefined;
+    const envConfig = getEnvironment(requestedEnv);
+    if (requestedEnv) {
+      console.log(`[drgreen-proxy] Using environment: ${envConfig.name} (${requestedEnv})`);
+    }
+    
     let response: Response;
     
     switch (action) {
@@ -2588,14 +2595,16 @@ serve(async (req) => {
         if (!validateCountryCode(countryCode)) {
           throw new Error("Invalid country code");
         }
-        logInfo(`Fetching strains for country: ${countryCode}`);
-        response = await drGreenRequest(`/dapp/strains?countryCode=${countryCode}`, "GET");
+        logInfo(`Fetching strains for country: ${countryCode}, env: ${envConfig.name}`);
+        // Use /strains endpoint (not /dapp/strains) with query string signing
+        response = await drGreenRequestGet("/strains", { countryCode, take: 50 }, requestedEnv !== 'production', envConfig);
         break;
       }
       
       case "get-all-strains": {
-        logInfo("Fetching all strains");
-        response = await drGreenRequest("/dapp/strains", "GET");
+        logInfo(`Fetching all strains, env: ${envConfig.name}`);
+        // Use /strains endpoint (not /dapp/strains) with query string signing
+        response = await drGreenRequestGet("/strains", { take: 100 }, requestedEnv !== 'production', envConfig);
         break;
       }
       
@@ -2605,7 +2614,8 @@ serve(async (req) => {
         }
         // Method A - Body Sign: signs {"strainId": "..."}
         const signBody = { strainId: body.strainId };
-        response = await drGreenRequestBody(`/strains/${body.strainId}`, "GET", signBody);
+        logInfo(`Fetching strain ${body.strainId}, env: ${envConfig.name}`);
+        response = await drGreenRequestBody(`/strains/${body.strainId}`, "GET", signBody, false, envConfig);
         break;
       }
       
