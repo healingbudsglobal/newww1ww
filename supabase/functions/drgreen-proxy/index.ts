@@ -2569,10 +2569,11 @@ serve(async (req) => {
         });
         
         // Retry cart add with exponential backoff in case of propagation delay
-        // Use 5 attempts with longer waits (1.5s, 3s, 4.5s, 6s)
+        // Use 3 attempts with shorter waits since client may already have shipping from registration
         let cartSuccess = false;
         let cartAttempts = 0;
-        const maxCartAttempts = 5;
+        const maxCartAttempts = 3;
+        let lastCartError = "";
         
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
@@ -2582,60 +2583,110 @@ serve(async (req) => {
               logInfo("Items added to cart successfully", { attempt: cartAttempts });
               cartSuccess = true;
             } else {
-              const cartError = await cartResponse.clone().text();
+              lastCartError = await cartResponse.clone().text();
               logWarn("Cart add attempt failed", { 
                 attempt: cartAttempts,
                 status: cartResponse.status,
-                error: cartError,
+                error: lastCartError,
               });
               
               // If shipping address not found and we have more attempts, wait and retry
-              if (cartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1500; // 1.5s, 3s, 4.5s, 6s
+              if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
+                const delay = cartAttempts * 1000; // 1s, 2s
                 logInfo(`Waiting ${delay}ms before retry (shipping propagation)`);
                 await sleep(delay);
-              } else {
-                // Final failure
-                response = cartResponse;
+              } else if (cartAttempts >= maxCartAttempts) {
+                // Will try fallback order creation
                 break;
               }
             }
           } catch (cartErr) {
             logError("Cart add threw exception", { attempt: cartAttempts, error: String(cartErr) });
-            if (cartAttempts >= maxCartAttempts) {
-              throw new Error(`Failed to add items to cart: ${String(cartErr)}`);
+            lastCartError = String(cartErr);
+            if (cartAttempts < maxCartAttempts) {
+              await sleep(1000);
             }
-            await sleep(1500);
           }
         }
         
-        // If cart failed after all retries, throw error with detailed message
-        if (!cartSuccess) {
-          logError("Cart add failed after all retries");
-          // Check if this is likely a permission issue (shipping not being saved)
-          const errorMsg = shippingVerified 
-            ? "Failed to add items to cart. Please try again later."
-            : "Unable to save shipping address. Your account may need additional verification in the Dr. Green portal, or please contact support.";
-          throw new Error(errorMsg);
+        // If cart succeeded, create order from cart
+        if (cartSuccess) {
+          // Step 3: Create order from cart
+          logInfo("Step 3: Creating order from cart", { clientId });
+          
+          const orderPayload = {
+            clientId: clientId,
+          };
+          
+          response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload);
+          
+          if (response.ok) {
+            logInfo("Order created successfully via cart flow");
+          } else {
+            const orderError = await response.clone().text();
+            logError("Order creation failed", { 
+              status: response.status,
+              error: orderError,
+            });
+          }
+          break;
         }
         
-        // Step 3: Create order from cart
-        logInfo("Step 3: Creating order from cart", { clientId });
+        // FALLBACK: If cart failed (likely due to shipping permission issue), try direct order creation
+        // Some Dr. Green API configurations support creating orders directly with items
+        logInfo("Step 3 (Fallback): Attempting direct order creation", { 
+          clientId,
+          cartFailed: true,
+          lastError: lastCartError.substring(0, 100),
+        });
         
-        const orderPayload = {
+        // Build direct order payload with items included
+        const directOrderPayload = {
           clientId: clientId,
+          items: cartItems.map((item: { strainId: string; quantity: number }) => ({
+            strainId: item.strainId,
+            quantity: item.quantity,
+          })),
         };
         
-        response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload);
-        
-        if (response.ok) {
-          logInfo("Order created successfully");
-        } else {
-          const orderError = await response.clone().text();
-          logError("Order creation failed", { 
-            status: response.status,
-            error: orderError,
-          });
+        try {
+          response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload);
+          
+          if (response.ok) {
+            logInfo("Order created successfully via direct order (fallback)");
+          } else {
+            const directError = await response.clone().text();
+            logWarn("Direct order creation also failed", { 
+              status: response.status,
+              error: directError,
+            });
+            
+            // Check if the error indicates shipping is truly required on their end
+            const isShippingError = lastCartError.includes("shipping") || directError.includes("shipping");
+            
+            // Provide actionable error message
+            if (isShippingError) {
+              throw new Error(
+                "The Dr. Green system requires your shipping address to be set up. " +
+                "This may need to be configured in the Dr. Green portal. " +
+                "Please contact support for assistance."
+              );
+            } else {
+              // Generic order failure
+              throw new Error(`Order creation failed: ${directError.substring(0, 150)}`);
+            }
+          }
+        } catch (directErr) {
+          // If it's already our custom error, re-throw
+          if (directErr instanceof Error && directErr.message.includes("Dr. Green")) {
+            throw directErr;
+          }
+          logError("Direct order creation threw exception", { error: String(directErr) });
+          throw new Error(
+            "Unable to complete your order at this time. " +
+            "The Dr. Green system may be temporarily unavailable. " +
+            "Please try again later or contact support."
+          );
         }
         break;
       }
