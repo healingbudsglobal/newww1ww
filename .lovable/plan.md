@@ -1,5 +1,3 @@
-
-
 ## Visual Edits Plan
 
 ### Summary of Required Changes
@@ -16,6 +14,7 @@ Based on the previous conversation, the following visual edits were requested bu
 The "Quick Login (Dev)" dropdown with Admin and Kayliegh options is still present.
 
 **Action:** Remove the entire dropdown block:
+
 ```tsx
 // DELETE this entire block (lines 300-340):
 {isLogin && !isForgotPassword && (
@@ -33,16 +32,16 @@ The "Quick Login (Dev)" dropdown with Admin and Kayliegh options is still presen
 
 Found **233 matches in 10 files**. Changes required:
 
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Rename route `/shop/cultivar/:cultivarId` → `/shop/strain/:strainId` |
-| `src/pages/CultivarDetail.tsx` | Rename file to `StrainDetail.tsx`, update component name |
-| `src/components/shop/CultivarQuickView.tsx` | Rename to `StrainQuickView.tsx`, update component/props |
-| `src/components/shop/ProductCard.tsx` | Update navigation path |
-| `src/components/shop/ProductGrid.tsx` | Update import and component usage |
-| `src/i18n/locales/en/shop.json` | Replace "cultivars" → "strains" |
-| `src/i18n/locales/pt/shop.json` | Replace "cultivares" → "estirpes" (strains in Portuguese) |
-| `src/pages/Shop.tsx` | Update SEO text |
+| File                                        | Changes                                                              |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `src/App.tsx`                               | Rename route `/shop/cultivar/:cultivarId` → `/shop/strain/:strainId` |
+| `src/pages/CultivarDetail.tsx`              | Rename file to `StrainDetail.tsx`, update component name             |
+| `src/components/shop/CultivarQuickView.tsx` | Rename to `StrainQuickView.tsx`, update component/props              |
+| `src/components/shop/ProductCard.tsx`       | Update navigation path                                               |
+| `src/components/shop/ProductGrid.tsx`       | Update import and component usage                                    |
+| `src/i18n/locales/en/shop.json`             | Replace "cultivars" → "strains"                                      |
+| `src/i18n/locales/pt/shop.json`             | Replace "cultivares" → "estirpes" (strains in Portuguese)            |
+| `src/pages/Shop.tsx`                        | Update SEO text                                                      |
 
 ---
 
@@ -58,8 +57,8 @@ The primary CTA always shows "Check Eligibility" for all users.
 ```tsx
 // Hero CTA (around line 124)
 {isEligible ? (
-  <Button 
-    size="lg" 
+  <Button
+    size="lg"
     className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
     onClick={() => navigate('/shop')}
   >
@@ -67,8 +66,8 @@ The primary CTA always shows "Check Eligibility" for all users.
     <ArrowRight className="ml-2 w-5 h-5" />
   </Button>
 ) : (
-  <Button 
-    size="lg" 
+  <Button
+    size="lg"
     className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
     onClick={() => navigate('/eligibility')}
   >
@@ -79,6 +78,7 @@ The primary CTA always shows "Check Eligibility" for all users.
 ```
 
 **Also update the "Get Started" section (lines 373-381):**
+
 ```tsx
 // Change for verified users
 {isEligible ? (
@@ -98,27 +98,27 @@ The primary CTA always shows "Check Eligibility" for all users.
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/pages/Auth.tsx` | Remove Quick Login dropdown (lines 300-340) |
-| `src/pages/Index.tsx` | Dynamic CTAs based on eligibility |
-| `src/App.tsx` | Update route path from cultivar to strain |
-| `src/pages/CultivarDetail.tsx` | Rename to `StrainDetail.tsx` |
-| `src/components/shop/CultivarQuickView.tsx` | Rename to `StrainQuickView.tsx` |
-| `src/components/shop/ProductCard.tsx` | Update navigation path |
-| `src/components/shop/ProductGrid.tsx` | Update imports |
-| `src/i18n/locales/en/shop.json` | Replace cultivar terminology |
-| `src/i18n/locales/pt/shop.json` | Replace cultivar terminology |
-| `src/pages/Shop.tsx` | Update SEO/meta text |
+| File                                        | Change                                      |
+| ------------------------------------------- | ------------------------------------------- |
+| `src/pages/Auth.tsx`                        | Remove Quick Login dropdown (lines 300-340) |
+| `src/pages/Index.tsx`                       | Dynamic CTAs based on eligibility           |
+| `src/App.tsx`                               | Update route path from cultivar to strain   |
+| `src/pages/CultivarDetail.tsx`              | Rename to `StrainDetail.tsx`                |
+| `src/components/shop/CultivarQuickView.tsx` | Rename to `StrainQuickView.tsx`             |
+| `src/components/shop/ProductCard.tsx`       | Update navigation path                      |
+| `src/components/shop/ProductGrid.tsx`       | Update imports                              |
+| `src/i18n/locales/en/shop.json`             | Replace cultivar terminology                |
+| `src/i18n/locales/pt/shop.json`             | Replace cultivar terminology                |
+| `src/pages/Shop.tsx`                        | Update SEO/meta text                        |
 
 ---
 
 ## Testing Steps
 
 After implementation:
+
 1. Verify Auth page no longer shows Quick Login dropdown
 2. Log in as Kayliegh (verified patient) and confirm homepage shows "Browse Strains"
 3. Log out and confirm homepage shows "Check Eligibility"
 4. Navigate to `/shop` and click a product → verify URL is `/shop/strain/{id}`
 5. Search for "cultivar" in codebase → should return 0 results
-
