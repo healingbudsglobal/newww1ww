@@ -575,6 +575,39 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_auth_nonces: {
+        Row: {
+          address: string
+          expires_at: string
+          id: string
+          issued_at: string
+          nonce: string
+          purpose: string
+          used: boolean
+          used_at: string | null
+        }
+        Insert: {
+          address: string
+          expires_at?: string
+          id?: string
+          issued_at?: string
+          nonce: string
+          purpose: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Update: {
+          address?: string
+          expires_at?: string
+          id?: string
+          issued_at?: string
+          nonce?: string
+          purpose?: string
+          used?: boolean
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       wallet_email_mappings: {
         Row: {
           created_at: string
