@@ -3463,7 +3463,6 @@ serve(async (req) => {
             if (clients.length < PAGE_SIZE) break;
           }
           
-          // Return full details for admin debugging
           const results = allClients.map((c: any) => ({
             id: c.id || c.clientId,
             firstName: c.firstName || c.first_name || '(no first name)',

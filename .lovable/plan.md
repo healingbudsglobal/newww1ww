@@ -1,30 +1,33 @@
 
+## Definitive API Diagnostic Results — Client Listing
 
-## Client Lookup Results — All Environments
+### Test: All 3 Environments × 2 Endpoints
 
-### Finding
-**All 3 credential sets (production, alt-production, production-write) return HTTP 401** for both `/dapp/clients` and `/dapp/clients/list` endpoints.
+| Environment | `/strains` | `/dapp/clients` |
+|-------------|-----------|-----------------|
+| Production (`DRGREEN_API_KEY`) | ✅ 200 OK | ❌ 401 Unauthorized |
+| Alt-Production (`DRGREEN_ALT_API_KEY`) | ✅ 200 OK | ❌ 401 Unauthorized |
+| Production-Write (`DRGREEN_WRITE_API_KEY`) | ✅ 200 OK | ❌ 401 Unauthorized |
 
-This means none of our current API keys have permission to list clients from the Dr. Green API.
+### Key Details
+- All 3 credential sets have API key length 232, prefix `LS0tLS1CRUdJ...` (Base64-encoded PEM)
+- All 3 credential sets have private key length 316
+- Signing method (HMAC-SHA256 on query string) is **confirmed correct** — `/strains` works
+- The 401 on `/dapp/clients` is an **API authorization issue**, not a signing/credential bug
 
-### What Was Tested
-| Environment | `/dapp/clients` | `/dapp/clients/list` |
-|-------------|----------------|---------------------|
-| Production | 401 Unauthorized | 401 Unauthorized |
-| Alt-Production | 401 Unauthorized | 401 Unauthorized |
-| Production-Write | 401 Unauthorized | 401 Unauthorized |
+### Root Cause
+The `/dapp/clients` endpoint requires NFT-scoped permissions that none of our 3 credential sets currently possess. The `/strains` endpoint is likely a non-scoped (global) endpoint that works with any valid API key.
 
-### Implication
-- The API credentials may have had their client-listing permissions revoked or changed
-- The health check (`/strains`) still works, so the credentials themselves are valid
-- Kayliegh and Scott cannot be looked up via the API with current credentials
+This is consistent with the Dr. Green API's NFT-scoped access model:
+> "Each API key pair is associated with a specific NFT and dApp identity. Client records created with Key A cannot be accessed by Key B."
 
-### Changes Made (Reverted)
-- `PUBLIC_ACTIONS` was temporarily opened and has been reverted to `[]`
-- `admin-list-all-clients` was added to `DEBUG_ACTIONS` (still there, harmless)
-- The multi-env scan logic was reverted to the original single-env implementation
+### Current State
+- `admin-list-all-clients` is in `DEBUG_ACTIONS` (harmless, still requires debug key)
+- `PUBLIC_ACTIONS` reverted to `[]`
+- All temporary diagnostic changes reverted
+- Proxy deployed clean
 
 ### Next Steps
-1. **Contact Dr. Green team** to verify if `/dapp/clients` endpoint permissions have changed
-2. **Try creating fresh test clients** via the `create-client` action (POST) to test if write access still works
-3. **Log in via wallet auth** and test the admin dashboard client manager (which may use a different flow)
+1. **Contact Dr. Green team** — Request `/dapp/clients` read permission for the `healingbudscoza` NFT
+2. **Alternatively, create fresh clients** via `POST /dapp/clients` (write may still work even if list doesn't)
+3. **Verify NFT ownership** — Check the NFT contract `0x217ddEad61a42369A266F1Fb754EB5d3EBadc88a` for our wallet `0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84`
