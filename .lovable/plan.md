@@ -1,104 +1,116 @@
 
 
-# Fix Order Data for Reliable Admin Sync
+# Re-Register Scott & Kayleigh in Dr. Green API
+
+## Current State Analysis
+
+Based on the codebase exploration:
+
+1. **Admin Client Manager exists** (`src/components/admin/AdminClientManager.tsx`)
+   - Has `handleReregister()` function that calls `reregisterClient()`
+   - Shows clients fetched from Dr. Green API with filter tabs
+
+2. **Re-registration endpoint exists** (`admin-reregister-client` action in drgreen-proxy)
+   - Creates new client record in Dr. Green API under current API key pair
+   - Generates new KYC link
+   - Updates local `drgreen_clients` table with new `drgreen_client_id`
+
+3. **Local database is empty**
+   - `drgreen_clients` table: 0 records
+   - `drgreen_orders` table: 0 records
 
 ## The Problem
 
-Currently, the `drgreen_orders` table stores **minimal data** - it doesn't capture the shipping address used at checkout. When an admin syncs an order:
+Scott and Kayleigh's client records exist in the Dr. Green API (created under a previous API key pair), but:
+- Their records are NOT linked to the current API credentials
+- Orders created for them fail with 401 errors
+- They need to be re-registered under the current API key
 
-1. The system fetches the shipping address from `drgreen_clients`
-2. If the client updated their address after placing the order, **the wrong address is sent to Dr. Green API**
-3. This causes delivery failures
+## Solution: Admin Dashboard Re-Registration
 
-## Solution: Store Order Context at Checkout
+### Step 1: Access Admin Client Manager
 
-Capture a complete snapshot of order context when the order is placed, ensuring admin sync always uses the correct data.
+Navigate to `/admin` and use the Client Management section to:
+1. View all clients from the Dr. Green API
+2. Find Scott and Kayleigh by searching their email addresses
 
----
+### Step 2: Re-Register Each Client
 
-## Database Changes
+For each client (Scott and Kayleigh):
+1. Click the "Re-register" button (KeyRound icon) on their row
+2. Confirm the re-registration dialog
+3. The system will:
+   - Call Dr. Green API `/dapp/clients` POST to create a new client
+   - Store the new `drgreen_client_id` in local database
+   - Generate a new KYC verification link
+   - Reset their status to `PENDING`
 
-Add columns to `drgreen_orders`:
+### Step 3: Complete KYC Again
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `client_id` | text | Dr. Green client ID at time of order |
-| `shipping_address` | jsonb | Address snapshot at checkout |
-| `customer_email` | text | Email for quick reference |
-| `customer_name` | text | Name for quick reference |
-| `country_code` | text | Country for regional tracking |
-| `currency` | text | Currency used (EUR, ZAR, GBP) |
-
----
-
-## Code Changes
-
-### 1. Update Order Tracking Hook (`useOrderTracking.ts`)
-
-Modify `saveOrder()` to accept and store:
-- Shipping address snapshot
-- Client ID
-- Customer details
-- Currency/country
-
-### 2. Update Checkout Flow (`Checkout.tsx`)
-
-Pass complete order context when saving:
-- Include shipping address used
-- Include client ID
-- Include country/currency
-
-### 3. Update Admin Order Sync (`useAdminOrderSync.ts`)
-
-Prioritize order-stored data:
-- Use `order.shipping_address` instead of client record
-- Use `order.client_id` directly (no join needed)
-- Only fallback to client record if order data missing
+After re-registration, the clients will need to:
+1. Click the new KYC link (copied to clipboard automatically)
+2. Complete identity verification again
+3. Wait for admin approval in Dr. Green DApp portal
 
 ---
 
-## Implementation Sequence
+## Technical Implementation
 
-### Step 1: Database Migration
-```sql
-ALTER TABLE drgreen_orders 
-  ADD COLUMN IF NOT EXISTS client_id text,
-  ADD COLUMN IF NOT EXISTS shipping_address jsonb,
-  ADD COLUMN IF NOT EXISTS customer_email text,
-  ADD COLUMN IF NOT EXISTS customer_name text,
-  ADD COLUMN IF NOT EXISTS country_code text,
-  ADD COLUMN IF NOT EXISTS currency text DEFAULT 'EUR';
+The re-registration flow is already implemented. Here's how it works:
 
-CREATE INDEX idx_drgreen_orders_client_id ON drgreen_orders(client_id);
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Admin Dashboard → Client Management                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. Admin clicks "Re-register" on client row                │
+│     → handleReregister(client)                              │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. useDrGreenApi.reregisterClient() called                 │
+│     Payload: { email, firstName, lastName, countryCode }    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. drgreen-proxy → admin-reregister-client action          │
+│     - POST /dapp/clients with minimal medical record        │
+│     - Uses current API key pair for signing                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. Success Response:                                       │
+│     - New clientId returned                                 │
+│     - New kycLink generated                                 │
+│     - Local drgreen_clients record updated                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Step 2: Update Checkout
-Store complete context when order is placed
+---
 
-### Step 3: Update Admin Sync
-Use order-stored address instead of fetching from client
+## Action Items
 
-### Step 4: Backfill Existing Orders (Optional)
-Script to populate missing data for old orders
+1. **Go to Admin Dashboard** (`/admin`)
+2. **Find the Client Management section**
+3. **Search for Scott** (by email) → Click re-register button
+4. **Search for Kayleigh** (by email) → Click re-register button
+5. **Send new KYC links** to each user
+6. **Approve in Dr. Green DApp** after KYC completion
 
 ---
 
-## Technical Benefits
+## Files Involved (No Changes Needed)
 
-1. **Address Accuracy** - Orders sync with the address used at checkout, not current client address
-2. **Faster Queries** - No joins needed for admin order view
-3. **Audit Trail** - Complete order context preserved for compliance
-4. **Regional Analytics** - Track orders by country/currency
+| File | Purpose |
+|------|---------|
+| `src/components/admin/AdminClientManager.tsx` | UI for re-registration |
+| `src/hooks/useDrGreenApi.ts` | `reregisterClient()` method |
+| `supabase/functions/drgreen-proxy/index.ts` | `admin-reregister-client` action |
 
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| Database migration | Add columns |
-| `src/hooks/useOrderTracking.ts` | Expand saveOrder() interface |
-| `src/pages/Checkout.tsx` | Pass complete order context |
-| `src/hooks/useAdminOrderSync.ts` | Use order data instead of client join |
-| `src/components/admin/AdminOrdersTable.tsx` | Display captured address |
+The implementation is complete - you just need to use the admin dashboard to trigger re-registration for Scott and Kayleigh.
 
