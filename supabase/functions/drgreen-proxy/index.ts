@@ -3737,7 +3737,7 @@ serve(async (req) => {
       // TEMPORARY: Public bootstrap endpoint for test client creation
       // This allows creating clients without authentication for development testing
       case "bootstrap-test-client": {
-        const { email, firstName, lastName, countryCode, phoneCode, phoneCountryCode, contactNumber, shipping } = body || {};
+        const { email, firstName, lastName, countryCode, phoneCode, phoneCountryCode, contactNumber, shipping, environment } = body || {};
         
         if (!email || !validateEmail(email)) {
           throw new Error("Valid email is required");
@@ -3746,6 +3746,9 @@ serve(async (req) => {
           throw new Error("firstName and lastName are required");
         }
         
+        // Get the environment configuration (supports production, alt-production, staging, railway)
+        const envConfig = getEnvironment(environment);
+        console.log("[bootstrap-test-client] Using environment:", envConfig.name);
         console.log("[bootstrap-test-client] Creating client for:", String(email).slice(0, 5) + '***');
         
         const countryCodeMap: Record<string, string> = {
@@ -3791,7 +3794,8 @@ serve(async (req) => {
           },
         };
         
-        response = await drGreenRequestBody("/dapp/clients", "POST", bootstrapPayload, true);
+        // Use the selected environment for the API call
+        response = await drGreenRequestBody("/dapp/clients", "POST", bootstrapPayload, true, envConfig);
         
         const clonedResp = response.clone();
         const respBody = await clonedResp.text();
