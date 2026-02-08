@@ -7,12 +7,15 @@ import {
   CheckCircle, 
   AlertTriangle,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Search,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -23,68 +26,148 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 
-// Predefined clients to re-register
+// Predefined clients - using REAL Dr. Green emails for Find & Link
 const PREDEFINED_CLIENTS = [
   {
     id: 'scott',
     firstName: 'Scott',
-    lastName: 'Cunningham',
-    email: 'scott@healingbuds.co.uk',
-    countryCode: 'GBR',
-    phoneCode: '+44',
-    phoneCountryCode: 'GB',
-    contactNumber: '7700900000',
+    lastName: 'K',
+    email: 'scott.k1@outlook.com',  // Real Dr. Green email
+    countryCode: 'ZAF',
+    phoneCode: '+27',
+    phoneCountryCode: 'ZA',
+    contactNumber: '0000000000',
     shipping: {
-      address1: '123 Test Street',
-      city: 'London',
-      state: 'Greater London',
-      country: 'United Kingdom',
-      countryCode: 'GBR',
-      postalCode: 'SW1A 1AA',
+      address1: 'Address Pending',
+      city: 'Cape Town',
+      state: 'Western Cape',
+      country: 'South Africa',
+      countryCode: 'ZAF',
+      postalCode: '0000',
     },
   },
   {
     id: 'kayleigh',
     firstName: 'Kayleigh',
-    lastName: 'Cunningham',
-    email: 'kayleigh@healingbuds.co.uk',
-    countryCode: 'GBR',
-    phoneCode: '+44',
-    phoneCountryCode: 'GB',
-    contactNumber: '7700900001',
+    lastName: 'SM',
+    email: 'kayleigh.sm@gmail.com',  // Real Dr. Green email
+    countryCode: 'ZAF',
+    phoneCode: '+27',
+    phoneCountryCode: 'ZA',
+    contactNumber: '0000000000',
     shipping: {
-      address1: '123 Test Street',
-      city: 'London',
-      state: 'Greater London',
-      country: 'United Kingdom',
-      countryCode: 'GBR',
-      postalCode: 'SW1A 1AA',
+      address1: 'Address Pending',
+      city: 'Cape Town',
+      state: 'Western Cape',
+      country: 'South Africa',
+      countryCode: 'ZAF',
+      postalCode: '0000',
     },
   },
 ];
 
-interface CreationResult {
+interface ClientResult {
   clientId: string;
   firstName: string;
   lastName: string;
   email: string;
   kycLink?: string;
+  isKYCVerified?: boolean;
+  adminApproval?: string;
   success: boolean;
+  synced?: boolean;
   error?: string;
+  mode: 'found' | 'created';
 }
 
 export function AdminClientCreator() {
   const { toast } = useToast();
-  const { reregisterClient } = useDrGreenApi();
+  const { reregisterClient, syncClientByEmail } = useDrGreenApi();
   const [creating, setCreating] = useState<string | null>(null);
-  const [results, setResults] = useState<CreationResult[]>([]);
+  const [finding, setFinding] = useState<string | null>(null);
+  const [results, setResults] = useState<ClientResult[]>([]);
   
   // Custom client form
   const [customEmail, setCustomEmail] = useState('');
   const [customFirstName, setCustomFirstName] = useState('');
   const [customLastName, setCustomLastName] = useState('');
-  const [customCountry, setCustomCountry] = useState('GBR');
+  const [customCountry, setCustomCountry] = useState('ZAF');
 
+  // Find & Link existing client by email
+  const findAndLinkClient = async (client: typeof PREDEFINED_CLIENTS[0]) => {
+    setFinding(client.id);
+    
+    try {
+      const result = await syncClientByEmail(client.email);
+
+      if (result.error) {
+        const errorResult: ClientResult = {
+          clientId: '',
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          success: false,
+          error: result.error,
+          mode: 'found',
+        };
+        setResults(prev => [...prev.filter(r => r.email !== client.email), errorResult]);
+        
+        toast({
+          title: 'Search Failed',
+          description: `Could not search for ${client.firstName}: ${result.error}`,
+          variant: 'destructive',
+        });
+      } else if (result.data?.success && result.data?.client) {
+        const foundClient = result.data.client;
+        const successResult: ClientResult = {
+          clientId: foundClient.id,
+          firstName: foundClient.firstName,
+          lastName: foundClient.lastName,
+          email: foundClient.email,
+          isKYCVerified: foundClient.isKYCVerified,
+          adminApproval: foundClient.adminApproval,
+          success: true,
+          synced: result.data.synced,
+          mode: 'found',
+        };
+        setResults(prev => [...prev.filter(r => r.email !== client.email), successResult]);
+        
+        toast({
+          title: 'Client Found!',
+          description: `${foundClient.firstName} ${foundClient.lastName} linked successfully.`,
+        });
+      } else {
+        // Not found
+        const notFoundResult: ClientResult = {
+          clientId: '',
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          success: false,
+          error: result.data?.message || 'Client not found in Dr. Green API',
+          mode: 'found',
+        };
+        setResults(prev => [...prev.filter(r => r.email !== client.email), notFoundResult]);
+        
+        toast({
+          title: 'Not Found',
+          description: result.data?.message || `${client.email} not found. Try "Create New" instead.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Find error:', err);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setFinding(null);
+    }
+  };
+
+  // Create new client (existing functionality)
   const createClient = async (client: typeof PREDEFINED_CLIENTS[0]) => {
     setCreating(client.id);
     
@@ -101,15 +184,16 @@ export function AdminClientCreator() {
       });
 
       if (result.error) {
-        const errorResult: CreationResult = {
+        const errorResult: ClientResult = {
           clientId: '',
           firstName: client.firstName,
           lastName: client.lastName,
           email: client.email,
           success: false,
           error: result.error,
+          mode: 'created',
         };
-        setResults(prev => [...prev, errorResult]);
+        setResults(prev => [...prev.filter(r => r.email !== client.email), errorResult]);
         
         toast({
           title: 'Creation Failed',
@@ -117,15 +201,16 @@ export function AdminClientCreator() {
           variant: 'destructive',
         });
       } else if (result.data?.success) {
-        const successResult: CreationResult = {
+        const successResult: ClientResult = {
           clientId: result.data.clientId || '',
           firstName: client.firstName,
           lastName: client.lastName,
           email: client.email,
           kycLink: result.data.kycLink,
           success: true,
+          mode: 'created',
         };
-        setResults(prev => [...prev, successResult]);
+        setResults(prev => [...prev.filter(r => r.email !== client.email), successResult]);
         
         toast({
           title: 'Client Created!',
@@ -186,9 +271,9 @@ export function AdminClientCreator() {
     setCustomLastName('');
   };
 
-  const createAllPredefined = async () => {
+  const findAllPredefined = async () => {
     for (const client of PREDEFINED_CLIENTS) {
-      await createClient(client);
+      await findAndLinkClient(client);
     }
   };
 
@@ -200,6 +285,20 @@ export function AdminClientCreator() {
     });
   };
 
+  const getApprovalBadge = (approval?: string) => {
+    if (!approval) return null;
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      VERIFIED: 'default',
+      PENDING: 'secondary',
+      REJECTED: 'destructive',
+    };
+    return (
+      <Badge variant={variants[approval] || 'outline'} className="text-xs">
+        {approval}
+      </Badge>
+    );
+  };
+
   return (
     <Card className="border-primary/20">
       <CardHeader>
@@ -208,22 +307,24 @@ export function AdminClientCreator() {
             <UserPlus className="w-5 h-5 text-green-600" />
           </div>
           <div>
-            <CardTitle className="text-lg">Create Dr. Green Clients</CardTitle>
+            <CardTitle className="text-lg">Sync & Link Dr. Green Clients</CardTitle>
             <CardDescription>
-              Register new clients under the current API key pair
+              Find existing clients or create new ones under the current API key
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Predefined Clients */}
+        {/* Predefined Clients with Find & Link */}
         <div className="space-y-3">
           <h4 className="font-medium text-sm flex items-center gap-2">
-            Quick Actions — Predefined Clients
+            <LinkIcon className="w-4 h-4" />
+            Find & Link Existing Clients
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {PREDEFINED_CLIENTS.map((client) => {
               const existingResult = results.find(r => r.email === client.email);
+              const isLoading = finding === client.id || creating === client.id;
               
               return (
                 <motion.div
@@ -232,32 +333,40 @@ export function AdminClientCreator() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
                       <p className="font-medium">{client.firstName} {client.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{client.email}</p>
+                      <p className="text-sm text-muted-foreground truncate">{client.email}</p>
                     </div>
                     {existingResult?.success ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : existingResult?.error ? (
-                      <AlertTriangle className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => createClient(client)}
-                        disabled={creating === client.id}
-                      >
-                        {creating === client.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-1" />
-                            Create
-                          </>
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        {existingResult.mode === 'found' && (
+                          <Badge variant="outline" className="text-xs">Linked</Badge>
                         )}
-                      </Button>
-                    )}
+                      </div>
+                    ) : existingResult?.error ? (
+                      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    ) : null}
                   </div>
+                  
+                  {/* Status display for found clients */}
+                  {existingResult?.success && existingResult.mode === 'found' && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        ID: <span className="font-mono">{existingResult.clientId.slice(0, 16)}...</span>
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">KYC:</span>
+                        <Badge variant={existingResult.isKYCVerified ? 'default' : 'secondary'} className="text-xs">
+                          {existingResult.isKYCVerified ? 'Verified' : 'Pending'}
+                        </Badge>
+                        {getApprovalBadge(existingResult.adminApproval)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* KYC link for created clients */}
                   {existingResult?.kycLink && (
                     <div className="mt-2 flex items-center gap-2">
                       <Button
@@ -277,8 +386,47 @@ export function AdminClientCreator() {
                       </Button>
                     </div>
                   )}
+                  
+                  {/* Error display */}
                   {existingResult?.error && (
                     <p className="mt-2 text-xs text-red-500">{existingResult.error}</p>
+                  )}
+                  
+                  {/* Action buttons */}
+                  {!existingResult?.success && (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => findAndLinkClient(client)}
+                        disabled={isLoading}
+                        className="flex-1"
+                      >
+                        {finding === client.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Search className="w-4 h-4 mr-1" />
+                            Find & Link
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createClient(client)}
+                        disabled={isLoading}
+                      >
+                        {creating === client.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-1" />
+                            Create New
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </motion.div>
               );
@@ -286,11 +434,12 @@ export function AdminClientCreator() {
           </div>
           <Button
             variant="secondary"
-            onClick={createAllPredefined}
-            disabled={!!creating}
+            onClick={findAllPredefined}
+            disabled={!!finding || !!creating}
             className="w-full"
           >
-            Create All Predefined Clients
+            <Search className="w-4 h-4 mr-2" />
+            Find & Link All Predefined Clients
           </Button>
         </div>
 
@@ -333,8 +482,8 @@ export function AdminClientCreator() {
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="GBR">United Kingdom</SelectItem>
                   <SelectItem value="ZAF">South Africa</SelectItem>
+                  <SelectItem value="GBR">United Kingdom</SelectItem>
                   <SelectItem value="PRT">Portugal</SelectItem>
                   <SelectItem value="THA">Thailand</SelectItem>
                 </SelectContent>
@@ -358,7 +507,7 @@ export function AdminClientCreator() {
         {/* Results Summary */}
         {results.length > 0 && (
           <div className="border-t pt-6 space-y-3">
-            <h4 className="font-medium text-sm">Creation Results</h4>
+            <h4 className="font-medium text-sm">Results Summary</h4>
             <div className="space-y-2">
               {results.map((result, idx) => (
                 <div 
@@ -370,9 +519,14 @@ export function AdminClientCreator() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">
-                      {result.firstName} {result.lastName}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {result.firstName} {result.lastName}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {result.mode === 'found' ? 'Linked' : 'Created'}
+                      </Badge>
+                    </div>
                     {result.success ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
                     ) : (
@@ -381,7 +535,7 @@ export function AdminClientCreator() {
                   </div>
                   {result.success && result.clientId && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      ID: {result.clientId.slice(0, 16)}...
+                      ID: <span className="font-mono">{result.clientId.slice(0, 24)}...</span>
                     </p>
                   )}
                   {result.error && (
@@ -399,10 +553,10 @@ export function AdminClientCreator() {
             How this works:
           </p>
           <ul className="text-muted-foreground space-y-1 text-xs">
-            <li>• Creates clients under the current Dr. Green API key pair</li>
-            <li>• New clients will need to complete KYC verification</li>
-            <li>• KYC links are automatically copied to clipboard</li>
-            <li>• Admin approval required after KYC in Dr. Green DApp portal</li>
+            <li>• <strong>Find & Link:</strong> Searches Dr. Green API for existing clients by email</li>
+            <li>• <strong>Create New:</strong> Registers a new client under current API key pair</li>
+            <li>• Existing clients will be synced to local database for quick access</li>
+            <li>• Admin approval must be done in Dr. Green DApp portal</li>
           </ul>
         </div>
       </CardContent>
