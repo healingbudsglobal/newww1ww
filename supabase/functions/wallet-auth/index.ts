@@ -36,11 +36,11 @@ const BALANCE_OF_SELECTOR = '0x70a08231';
 const RPC_TIMEOUT_MS = 10_000;
 
 /**
- * Wallet-to-email mapping for account linking.
- * When a mapped wallet connects, the edge function reuses the existing
- * email-based Supabase user instead of creating a wallet-derived one.
+ * Hardcoded fallback wallet-to-email mapping.
+ * Used only if the DB lookup fails (e.g., during initial setup).
+ * The primary source of truth is the wallet_email_mappings table.
  */
-const WALLET_EMAIL_MAP: Record<string, string> = {
+const FALLBACK_WALLET_EMAIL_MAP: Record<string, string> = {
   '0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84': 'healingbudsglobal@gmail.com',
 };
 
@@ -206,16 +206,43 @@ function parseAuthMessage(message: string): { wallet: string; timestamp: number 
 // ─── Account Linking ──────────────────────────────────────
 
 /**
- * Resolve the email to use for this wallet.
- * If a mapping exists, use the mapped email (account linking).
- * Otherwise, use the wallet-derived email.
+ * Resolve the email to use for this wallet by checking the
+ * wallet_email_mappings table. Falls back to hardcoded map if DB fails.
  */
-function resolveEmail(walletAddress: string): { email: string; isLinked: boolean } {
+async function resolveEmail(
+  walletAddress: string,
+  adminClient: ReturnType<typeof createClient>
+): Promise<{ email: string; isLinked: boolean }> {
   const normalized = walletAddress.toLowerCase();
-  const mappedEmail = WALLET_EMAIL_MAP[normalized];
-  if (mappedEmail) {
-    return { email: mappedEmail, isLinked: true };
+
+  // Primary: query the wallet_email_mappings table (service role bypasses RLS)
+  try {
+    const { data, error } = await adminClient
+      .from('wallet_email_mappings')
+      .select('email')
+      .eq('wallet_address', normalized)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!error && data?.email) {
+      console.log(`[wallet-auth] DB mapping found: ${normalized.slice(0, 10)}... -> ${data.email}`);
+      return { email: data.email, isLinked: true };
+    }
+
+    if (error) {
+      console.warn('[wallet-auth] DB mapping lookup failed:', error.message);
+    }
+  } catch (err) {
+    console.warn('[wallet-auth] DB mapping lookup exception:', err);
   }
+
+  // Fallback: hardcoded map
+  const fallbackEmail = FALLBACK_WALLET_EMAIL_MAP[normalized];
+  if (fallbackEmail) {
+    console.log(`[wallet-auth] Fallback mapping used: ${normalized.slice(0, 10)}... -> ${fallbackEmail}`);
+    return { email: fallbackEmail, isLinked: true };
+  }
+
   return { email: `${normalized}@wallet.healingbuds`, isLinked: false };
 }
 
@@ -313,12 +340,6 @@ serve(async (req) => {
       );
     }
 
-    // ── Resolve email (account linking) ──
-    const { email: userEmail, isLinked } = resolveEmail(address);
-    console.log(
-      `[wallet-auth] Email resolved: ${userEmail} (linked=${isLinked})`
-    );
-
     // ── Create/find Supabase user and generate session ──
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -326,6 +347,12 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // ── Resolve email (account linking via DB) ──
+    const { email: userEmail, isLinked } = await resolveEmail(address, adminClient);
+    console.log(
+      `[wallet-auth] Email resolved: ${userEmail} (linked=${isLinked})`
+    );
 
     // Try to find existing user by the resolved email
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
