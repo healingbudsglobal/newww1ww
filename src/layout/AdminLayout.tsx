@@ -33,7 +33,8 @@ import {
   Package,
   Users,
   ShoppingCart,
-  Bug
+  Bug,
+  Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +65,7 @@ const navItems: NavItem[] = [
   { to: "/admin/strain-sync", label: "Strain Sync", icon: RefreshCw },
   { to: "/admin/strain-knowledge", label: "Knowledge Base", icon: Database },
   { to: "/admin/roles", label: "User Roles", icon: Users },
+  { to: "/admin/wallet-mappings", label: "Wallet Mappings", icon: Wallet },
 ];
 
 const secondaryNavItems: NavItem[] = [

@@ -47,7 +47,7 @@ import { AdminClientCreator } from "@/components/admin/AdminClientCreator";
 import { ApiDebugPanel } from "@/components/admin/ApiDebugPanel";
 import { ApiTestRunner } from "@/components/admin/ApiTestRunner";
 import { ApiComparisonDashboard } from "@/components/admin/ApiComparisonDashboard";
-import { WalletEmailMappings } from "@/components/admin/WalletEmailMappings";
+
 import { EnvironmentSelector } from "@/components/admin/EnvironmentSelector";
 import { useApiEnvironment } from "@/context/ApiEnvironmentContext";
 import { useAccount, useDisconnect, useBalance, useChainId } from "wagmi";
@@ -696,11 +696,6 @@ const AdminDashboard = () => {
         {/* Manual Email Trigger */}
         <div className="mb-12">
           <AdminEmailTrigger />
-        </div>
-
-        {/* Wallet-Email Mappings */}
-        <div className="mb-12">
-          <WalletEmailMappings />
         </div>
 
         {/* Client Import Tool */}
