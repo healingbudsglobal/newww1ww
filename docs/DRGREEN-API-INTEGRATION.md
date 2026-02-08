@@ -28,7 +28,7 @@ This document provides comprehensive documentation for the Dr. Green DApp API in
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                    drgreen-proxy                              │   │
 │  │              (Edge Function - Request Signing)                │   │
-│  │  • Signs requests with secp256k1 + SHA-256                    │   │
+│  │  • Signs requests with HMAC-SHA256                             │   │
 │  │  • Routes to appropriate Dr. Green endpoint                   │   │
 │  │  • Handles authentication headers                             │   │
 │  └──────────────────────────────────────────────────────────────┘   │
@@ -65,18 +65,48 @@ All Dr. Green API requests require cryptographic signing:
 | `x-auth-signature` | String (Base64) | Cryptographic signature of request payload |
 | `Content-Type` | String | `application/json` |
 
-### Signature Generation (Node.js)
+### Signature Generation
+
+> **Full details:** See [DRGREEN-API-SIGNING-KNOWLEDGE.md](./DRGREEN-API-SIGNING-KNOWLEDGE.md)
+
+**Node.js (HMAC-SHA256):**
 
 ```javascript
 const crypto = require('crypto');
 
-function signRequest(payload, secretKey) {
-  const privateKeyBuffer = Buffer.from(secretKey, 'base64');
-  const privateKeyObject = crypto.createPrivateKey(privateKeyBuffer);
-  const signature = crypto.sign(null, Buffer.from(payload), privateKeyObject);
-  return signature.toString('base64');
+function signRequest(dataToSign, secretKey) {
+  const keyBuffer = Buffer.from(secretKey, 'base64');
+  const hmac = crypto.createHmac('sha256', keyBuffer);
+  hmac.update(dataToSign);
+  return hmac.digest('base64');
+}
+
+// For GET requests: dataToSign = query string (e.g., "orderBy=desc&take=10&page=1")
+// For POST requests: dataToSign = JSON.stringify(body)
+```
+
+**Deno / Web Crypto API (Edge Functions):**
+
+```typescript
+async function signRequest(dataToSign: string, secretKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const binaryString = atob(secretKey);
+  const keyBytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    keyBytes[i] = binaryString.charCodeAt(i);
+  }
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", keyBytes.buffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(dataToSign));
+  const bytes = new Uint8Array(sig);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 ```
+
+> ⚠️ **Important:** The `x-auth-apikey` header must contain the raw Base64 API key exactly as stored in secrets. Do NOT process it through `extractPemBody()` or any PEM-stripping utility.
 
 ### Secrets Required
 
@@ -745,12 +775,14 @@ Clients created under old credentials cannot be modified with new credentials.
 
 ### Signature Verification Fails
 
-**Cause**: Private key format mismatch or corruption
+**Cause**: Incorrect signing method or API key format
 
 **Solution**:
-1. Verify `DRGREEN_PRIVATE_KEY` is valid PKCS#8 secp256k1 format
-2. Check for whitespace or encoding issues
-3. Regenerate keys from Dr. Green DApp if needed
+1. Verify signing uses **HMAC-SHA256** (not secp256k1 ECDSA) — see [Signing Knowledge Base](./DRGREEN-API-SIGNING-KNOWLEDGE.md)
+2. Verify `x-auth-apikey` sends the raw Base64 key (no PEM stripping via `extractPemBody()`)
+3. Verify GET requests sign the **query string**, not `"{}"` or empty string
+4. Run `drgreen-health` to confirm credentials are valid
+5. Run `debug-signing-test` to compare signing methods
 
 ### Client Not Found
 
@@ -769,3 +801,11 @@ Clients created under old credentials cannot be modified with new credentials.
 |---------|------|---------|
 | 1.0.0 | 2026-01-30 | Initial documentation |
 | 1.1.0 | 2026-02-02 | Added NFT-scoped access control, mock mode, troubleshooting |
+| 1.2.0 | 2026-02-08 | **CRITICAL FIX**: Corrected signing method from secp256k1 ECDSA to HMAC-SHA256. Updated all code examples. Added cross-references to [Signing Knowledge Base](./DRGREEN-API-SIGNING-KNOWLEDGE.md) and [API Infrastructure](../.agent/knowledge/API_INFRASTRUCTURE.md). |
+
+---
+
+## Related Documentation
+
+- **[API Signing Knowledge Base](./DRGREEN-API-SIGNING-KNOWLEDGE.md)** — Detailed signing mechanics, root cause analysis, and reference implementations
+- **[API Infrastructure Knowledge](../.agent/knowledge/API_INFRASTRUCTURE.md)** — Architecture, multi-environment config, security patterns, and operational procedures
