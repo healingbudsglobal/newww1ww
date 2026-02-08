@@ -105,7 +105,7 @@ const OWNERSHIP_ACTIONS = [
 
 // Public actions that don't require authentication (minimal - only webhooks/health)
 // TEMPORARY: bootstrap-test-client allows unauthenticated client creation for testing
-const PUBLIC_ACTIONS: string[] = ['debug-list-all-clients', 'bootstrap-test-client'];
+const PUBLIC_ACTIONS: string[] = ['debug-list-all-clients', 'bootstrap-test-client', 'debug-compare-keys'];
 
 // Country-gated actions: open countries (ZA, TH) don't require auth, restricted (GB, PT) do
 const COUNTRY_GATED_ACTIONS = [
@@ -4132,6 +4132,83 @@ serve(async (req) => {
         break;
       }
       
+      // Diagnostic endpoint to compare all key formats across environments
+      case "debug-compare-keys": {
+        const envResults: Record<string, unknown> = {};
+        
+        for (const [envName, envConfig] of Object.entries(ENV_CONFIG)) {
+          const apiKey = Deno.env.get(envConfig.apiKeyEnv);
+          const privateKey = Deno.env.get(envConfig.privateKeyEnv);
+          
+          if (!apiKey || !privateKey) {
+            envResults[envName] = { 
+              configured: false, 
+              apiKeyEnv: envConfig.apiKeyEnv,
+              privateKeyEnv: envConfig.privateKeyEnv 
+            };
+            continue;
+          }
+          
+          // Analyze key format
+          let apiKeyFormat = 'unknown';
+          let extractedKeyLength = 0;
+          let isPem = false;
+          
+          try {
+            const decoded = base64ToBytes(apiKey);
+            const pemText = new TextDecoder().decode(decoded);
+            isPem = pemText.includes('-----BEGIN');
+            
+            if (isPem) {
+              apiKeyFormat = 'base64-encoded-pem';
+              const extracted = extractPemBody(apiKey);
+              extractedKeyLength = extracted.length;
+            } else {
+              apiKeyFormat = 'raw-base64';
+              extractedKeyLength = apiKey.length;
+            }
+          } catch {
+            apiKeyFormat = 'decode-error';
+          }
+          
+          // Try a simple GET request to test credentials
+          let testResult = 'untested';
+          try {
+            const testResp = await drGreenRequestGet(
+              '/dapp/strains',
+              { countryCode: 'ZAF', take: 1 },
+              false,
+              envConfig
+            );
+            testResult = testResp.ok ? 'SUCCESS' : `FAIL:${testResp.status}`;
+          } catch (e) {
+            testResult = `ERROR:${String(e).slice(0, 50)}`;
+          }
+          
+          envResults[envName] = {
+            configured: true,
+            apiKeyEnv: envConfig.apiKeyEnv,
+            apiKeyLength: apiKey.length,
+            apiKeyPrefix: apiKey.slice(0, 12) + '...',
+            isPem,
+            apiKeyFormat,
+            extractedKeyLength,
+            privateKeyLength: privateKey.length,
+            privateKeyPrefix: privateKey.slice(0, 12) + '...',
+            testResult,
+          };
+        }
+        
+        return new Response(JSON.stringify({
+          action: 'debug-compare-keys',
+          environments: envResults,
+          timestamp: new Date().toISOString(),
+        }, null, 2), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Unknown action", action }),
