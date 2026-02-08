@@ -9,24 +9,24 @@ const corsHeaders = {
 // Real user accounts - these will sync with Dr. Green API on login
 const TEST_USERS = [
   {
-    email: "admin@healingbuds.test",
-    password: "Admin123!",
-    fullName: "Admin User",
+    email: "healingbudsglobal@gmail.com",
+    password: "H34l1ng@buds2025",
+    fullName: "Admin",
     createClient: false,
     role: "admin",
   },
   // Real Dr. Green registered users - already verified in Dr. Green API
   {
     email: "scott.k1@outlook.com",
-    password: "TempPassword123!",
-    fullName: "Scott",
+    password: "H34l1ng@buds2025",
+    fullName: "Scott K",
     createClient: false, // Will sync from Dr. Green API
     role: null,
   },
   {
-    email: "kayliegh.sm@gmail.com",
-    password: "TempPassword123!",
-    fullName: "Kayliegh",
+    email: "kayleigh.sm@gmail.com",
+    password: "H34l1ng@buds2025",
+    fullName: "Kayleigh SM",
     createClient: false, // Will sync from Dr. Green API
     role: null,
   },

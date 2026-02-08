@@ -20,32 +20,25 @@ interface TestUser {
 
 const TEST_USERS: TestUser[] = [
   {
-    email: 'scott@healingbuds.global',
-    password: 'Admin123!',
-    name: 'Scott (Admin)',
+    email: 'healingbudsglobal@gmail.com',
+    password: 'H34l1ng@buds2025',
+    name: 'Admin',
     role: 'admin',
     description: 'Full admin access',
   },
   {
-    email: 'scott@healingbuds.co.uk',
-    password: 'Patient123!',
-    name: 'Scott Cunningham',
+    email: 'scott.k1@outlook.com',
+    password: 'H34l1ng@buds2025',
+    name: 'Scott K',
     role: 'patient',
-    description: 'UK Patient - KYC Pending',
+    description: 'Dr. Green Patient',
   },
   {
-    email: 'kayleigh@healingbuds.co.uk',
-    password: 'Patient123!',
-    name: 'Kayleigh Cunningham',
+    email: 'kayleigh.sm@gmail.com',
+    password: 'H34l1ng@buds2025',
+    name: 'Kayleigh SM',
     role: 'patient',
-    description: 'UK Patient - KYC Pending',
-  },
-  {
-    email: 'test@healingbuds.co.uk',
-    password: 'Test123!',
-    name: 'Test User',
-    role: 'user',
-    description: 'Standard test account',
+    description: 'Dr. Green Patient',
   },
 ];
 
