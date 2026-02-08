@@ -58,6 +58,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { to: "/admin/prescriptions", label: "Prescriptions", icon: FileText },
   { to: "/admin/strains", label: "Strains", icon: Leaf },
   { to: "/admin/strain-sync", label: "Strain Sync", icon: RefreshCw },

@@ -190,6 +190,9 @@ export type Database = {
           items: Json
           payment_status: string
           status: string
+          sync_error: string | null
+          sync_status: string | null
+          synced_at: string | null
           total_amount: number
           updated_at: string
           user_id: string
@@ -201,6 +204,9 @@ export type Database = {
           items?: Json
           payment_status?: string
           status?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          synced_at?: string | null
           total_amount: number
           updated_at?: string
           user_id: string
@@ -212,6 +218,9 @@ export type Database = {
           items?: Json
           payment_status?: string
           status?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          synced_at?: string | null
           total_amount?: number
           updated_at?: string
           user_id?: string
