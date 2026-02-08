@@ -1,93 +1,91 @@
 
 
-# Fix: Dr. Green API Proxy Signing Method
+# Create API Knowledge and Infrastructure Documentation
 
-## Problem Identified
+## Overview
+Create two new documentation files that capture the critical findings from the Dr. Green API integration debugging process. These files serve as a permanent knowledge base for this project and as transferable reference material for future projects involving similar API integrations.
 
-The API is **online and credentials are valid** -- confirmed by the health check endpoint which successfully authenticates and returns strains data (200 OK in 497ms).
+## Files to Create
 
-However, the main proxy function uses the **wrong signing algorithm**, causing all 5 environments to return 401 Unauthorized.
+### File 1: `docs/DRGREEN-API-SIGNING-KNOWLEDGE.md`
+A focused technical document capturing the authentication and signing mechanics that were discovered, debugged, and resolved. This is the "lessons learned" document that prevents the same debugging process from happening again.
 
-### Root Cause Analysis
+**Contents will include:**
+- The correct signing method: HMAC-SHA256 (not secp256k1 ECDSA)
+- What to sign for GET requests: the query string (e.g., `orderBy=desc&take=1&page=1`)
+- What to sign for POST requests: the JSON body string
+- API key header format: send raw Base64 key, do not strip PEM headers
+- Secret key decoding: Base64-decode to raw bytes before use as HMAC key
+- The `DRGREEN_USE_HMAC` environment variable toggle for rollback
+- Reference implementation in both Deno (Web Crypto API) and Node.js
+- Common pitfalls and the root cause analysis of the 401 errors
+- Diagnostic endpoints available for future testing
 
-Three critical mismatches exist between the working health check and the broken proxy:
+### File 2: `.agent/knowledge/API_INFRASTRUCTURE.md`
+A broader infrastructure knowledge document that captures architectural decisions, multi-environment configuration, credential management, and operational patterns. Designed to be reusable across future projects.
 
-1. **Signing Algorithm Mismatch**
-   - Health check uses **HMAC-SHA256** (symmetric) -- this is correct per WordPress reference: "Auth Mechanism: HMAC SHA256 Signature + Public Key"
-   - Proxy uses **secp256k1 ECDSA** (asymmetric DER-encoded signatures) -- this is incorrect
+**Contents will include:**
+- Proxy architecture pattern (Frontend -> Edge Function -> External API)
+- Multi-environment credential management (5 environments with distinct key pairs)
+- NFT-scoped access control and its implications for client management
+- Secret naming conventions and what each credential pair is used for
+- Health check pattern for API connectivity monitoring
+- Retry configuration with exponential backoff
+- Security patterns (never expose keys client-side, sanitized logging)
+- The `extractPemBody` trap and why raw keys should be used
+- Write vs read credential separation
+- Key rotation and migration procedures
 
-2. **Payload Being Signed**
-   - Health check signs the **query string** for GET requests (e.g., `orderBy=desc&take=1&page=1`)
-   - Proxy signs an **empty JSON object** (`"{}"`) for all GET requests
+### File 3: Update existing `docs/DRGREEN-API-INTEGRATION.md`
+Update the existing integration guide to correct the outdated signing documentation that still references secp256k1 ECDSA. This prevents future developers from reimplementing the wrong approach.
 
-3. **API Key Header Format**
-   - Health check sends the **raw API key** value as stored in the secret
-   - Proxy processes the key through `extractPemBody()`, which strips PEM headers and sends only the inner Base64 body
-
-### Why the Confusion Occurred
-
-The `api_uses.md` documentation shows `crypto.sign(null, Buffer.from(payload), privateKeyObject)` which looks like asymmetric signing. However, the WordPress implementation (`api.md`) explicitly states "HMAC SHA256 Signature" -- and the health check proves this is the correct approach. The `crypto.sign(null, ...)` pattern may apply to POST requests only, or may be a documentation error.
-
-## Implementation Plan
-
-### Step 1: Add Diagnostic Endpoint to Confirm Fix
-Before changing the main proxy, add a new `debug-signing-test` action that tests both signing methods against the same strains endpoint. This will definitively confirm which approach works.
-
-The diagnostic will test:
-- Method A: HMAC-SHA256 + raw apiKey + sign query string (health check approach)
-- Method B: secp256k1 ECDSA + extractPemBody + sign `"{}"` (current proxy approach)
-
-### Step 2: Fix GET Request Signing in Proxy
-Update `drGreenRequestGet()` to use HMAC-SHA256 signing of the query string instead of secp256k1 ECDSA signing of `"{}"`:
-- Change the signing from `signPayload("{}", secretKey)` to a new `signWithHmac(queryString, secretKey)` function
-- Send the raw API key instead of processing it through `extractPemBody()`
-- Keep the existing secp256k1 approach available as a fallback
-
-### Step 3: Fix POST Request Signing in Proxy
-Update `drGreenRequestBody()` to use HMAC-SHA256 signing of the JSON payload:
-- Change the signing from secp256k1 ECDSA to HMAC-SHA256
-- Sign the stringified JSON body
-- Send the raw API key instead of `extractPemBody()` output
-
-### Step 4: Fix Cart Remove Inconsistency
-The `remove-from-cart` handler already sends the raw `apiKey` (line 2209), which is actually correct. Align all other handlers to do the same.
-
-### Step 5: Preserve Backwards Compatibility
-- Keep `generateSecp256k1Signature()` and `generatePrivateKeySignature()` functions intact (they may be needed for other API versions)
-- Add a configuration flag `DRGREEN_USE_HMAC=true` (default true) so the signing method can be toggled without code changes if needed
-
-### Step 6: Test All Environments
-After deploying the fix, run the debug-compare-keys diagnostic to verify all 5 environments authenticate successfully.
+**Specific corrections:**
+- Update the architecture diagram to say "HMAC-SHA256" instead of "secp256k1 + SHA-256"
+- Update the "Signature Generation" code example to show HMAC-SHA256
+- Update the Troubleshooting section to reference the correct signing method
+- Add version history entry for this fix
+- Add cross-reference to the new signing knowledge document
 
 ## Technical Details
 
-### New HMAC Signing Function (matching health check)
+### File locations
+- `docs/DRGREEN-API-SIGNING-KNOWLEDGE.md` (new)
+- `.agent/knowledge/API_INFRASTRUCTURE.md` (new)
+- `docs/DRGREEN-API-INTEGRATION.md` (update lines 31, 56-79, 748-753, 766-771)
+
+### No code changes required
+These are documentation-only changes. No edge functions, components, or configuration files will be modified.
+
+### Correct Signing Reference (to be documented)
+
+**Deno / Web Crypto API (edge functions):**
 ```text
-function signWithHmac(data, secretKey):
-  1. Base64-decode secretKey to get raw bytes (PEM text as bytes)
-  2. Import as HMAC-SHA256 key via crypto.subtle.importKey("raw", ...)
-  3. Sign the data string with HMAC
-  4. Return Base64-encoded signature
+1. Base64-decode the secret key to raw bytes
+2. Import as HMAC key: crypto.subtle.importKey("raw", keyBytes, {name: "HMAC", hash: "SHA-256"})
+3. Sign the data: crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(dataToSign))
+4. Base64-encode the resulting signature
+5. Send raw API key in x-auth-apikey header (no PEM stripping)
 ```
 
-### Updated GET Request Flow
+**Node.js (WordPress reference):**
 ```text
-Before: sign("{}", secp256k1) + extractPemBody(apiKey)
-After:  sign(queryString, HMAC-SHA256) + raw apiKey
+1. Create HMAC: crypto.createHmac('sha256', Buffer.from(secretKey, 'base64'))
+2. Update with data: hmac.update(payload)
+3. Digest as Base64: hmac.digest('base64')
+4. Send raw API key in x-auth-apikey header
 ```
 
-### Updated POST Request Flow
-```text
-Before: sign(JSON.stringify(body), secp256k1) + extractPemBody(apiKey)
-After:  sign(JSON.stringify(body), HMAC-SHA256) + raw apiKey
-```
+**What to sign per HTTP method:**
+- GET: The query string (e.g., "orderBy=desc&take=10&page=1")
+- POST/PATCH/DELETE: The JSON body string (JSON.stringify(body))
+- No body/params: Empty string ""
 
-### Files to Modify
-- `supabase/functions/drgreen-proxy/index.ts` -- Main proxy signing logic
-- `supabase/functions/drgreen-health/index.ts` -- No changes needed (already works correctly)
+### Key Findings to Document
 
-### Risk Assessment
-- **Low risk**: The health check already proves the HMAC approach works with current credentials
-- **Rollback**: Can toggle back to ECDSA via environment variable if needed
-- **No frontend changes**: Only backend proxy signing is affected
+| Finding | Wrong Approach | Correct Approach |
+|---------|---------------|-----------------|
+| Signing algorithm | secp256k1 ECDSA (asymmetric) | HMAC-SHA256 (symmetric) |
+| GET payload to sign | Empty JSON object `"{}"` | Query string parameters |
+| API key header | Stripped via extractPemBody() | Raw Base64 as stored |
+| Secret key usage | Parse as PKCS#8, extract 32-byte EC key | Base64-decode to raw bytes for HMAC |
 
