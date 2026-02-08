@@ -261,7 +261,79 @@ serve(async (req) => {
       );
     }
 
-    const { message, signature, address } = await req.json();
+    const body = await req.json();
+
+    // ── NFT Ownership Check (read-only diagnostic) ──────────
+    if (body.action === 'nft-check') {
+      const checkAddress = body.address;
+
+      if (!checkAddress || !/^0x[a-fA-F0-9]{40}$/.test(checkAddress)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or missing Ethereum address' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const normalized = checkAddress.toLowerCase();
+      console.log(`[wallet-auth] NFT check requested for ${normalized.slice(0, 10)}...`);
+
+      // On-chain NFT ownership check (reuses existing function)
+      const nftResult = await checkNFTOwnership(normalized);
+
+      // Admin whitelist check
+      const fallbackWallets = getFallbackWallets();
+      const isInAdminWhitelist = fallbackWallets.includes(normalized);
+
+      // DB mapping check
+      let hasDbMapping = false;
+      let maskedEmail: string | null = null;
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+
+        const { data } = await adminClient
+          .from('wallet_email_mappings')
+          .select('email')
+          .eq('wallet_address', normalized)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (data?.email) {
+          hasDbMapping = true;
+          // Mask email for security: show first 3 chars + *** + domain
+          const [local, domain] = data.email.split('@');
+          maskedEmail = `${local.slice(0, 3)}***@${domain}`;
+        }
+      } catch (err) {
+        console.warn('[wallet-auth] DB mapping check failed during nft-check:', err);
+      }
+
+      const result = {
+        address: normalized,
+        ownsNFT: nftResult.ownsNFT,
+        balance: nftResult.balance ?? null,
+        method: nftResult.method,
+        contract: DR_GREEN_NFT_CONTRACT,
+        chainId: 1,
+        isInAdminWhitelist,
+        hasDbMapping,
+        mappedEmail: maskedEmail,
+        checkedAt: new Date().toISOString(),
+      };
+
+      console.log(`[wallet-auth] NFT check result:`, JSON.stringify(result));
+
+      return new Response(
+        JSON.stringify(result),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── Full Wallet Auth Flow (existing, unchanged) ─────────
+    const { message, signature, address } = body;
 
     // ── Input validation ──
     if (!message || !signature || !address) {
