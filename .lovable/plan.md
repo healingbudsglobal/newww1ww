@@ -1,40 +1,27 @@
 
 
-# Secret Configuration for Remixed Project
+# Save Profile & Authentication API Reference Document
 
-## Overview
-Your remixed project needs 12 secrets re-entered to restore full functionality. These secrets are not carried over during a remix — only the secret names exist, but the values are empty.
+## What This Does
+Save the comprehensive Profile & Authentication API specification you provided as a new markdown reference document in the project's `docs/` folder. This document covers wallet auth flows, client CRUD, wallet linking, session management, KYC, billing, GDPR, webhooks, and admin endpoints — serving as the authoritative reference for all profile and authentication API integration work.
 
-## Secrets to Update (in order of priority)
+## File to Create
+- **`docs/PROFILE-AUTH-API-REFERENCE.md`** — The full API specification, properly formatted as clean markdown with:
+  - All 12 endpoint sections (Auth/Wallet, Client CRUD, Wallet Linking, Sessions, Preferences, KYC, Billing, GDPR, Webhooks, Admin, Notifications, Policies)
+  - cURL and fetch examples
+  - Node/Express reference snippets
+  - OpenAPI YAML starter
+  - Postman collection JSON template
+  - Security policies and edge case guidance
+  - End-to-end wallet login flow example
 
-### Dr. Green API — Production (Read)
-1. **DRGREEN_API_KEY** — Primary production API key
-2. **DRGREEN_PRIVATE_KEY** — Primary production HMAC signing key
+## How It Relates to Existing Code
+- **Current `wallet-auth` edge function**: Implements a subset of this spec (SIWE sign + NFT check + OTP session). The new doc provides the full nonce-based pattern (Sections 1.1-1.2) that could replace or extend the current timestamp-based approach.
+- **Current `drgreen-proxy`**: Already handles client creation, cart, orders. The new doc adds wallet linking (Section 3), session management (Section 4), and preferences (Section 5) as future capabilities.
+- **Existing `docs/DRGREEN-API-FULL-REFERENCE.md`**: Covers the Dr. Green DApp API specifically. This new document is complementary — it defines the profile/auth layer that sits between the frontend and the DApp API.
 
-### Dr. Green API — Production (Write)
-3. **DRGREEN_WRITE_API_KEY** — Write-enabled key for client creation and orders
-4. **DRGREEN_WRITE_PRIVATE_KEY** — Write-enabled signing key
-
-### Dr. Green API — Alternate Production
-5. **DRGREEN_ALT_API_KEY** — Alternate production API key
-6. **DRGREEN_ALT_PRIVATE_KEY** — Alternate production signing key
-
-### Dr. Green API — Staging
-7. **DRGREEN_STAGING_API_URL** — Staging API base URL
-8. **DRGREEN_STAGING_API_KEY** — Staging API key
-9. **DRGREEN_STAGING_PRIVATE_KEY** — Staging signing key
-
-### Platform and Services
-10. **ADMIN_WALLET_ADDRESSES** — Comma-separated Ethereum wallet addresses for admin access
-11. **RESEND_API_KEY** — Email delivery service key
-12. **EXTERNAL_SUPABASE_SERVICE_KEY** — Service key for external backend project
-
-## Implementation
-Once approved, I will prompt you to enter each secret value using the secure input form. You will need to retrieve the original values from your previous project's settings or from your credentials store.
-
-## What You Need Ready
-- Access to your Dr. Green DApp API dashboard (for all API keys and signing keys)
-- Your Resend account dashboard (for the email API key)
-- Your admin wallet addresses
-- The external backend service key (if still in use)
+## Technical Notes
+- No code changes are made — this is documentation only
+- The document will be formatted with proper markdown headings, code blocks, and tables for readability
+- All variable placeholders (e.g., `{{baseUrl}}`, `{{accessToken}}`) are preserved as-is for Postman/API client compatibility
 
