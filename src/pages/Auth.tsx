@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useShop } from "@/context/ShopContext";
 import { getProductionPath } from "@/lib/urls";
+import { DevQuickLogin } from "@/components/DevQuickLogin";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -111,6 +112,41 @@ const Auth = () => {
       }
       return false;
     }
+  };
+
+  // Quick login for dev mode - auto-fill and submit
+  const handleQuickLogin = async (quickEmail: string, quickPassword: string) => {
+    setEmail(quickEmail);
+    setPassword(quickPassword);
+    setLoading(true);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: quickEmail.trim(),
+      password: quickPassword,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      let message = t('loginError');
+      if (error.message.includes("Invalid login credentials")) {
+        message = t('invalidCredentials');
+      } else if (error.message.includes("Email not confirmed")) {
+        message = t('emailNotConfirmed');
+      }
+      toast({
+        title: t('loginFailed'),
+        description: message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: t('welcomeBackToast'),
+      description: t('loginSuccess'),
+    });
+    // Navigation handled by useEffect based on role/eligibility
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -461,6 +497,14 @@ const Auth = () => {
                         <p className="text-destructive text-xs">{errors.confirmPassword}</p>
                       )}
                     </div>
+                  )}
+
+                  {/* Dev Quick Login - only show on login mode */}
+                  {isLogin && (
+                    <DevQuickLogin 
+                      onSelectUser={handleQuickLogin} 
+                      disabled={loading}
+                    />
                   )}
 
                   <Button
