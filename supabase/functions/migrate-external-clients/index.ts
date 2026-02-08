@@ -16,7 +16,7 @@ serve(async (req) => {
     console.log('[MIGRATE] Starting external client migration...');
 
     // External Supabase credentials (source) - using service role key to bypass RLS
-    const externalUrl = "https://jthomldceuhuqnqhlhpe.supabase.co";
+    const externalUrl = "https://texrwjjwrkvhdfjemnf.supabase.co";
     const externalServiceKey = Deno.env.get('EXTERNAL_SUPABASE_SERVICE_KEY');
     
     if (!externalServiceKey) {
