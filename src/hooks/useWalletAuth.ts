@@ -1,12 +1,13 @@
 /**
  * useWalletAuth Hook
  * 
- * Implements Sign-In with Ethereum (SIWE) for admin wallet authentication.
+ * Implements nonce-based Sign-In with Ethereum (SIWE) for admin wallet authentication.
  * Flow:
  * 1. User connects MetaMask wallet
- * 2. Signs a timestamped auth message
- * 3. Edge function verifies signature + checks wallet authorization
- * 4. Returns OTP token → frontend establishes Supabase session
+ * 2. Request a server-issued nonce from the edge function
+ * 3. Build and sign a message containing the nonce
+ * 4. Edge function verifies signature + nonce + NFT ownership
+ * 5. Returns OTP token → frontend establishes Supabase session
  */
 
 import { useState, useCallback } from 'react';
@@ -29,24 +30,38 @@ export function useWalletAuth() {
   });
 
   /**
-   * Build the SIWE-style authentication message.
-   * Includes wallet address and a timestamp for replay protection.
+   * Build the nonce-based authentication message.
    */
-  const buildAuthMessage = useCallback((walletAddress: string): string => {
-    const timestamp = Date.now();
+  const buildAuthMessage = useCallback((walletAddress: string, nonce: string, issuedAt: string): string => {
     return [
       'Healing Buds Admin Authentication',
       '',
       'I am signing in to the Healing Buds admin portal.',
       '',
       `Wallet: ${walletAddress}`,
-      `Timestamp: ${timestamp}`,
+      `Nonce: ${nonce}`,
+      `Issued At: ${issuedAt}`,
     ].join('\n');
   }, []);
 
   /**
+   * Request a server-issued nonce for wallet authentication.
+   */
+  const requestNonce = useCallback(async (walletAddress: string, purpose: string = 'login') => {
+    const { data, error } = await supabase.functions.invoke('wallet-auth', {
+      body: { action: 'request-nonce', address: walletAddress, purpose },
+    });
+
+    if (error || !data?.nonce) {
+      throw new Error(data?.error || error?.message || 'Failed to request nonce');
+    }
+
+    return data as { address: string; nonce: string; purpose: string; issuedAt: string; expiresAt: string };
+  }, []);
+
+  /**
    * Initiate wallet-based authentication.
-   * Requests signature from MetaMask, verifies server-side, establishes session.
+   * Two-step: request nonce → sign → verify.
    */
   const authenticateWithWallet = useCallback(async (): Promise<boolean> => {
     if (!isConnected || !address) {
@@ -57,15 +72,19 @@ export function useWalletAuth() {
     setState({ isAuthenticating: true, error: null });
 
     try {
-      // 1. Build auth message
-      const message = buildAuthMessage(address);
+      // 1. Request nonce from server
+      console.log('[useWalletAuth] Requesting nonce...');
+      const nonceData = await requestNonce(address, 'login');
+      console.log('[useWalletAuth] Nonce received:', nonceData.nonce.slice(0, 8) + '...');
 
-      // 2. Request signature from wallet
+      // 2. Build message with server nonce
+      const message = buildAuthMessage(address, nonceData.nonce, nonceData.issuedAt);
+
+      // 3. Request signature from wallet
       let signature: string;
       try {
         signature = await signMessageAsync({ message, account: address });
       } catch (signError: any) {
-        // User rejected the signature request
         if (signError?.code === 4001 || signError?.message?.includes('rejected')) {
           setState({ isAuthenticating: false, error: null });
           return false;
@@ -73,9 +92,9 @@ export function useWalletAuth() {
         throw signError;
       }
 
-      // 3. Send to edge function for verification
+      // 4. Verify with edge function (nonce-based)
       const { data, error: fnError } = await supabase.functions.invoke('wallet-auth', {
-        body: { message, signature, address },
+        body: { action: 'verify', message, signature, address, purpose: 'login' },
       });
 
       if (fnError) {
@@ -100,7 +119,7 @@ export function useWalletAuth() {
         return false;
       }
 
-      // 4. Use OTP to establish Supabase session
+      // 5. Use OTP to establish Supabase session
       const { error: otpError } = await supabase.auth.verifyOtp({
         email: data.email,
         token: data.token,
@@ -118,7 +137,7 @@ export function useWalletAuth() {
         return false;
       }
 
-      // 5. Success!
+      // 6. Success!
       setState({ isAuthenticating: false, error: null });
       toast({
         title: 'Welcome, Admin',
@@ -138,7 +157,7 @@ export function useWalletAuth() {
       });
       return false;
     }
-  }, [address, isConnected, signMessageAsync, buildAuthMessage, toast]);
+  }, [address, isConnected, signMessageAsync, buildAuthMessage, requestNonce, toast]);
 
   return {
     authenticateWithWallet,

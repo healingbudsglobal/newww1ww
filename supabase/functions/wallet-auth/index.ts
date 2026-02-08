@@ -14,7 +14,7 @@ secp256k1.etc.hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]) => {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // ─── Constants ────────────────────────────────────────────
@@ -38,7 +38,6 @@ const RPC_TIMEOUT_MS = 10_000;
 /**
  * Hardcoded fallback wallet-to-email mapping.
  * Used only if the DB lookup fails (e.g., during initial setup).
- * The primary source of truth is the wallet_email_mappings table.
  */
 const FALLBACK_WALLET_EMAIL_MAP: Record<string, string> = {
   '0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84': 'healingbudsglobal@gmail.com',
@@ -95,12 +94,6 @@ function recoverAddress(message: string, signature: string): string {
 
 // ─── On-Chain NFT Verification ────────────────────────────
 
-/**
- * Check if a wallet holds a Dr. Green Digital Key NFT via on-chain
- * ERC-721 balanceOf call. Tries multiple RPC endpoints with timeout.
- *
- * @returns { ownsNFT: boolean, method: 'on-chain' | 'fallback', balance?: number }
- */
 async function checkNFTOwnership(
   walletAddress: string
 ): Promise<{ ownsNFT: boolean; method: 'on-chain' | 'fallback'; balance?: number }> {
@@ -110,17 +103,10 @@ async function checkNFTOwnership(
   const rpcPayload = JSON.stringify({
     jsonrpc: '2.0',
     method: 'eth_call',
-    params: [
-      {
-        to: DR_GREEN_NFT_CONTRACT,
-        data: callData,
-      },
-      'latest',
-    ],
+    params: [{ to: DR_GREEN_NFT_CONTRACT, data: callData }, 'latest'],
     id: 1,
   });
 
-  // Try each RPC endpoint in sequence until one succeeds
   for (const rpcUrl of ETHEREUM_RPC_URLS) {
     try {
       const controller = new AbortController();
@@ -141,13 +127,11 @@ async function checkNFTOwnership(
       }
 
       const data = await response.json();
-
       if (data.error) {
         console.warn(`[wallet-auth] RPC ${rpcUrl} returned error:`, data.error);
         continue;
       }
 
-      // Parse hex balance (uint256)
       const hexBalance = data.result;
       if (!hexBalance || hexBalance === '0x') {
         console.warn(`[wallet-auth] RPC ${rpcUrl} returned empty result`);
@@ -155,10 +139,7 @@ async function checkNFTOwnership(
       }
 
       const balance = parseInt(hexBalance, 16);
-      console.log(
-        `[wallet-auth] On-chain NFT check via ${rpcUrl}: wallet=${walletAddress.slice(0, 10)}..., balance=${balance}`
-      );
-
+      console.log(`[wallet-auth] On-chain NFT check via ${rpcUrl}: wallet=${walletAddress.slice(0, 10)}..., balance=${balance}`);
       return { ownsNFT: balance > 0, method: 'on-chain', balance };
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -167,29 +148,45 @@ async function checkNFTOwnership(
     }
   }
 
-  // ── Fallback: static ADMIN_WALLET_ADDRESSES secret ──
   console.warn('[wallet-auth] All RPC endpoints failed — falling back to ADMIN_WALLET_ADDRESSES');
   const fallbackWallets = getFallbackWallets();
   const isInFallback = fallbackWallets.includes(walletAddress.toLowerCase());
   return { ownsNFT: isInFallback, method: 'fallback' };
 }
 
-/**
- * Get fallback admin wallet addresses from the ADMIN_WALLET_ADDRESSES secret.
- */
 function getFallbackWallets(): string[] {
   const envWallets = Deno.env.get('ADMIN_WALLET_ADDRESSES');
   if (envWallets) {
     return envWallets.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
   }
-  // Hardcoded safety net
   return ['0x0b60d85fefcd9064a29f7df0f8cbc7901b9e6c84'];
 }
 
+// ─── Auth Message Parsing ─────────────────────────────────
+
 /**
- * Parse and validate the SIWE-style auth message.
+ * Parse nonce-based auth message (new format).
  */
-function parseAuthMessage(message: string): { wallet: string; timestamp: number } | null {
+function parseNonceAuthMessage(message: string): { wallet: string; nonce: string; issuedAt: string } | null {
+  try {
+    const walletMatch = message.match(/Wallet:\s*(0x[a-fA-F0-9]{40})/);
+    const nonceMatch = message.match(/Nonce:\s*([a-f0-9-]+)/i);
+    const issuedAtMatch = message.match(/Issued At:\s*(.+)/);
+    if (!walletMatch || !nonceMatch || !issuedAtMatch) return null;
+    return {
+      wallet: walletMatch[1].toLowerCase(),
+      nonce: nonceMatch[1],
+      issuedAt: issuedAtMatch[1].trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse legacy timestamp-based auth message.
+ */
+function parseLegacyAuthMessage(message: string): { wallet: string; timestamp: number } | null {
   try {
     const walletMatch = message.match(/Wallet:\s*(0x[a-fA-F0-9]{40})/);
     const timestampMatch = message.match(/Timestamp:\s*(\d+)/);
@@ -205,17 +202,12 @@ function parseAuthMessage(message: string): { wallet: string; timestamp: number 
 
 // ─── Account Linking ──────────────────────────────────────
 
-/**
- * Resolve the email to use for this wallet by checking the
- * wallet_email_mappings table. Falls back to hardcoded map if DB fails.
- */
 async function resolveEmail(
   walletAddress: string,
   adminClient: ReturnType<typeof createClient>
 ): Promise<{ email: string; isLinked: boolean }> {
   const normalized = walletAddress.toLowerCase();
 
-  // Primary: query the wallet_email_mappings table (service role bypasses RLS)
   try {
     const { data, error } = await adminClient
       .from('wallet_email_mappings')
@@ -236,7 +228,6 @@ async function resolveEmail(
     console.warn('[wallet-auth] DB mapping lookup exception:', err);
   }
 
-  // Fallback: hardcoded map
   const fallbackEmail = FALLBACK_WALLET_EMAIL_MAP[normalized];
   if (fallbackEmail) {
     console.log(`[wallet-auth] Fallback mapping used: ${normalized.slice(0, 10)}... -> ${fallbackEmail}`);
@@ -246,11 +237,127 @@ async function resolveEmail(
   return { email: `${normalized}@wallet.healingbuds`, isLinked: false };
 }
 
+// ─── Shared: Post-verification user creation & session ────
+
+async function createSessionForWallet(
+  address: string,
+  nftResult: { ownsNFT: boolean; method: string; balance?: number },
+  adminClient: ReturnType<typeof createClient>
+): Promise<Response> {
+  // Resolve email
+  const { email: userEmail, isLinked } = await resolveEmail(address, adminClient);
+  console.log(`[wallet-auth] Email resolved: ${userEmail} (linked=${isLinked})`);
+
+  // Find or create user
+  const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+  let userId: string | null = null;
+  let isNewUser = false;
+
+  const existingUser = existingUsers?.users?.find(u => u.email === userEmail);
+  const walletEmail = `${address.toLowerCase()}@wallet.healingbuds`;
+  const legacyWalletUser = isLinked
+    ? existingUsers?.users?.find(u => u.email === walletEmail)
+    : null;
+
+  if (existingUser) {
+    userId = existingUser.id;
+    console.log(`[wallet-auth] Existing user found: ${userId.slice(0, 8)}...`);
+    await adminClient.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        ...existingUser.user_metadata,
+        wallet_address: address.toLowerCase(),
+        auth_method: 'wallet',
+        nft_verified: true,
+        nft_verification_method: nftResult.method,
+      },
+    });
+  } else {
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email: userEmail,
+      email_confirm: true,
+      user_metadata: {
+        wallet_address: address.toLowerCase(),
+        auth_method: 'wallet',
+        full_name: isLinked ? 'Admin' : `Admin (${address.slice(0, 6)}...${address.slice(-4)})`,
+        nft_verified: true,
+        nft_verification_method: nftResult.method,
+      },
+    });
+
+    if (createError) {
+      console.error('[wallet-auth] User creation failed:', createError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create user account' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    userId = newUser.user.id;
+    isNewUser = true;
+    console.log(`[wallet-auth] New user created: ${userId.slice(0, 8)}...`);
+  }
+
+  if (legacyWalletUser && legacyWalletUser.id !== userId) {
+    console.log(`[wallet-auth] Legacy wallet user found (${legacyWalletUser.id.slice(0, 8)}...), linked account used instead`);
+  }
+
+  // Ensure admin role
+  if (userId) {
+    const { data: hasRole } = await adminClient.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin',
+    });
+
+    if (!hasRole) {
+      const { error: roleError } = await adminClient
+        .from('user_roles')
+        .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' });
+
+      if (roleError) {
+        console.error('[wallet-auth] Role assignment failed:', roleError.message);
+      } else {
+        console.log(`[wallet-auth] Admin role assigned to ${userId.slice(0, 8)}...`);
+      }
+    }
+  }
+
+  // Generate magic link token
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email: userEmail,
+  });
+
+  if (linkError || !linkData) {
+    console.error('[wallet-auth] Link generation failed:', linkError?.message);
+    return new Response(
+      JSON.stringify({ error: 'Failed to generate authentication session' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const properties = linkData.properties;
+
+  console.log(`[wallet-auth] Auth successful: wallet=${address.slice(0, 10)}..., email=${userEmail}, nft_method=${nftResult.method}, new=${isNewUser}, linked=${isLinked}`);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      email: userEmail,
+      token: properties.email_otp,
+      hashed_token: properties.hashed_token,
+      is_new_user: isNewUser,
+      is_linked_account: isLinked,
+      nft_verification: nftResult.method,
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
 // ─── Main Handler ──────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -262,8 +369,190 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // ── NFT Ownership Check (read-only diagnostic) ──────────
+    // ── ACTION: request-nonce ───────────────────────────────
+    if (body.action === 'request-nonce') {
+      const { address, purpose } = body;
+
+      if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or missing Ethereum address' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validPurposes = ['login', 'create', 'link', 'delete'];
+      if (!purpose || !validPurposes.includes(purpose)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid purpose. Must be one of: ${validPurposes.join(', ')}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const normalized = address.toLowerCase();
+      const nonce = crypto.randomUUID();
+      const issuedAt = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      // Cleanup expired nonces older than 1 hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      await adminClient
+        .from('wallet_auth_nonces')
+        .delete()
+        .lt('expires_at', oneHourAgo);
+
+      // Store nonce
+      const { error: insertError } = await adminClient
+        .from('wallet_auth_nonces')
+        .insert({
+          address: normalized,
+          nonce,
+          purpose,
+          issued_at: issuedAt,
+          expires_at: expiresAt,
+        });
+
+      if (insertError) {
+        console.error('[wallet-auth] Nonce insert failed:', insertError.message);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate nonce' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[wallet-auth] Nonce issued: address=${normalized.slice(0, 10)}..., purpose=${purpose}, nonce=${nonce.slice(0, 8)}...`);
+
+      return new Response(
+        JSON.stringify({ address: normalized, nonce, purpose, issuedAt, expiresAt }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── ACTION: verify (nonce-based) ────────────────────────
+    if (body.action === 'verify') {
+      const { address, message, signature, purpose } = body;
+
+      if (!address || !message || !signature || !purpose) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: address, message, signature, purpose' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid Ethereum address format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Parse nonce from message
+      const parsed = parseNonceAuthMessage(message);
+      if (!parsed) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication message format. Expected nonce-based message.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (parsed.wallet !== address.toLowerCase()) {
+        return new Response(
+          JSON.stringify({ error: 'Message wallet does not match provided address' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify signature
+      let recoveredAddress: string;
+      try {
+        recoveredAddress = recoverAddress(message, signature);
+      } catch (err) {
+        console.error('[wallet-auth] Signature recovery failed:', err);
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+        console.warn(`[wallet-auth] Address mismatch: claimed=${address}, recovered=${recoveredAddress}`);
+        return new Response(
+          JSON.stringify({ error: 'Signature does not match the provided address' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate nonce in DB
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const { data: nonceRecord, error: nonceError } = await adminClient
+        .from('wallet_auth_nonces')
+        .select('*')
+        .eq('nonce', parsed.nonce)
+        .eq('address', address.toLowerCase())
+        .eq('purpose', purpose)
+        .maybeSingle();
+
+      if (nonceError || !nonceRecord) {
+        console.warn(`[wallet-auth] Nonce not found: nonce=${parsed.nonce}, address=${address.slice(0, 10)}...`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired nonce. Please request a new one.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (nonceRecord.used) {
+        console.warn(`[wallet-auth] Nonce already used: ${parsed.nonce}`);
+        return new Response(
+          JSON.stringify({ error: 'Nonce has already been used. Please request a new one.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (new Date(nonceRecord.expires_at) < new Date()) {
+        console.warn(`[wallet-auth] Nonce expired: ${parsed.nonce}`);
+        return new Response(
+          JSON.stringify({ error: 'Nonce has expired. Please request a new one.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Mark nonce as used
+      await adminClient
+        .from('wallet_auth_nonces')
+        .update({ used: true, used_at: new Date().toISOString() })
+        .eq('id', nonceRecord.id);
+
+      console.log(`[wallet-auth] Nonce verified and consumed: ${parsed.nonce.slice(0, 8)}...`);
+
+      // NFT check
+      const nftResult = await checkNFTOwnership(address);
+      console.log(`[wallet-auth] NFT verification: ownsNFT=${nftResult.ownsNFT}, method=${nftResult.method}`);
+
+      if (!nftResult.ownsNFT) {
+        console.warn(`[wallet-auth] Unauthorized wallet (no NFT): ${address.slice(0, 10)}...`);
+        return new Response(
+          JSON.stringify({
+            error: 'This wallet is not authorized for admin access.',
+            detail: 'Only wallets holding a Dr. Green Digital Key NFT can sign in as admin.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Create session (shared logic)
+      return await createSessionForWallet(address, nftResult, adminClient);
+    }
+
+    // ── ACTION: nft-check (unchanged) ───────────────────────
     if (body.action === 'nft-check') {
       const checkAddress = body.address;
 
@@ -277,19 +566,13 @@ serve(async (req) => {
       const normalized = checkAddress.toLowerCase();
       console.log(`[wallet-auth] NFT check requested for ${normalized.slice(0, 10)}...`);
 
-      // On-chain NFT ownership check (reuses existing function)
       const nftResult = await checkNFTOwnership(normalized);
-
-      // Admin whitelist check
       const fallbackWallets = getFallbackWallets();
       const isInAdminWhitelist = fallbackWallets.includes(normalized);
 
-      // DB mapping check
       let hasDbMapping = false;
       let maskedEmail: string | null = null;
       try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const adminClient = createClient(supabaseUrl, serviceRoleKey, {
           auth: { autoRefreshToken: false, persistSession: false },
         });
@@ -303,7 +586,6 @@ serve(async (req) => {
 
         if (data?.email) {
           hasDbMapping = true;
-          // Mask email for security: show first 3 chars + *** + domain
           const [local, domain] = data.email.split('@');
           maskedEmail = `${local.slice(0, 3)}***@${domain}`;
         }
@@ -332,222 +614,85 @@ serve(async (req) => {
       );
     }
 
-    // ── Full Wallet Auth Flow (existing, unchanged) ─────────
+    // ── LEGACY FLOW (backward compat, deprecated) ───────────
     const { message, signature, address } = body;
 
-    // ── Input validation ──
-    if (!message || !signature || !address) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: message, signature, address' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    if (message && signature && address) {
+      console.warn('[wallet-auth] ⚠️ DEPRECATED: Using legacy timestamp-based auth. Please migrate to nonce-based flow (action: request-nonce + verify).');
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid Ethereum address format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── Parse message & validate timestamp (5 min window) ──
-    const parsed = parseAuthMessage(message);
-    if (!parsed) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication message format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000;
-    if (Math.abs(now - parsed.timestamp) > fiveMinutes) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication message expired. Please try again.' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── Verify signature ──
-    let recoveredAddress: string;
-    try {
-      recoveredAddress = recoverAddress(message, signature);
-    } catch (err) {
-      console.error('[wallet-auth] Signature recovery failed:', err);
-      return new Response(
-        JSON.stringify({ error: 'Invalid signature' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
-      console.warn(`[wallet-auth] Address mismatch: claimed=${address}, recovered=${recoveredAddress}`);
-      return new Response(
-        JSON.stringify({ error: 'Signature does not match the provided address' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (parsed.wallet !== address.toLowerCase()) {
-      return new Response(
-        JSON.stringify({ error: 'Message wallet does not match provided address' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── Check NFT ownership (on-chain with fallback) ──
-    const nftResult = await checkNFTOwnership(address);
-    console.log(
-      `[wallet-auth] NFT verification: ownsNFT=${nftResult.ownsNFT}, method=${nftResult.method}, balance=${nftResult.balance ?? 'N/A'}`
-    );
-
-    if (!nftResult.ownsNFT) {
-      console.warn(`[wallet-auth] Unauthorized wallet (no NFT): ${address.slice(0, 10)}...`);
-      return new Response(
-        JSON.stringify({
-          error: 'This wallet is not authorized for admin access.',
-          detail: 'Only wallets holding a Dr. Green Digital Key NFT can sign in as admin.',
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── Create/find Supabase user and generate session ──
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    // ── Resolve email (account linking via DB) ──
-    const { email: userEmail, isLinked } = await resolveEmail(address, adminClient);
-    console.log(
-      `[wallet-auth] Email resolved: ${userEmail} (linked=${isLinked})`
-    );
-
-    // Try to find existing user by the resolved email
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-    let userId: string | null = null;
-    let isNewUser = false;
-
-    const existingUser = existingUsers?.users?.find(u => u.email === userEmail);
-
-    // Also check for a legacy wallet-derived user that should be merged
-    const walletEmail = `${address.toLowerCase()}@wallet.healingbuds`;
-    const legacyWalletUser = isLinked
-      ? existingUsers?.users?.find(u => u.email === walletEmail)
-      : null;
-
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log(`[wallet-auth] Existing user found: ${userId.slice(0, 8)}... (email=${userEmail})`);
-
-      // Update metadata to include wallet info
-      await adminClient.auth.admin.updateUserById(userId, {
-        user_metadata: {
-          ...existingUser.user_metadata,
-          wallet_address: address.toLowerCase(),
-          auth_method: 'wallet',
-          nft_verified: true,
-          nft_verification_method: nftResult.method,
-        },
-      });
-    } else {
-      // Create new user with the resolved email
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email: userEmail,
-        email_confirm: true,
-        user_metadata: {
-          wallet_address: address.toLowerCase(),
-          auth_method: 'wallet',
-          full_name: isLinked
-            ? 'Admin'
-            : `Admin (${address.slice(0, 6)}...${address.slice(-4)})`,
-          nft_verified: true,
-          nft_verification_method: nftResult.method,
-        },
-      });
-
-      if (createError) {
-        console.error('[wallet-auth] User creation failed:', createError.message);
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
         return new Response(
-          JSON.stringify({ error: 'Failed to create user account' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Invalid Ethereum address format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      userId = newUser.user.id;
-      isNewUser = true;
-      console.log(`[wallet-auth] New user created: ${userId.slice(0, 8)}... (email=${userEmail})`);
-    }
+      const parsed = parseLegacyAuthMessage(message);
+      if (!parsed) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication message format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // Clean up legacy wallet-derived user if account was linked
-    if (legacyWalletUser && legacyWalletUser.id !== userId) {
-      console.log(
-        `[wallet-auth] Legacy wallet user found (${legacyWalletUser.id.slice(0, 8)}...), ` +
-        `linked account will be used instead`
-      );
-      // Note: We don't delete the legacy user automatically to avoid data loss.
-      // It can be cleaned up manually or via an admin tool.
-    }
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      if (Math.abs(now - parsed.timestamp) > fiveMinutes) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication message expired. Please try again.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // ── Ensure admin role is assigned ──
-    if (userId) {
-      const { data: hasRole } = await adminClient.rpc('has_role', {
-        _user_id: userId,
-        _role: 'admin',
+      let recoveredAddress: string;
+      try {
+        recoveredAddress = recoverAddress(message, signature);
+      } catch (err) {
+        console.error('[wallet-auth] Signature recovery failed:', err);
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+        return new Response(
+          JSON.stringify({ error: 'Signature does not match the provided address' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (parsed.wallet !== address.toLowerCase()) {
+        return new Response(
+          JSON.stringify({ error: 'Message wallet does not match provided address' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const nftResult = await checkNFTOwnership(address);
+      if (!nftResult.ownsNFT) {
+        return new Response(
+          JSON.stringify({
+            error: 'This wallet is not authorized for admin access.',
+            detail: 'Only wallets holding a Dr. Green Digital Key NFT can sign in as admin.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
       });
 
-      if (!hasRole) {
-        const { error: roleError } = await adminClient
-          .from('user_roles')
-          .upsert(
-            { user_id: userId, role: 'admin' },
-            { onConflict: 'user_id,role' }
-          );
-
-        if (roleError) {
-          console.error('[wallet-auth] Role assignment failed:', roleError.message);
-        } else {
-          console.log(`[wallet-auth] Admin role assigned to ${userId.slice(0, 8)}...`);
-        }
-      }
+      return await createSessionForWallet(address, nftResult, adminClient);
     }
 
-    // ── Generate magic link token for session ──
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userEmail,
-    });
-
-    if (linkError || !linkData) {
-      console.error('[wallet-auth] Link generation failed:', linkError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate authentication session' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const properties = linkData.properties;
-
-    console.log(
-      `[wallet-auth] Auth successful: wallet=${address.slice(0, 10)}..., ` +
-      `email=${userEmail}, nft_method=${nftResult.method}, new=${isNewUser}, linked=${isLinked}`
-    );
-
+    // ── Unknown request ─────────────────────────────────────
     return new Response(
-      JSON.stringify({
-        success: true,
-        email: userEmail,
-        token: properties.email_otp,
-        hashed_token: properties.hashed_token,
-        is_new_user: isNewUser,
-        is_linked_account: isLinked,
-        nft_verification: nftResult.method,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Invalid request. Use action: request-nonce, verify, or nft-check.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (err) {
     console.error('[wallet-auth] Unexpected error:', err);
     return new Response(
