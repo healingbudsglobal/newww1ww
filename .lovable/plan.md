@@ -1,92 +1,51 @@
 
 
-# Route Admin Dashboard Reads Through Production-Write Environment
+# Save API Gap Analysis as Reference Document
 
-## Problem
-Admin dashboard dApp endpoints (`dashboard-summary`, `sales-summary`, `get-clients-summary`, `dapp-clients`, etc.) return **401 Unauthorized** because they use the default `production` credentials (`DRGREEN_API_KEY`), which lack dApp admin permissions. The `production-write` credentials (`DRGREEN_WRITE_API_KEY`) have full access but are currently only auto-routed for client creation (write) actions.
+## Overview
+Create a structured reference document at `docs/API-GAP-ANALYSIS.md` that captures the full gap analysis of the 37-endpoint API specification against the existing Healing Buds codebase. The document will clearly separate admin-only (wallet/NFT) features from patient-facing features, serving as a planning roadmap for future development.
 
-## Root Cause
-In the `drgreen-proxy` edge function:
-- Line 1884: `envConfig = getEnvironment(requestedEnv)` resolves to `production` by default
-- Admin read endpoints (lines 2263-2308, 3956) call `drGreenRequestQuery(...)` **without passing `envConfig`**, so they fall back to hardcoded `production` credentials
-- The `WRITE_ACTIONS` list (line 354) only includes `create-client`, `create-client-legacy`, `admin-reregister-client`, `bootstrap-test-client` -- no admin read actions
+## Document Structure
 
-## Solution
+The file will be organized into the following sections:
 
-### 1. Edge Function: Add dApp Admin Read Actions to Auto-Route List (drgreen-proxy)
+1. **Header and Purpose** -- What this document is, when it was created, and how to use it
+2. **Architecture Summary** -- The two-track auth model (Patient = email/Supabase, Admin = wallet/NFT/SIWE)
+3. **Coverage Matrix** -- A table listing all 37 endpoints with status (Covered / Partial / New) and which user type they apply to
+4. **Admin-Only Endpoints (Wallet/NFT)** -- Detailed breakdown of admin-scoped endpoints, noting which are already implemented via `wallet-auth` edge function and `drgreen-proxy`
+5. **Patient-Facing Endpoints** -- Detailed breakdown of patient/client endpoints, noting coverage by Supabase Auth and the Dr. Green API
+6. **Genuinely New Gaps** -- Prioritized list of endpoints that do not exist yet, separated by user type
+7. **Recommended Build Priorities** -- Ordered by compliance importance and user value
+8. **Notes and Constraints** -- Reminders about what NOT to build (e.g., no wallet features for patients, no duplicating Supabase Auth)
 
-Create a new `DAPP_ADMIN_READ_ACTIONS` array alongside `WRITE_ACTIONS`:
+## Key Content Highlights
 
-```text
-DAPP_ADMIN_READ_ACTIONS = [
-  'dashboard-summary',
-  'dashboard-analytics',
-  'sales-summary',
-  'dapp-clients',
-  'dapp-client-details',
-  'dapp-clients-list',
-  'dapp-orders',
-  'dapp-order-details',
-  'dapp-carts',
-  'dapp-nfts',
-  'dapp-strains',
-  'get-clients-summary',
-  'get-sales-summary',
-  'admin-list-all-clients',
-]
-```
+### Coverage breakdown:
+- **Fully Covered (16 endpoints):** Login, logout, refresh, password reset, email verify, client create, client read, client update, client delete, KYC submit, KYC status, admin list clients, admin get client, admin ban, wallet nonce (via SIWE message), wallet verify (via wallet-auth edge function)
+- **Partially Covered (4 endpoints):** Wallet-email mappings exist but lack multi-wallet support; profiles exist but lack public/private distinction; preferences JSON column exists but has no dedicated API
+- **Genuinely New (17 endpoints):** GDPR export, activity/audit logs, session management, notification preferences API, public profile display, billing/payment methods, webhooks
 
-### 2. Edge Function: Update Environment Resolution Logic
+### Admin-only features (wallet/NFT holders):
+- Wallet linking/unlinking (endpoints 11-13) -- admin only, not for patients
+- Admin client management (endpoints 33-35) -- already covered via drgreen-proxy
+- Wallet nonce/verify pattern -- already covered by wallet-auth edge function using SIWE
 
-Modify `getWriteEnvironment` to also check `DAPP_ADMIN_READ_ACTIONS`, so both write actions AND admin read actions automatically route to `production-write` when those credentials are configured.
+### Patient-facing gaps (priority order):
+1. GDPR data export (regulatory compliance)
+2. Profile preferences API (notification/privacy settings)
+3. Activity logs (healthcare audit requirements)
+4. Public profile display (optional, low priority)
 
-### 3. Edge Function: Use Resolved envConfig in All Admin Endpoints
-
-Update every admin case in the switch statement to pass `envConfig` (or the auto-resolved write config) to `drGreenRequestQuery` and `drGreenRequestBody`:
-
-Before:
-```typescript
-case "dashboard-summary":
-  response = await drGreenRequestQuery("/dapp/dashboard/summary", {});
-```
-
-After:
-```typescript
-case "dashboard-summary":
-  response = await drGreenRequestQuery("/dapp/dashboard/summary", {}, false, adminEnvConfig);
-```
-
-Same pattern for `sales-summary`, `dapp-clients`, `dashboard-analytics`, `get-clients-summary`, `dapp-orders`, and all other dApp admin endpoints.
-
-### 4. Main Handler: Resolve Admin Environment Early
-
-After line 1884 where `envConfig` is resolved, add logic to detect admin actions and resolve to write credentials:
-
-```typescript
-const requestedEnv = body?.env as string | undefined;
-const envConfig = getEnvironment(requestedEnv);
-// Auto-route dApp admin reads to production-write credentials
-const adminEnvConfig = getWriteEnvironment(action, requestedEnv);
-```
-
-This way `adminEnvConfig` will use `production-write` for both write AND admin read actions, while `envConfig` stays as-is for non-admin operations.
-
-## Files Changed
+## File Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/drgreen-proxy/index.ts` | Add `DAPP_ADMIN_READ_ACTIONS` list, update `getWriteEnvironment` to include admin reads, pass resolved env config to all admin endpoint calls |
+| `docs/API-GAP-ANALYSIS.md` | New file -- complete gap analysis reference document |
 
-## No Frontend Changes Required
+## Technical Details
 
-The frontend (`useDrGreenApi.ts` and `AdminDashboard.tsx`) already sends the environment via `body.env`. The proxy will now correctly auto-route admin reads to the write-enabled credentials regardless of the frontend's selected environment.
-
-## Verification Steps
-
-After deployment:
-1. Call `dashboard-summary` -- should return live data instead of 401
-2. Call `sales-summary` -- should return sales stats
-3. Call `get-clients-summary` -- should return client counts
-4. Call `dapp-clients` -- should return paginated client list
-5. Confirm that non-admin endpoints (e.g., `get-strains`) continue to use standard production credentials
+- The document will use Markdown tables for the coverage matrix for easy scanning
+- Each endpoint entry will reference the existing implementation file where applicable (e.g., `supabase/functions/wallet-auth/index.ts`, `supabase/functions/drgreen-proxy/index.ts`)
+- Status labels: COVERED, PARTIAL, NEW, NOT APPLICABLE (for patient-irrelevant wallet endpoints)
+- No code changes, database changes, or edge function modifications -- this is purely a reference document
 
