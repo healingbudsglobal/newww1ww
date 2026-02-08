@@ -670,5 +670,32 @@ export function useDrGreenApi() {
     updateShippingAddress,
     getClientDetails,
     adminUpdateShippingAddress,
+    // Admin re-registration
+    reregisterClient: async (clientData: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      countryCode?: string;
+      phoneCode?: string;
+      phoneCountryCode?: string;
+      contactNumber?: string;
+      shipping?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        countryCode?: string;
+        postalCode?: string;
+        landmark?: string;
+      };
+    }) => {
+      return callProxy<{
+        success: boolean;
+        clientId?: string;
+        kycLink?: string;
+        message?: string;
+      }>('admin-reregister-client', clientData);
+    },
   };
 }

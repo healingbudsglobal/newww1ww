@@ -90,6 +90,7 @@ const ADMIN_ACTIONS = [
   'activate-client', 'deactivate-client', 'bulk-delete-clients',
   'admin-list-all-clients', // List all clients for debugging
   'admin-update-shipping-address', // Admin can update any client's address
+  'admin-reregister-client', // Re-register a client with current API key pair
 ];
 
 // Actions that require ownership verification (user must own the resource)
@@ -3585,6 +3586,150 @@ serve(async (req) => {
         });
         
         response = await drGreenRequest(`/dapp/clients/${body.clientId}`, "PATCH", shippingPayload);
+        break;
+      }
+      
+      // Admin: Re-register a client with the current API key pair
+      // This is used when clients were created with a different API key and need fresh IDs
+      case "admin-reregister-client": {
+        const { email, firstName, lastName, countryCode, phoneCode, phoneCountryCode, contactNumber, shipping } = body || {};
+        
+        if (!email || !validateEmail(email)) {
+          throw new Error("Valid email is required for re-registration");
+        }
+        if (!firstName || !lastName) {
+          throw new Error("firstName and lastName are required for re-registration");
+        }
+        
+        logInfo("[admin-reregister-client] Starting re-registration", {
+          email: String(email).slice(0, 5) + '***',
+          hasShipping: !!shipping,
+          countryCode: countryCode || 'not provided',
+        });
+        
+        // Country code conversion map (Alpha-2 to Alpha-3)
+        const countryCodeMap: Record<string, string> = {
+          PT: 'PRT',
+          GB: 'GBR',
+          ZA: 'ZAF',
+          TH: 'THA',
+          US: 'USA',
+        };
+        
+        // Build minimal but valid client creation payload
+        const shippingData = shipping || {};
+        const shippingCountryCode = shippingData.countryCode || countryCode || 'ZAF';
+        const alpha3CountryCode = countryCodeMap[shippingCountryCode] || shippingCountryCode;
+        
+        const reregisterPayload: Record<string, unknown> = {
+          firstName: String(firstName).trim(),
+          lastName: String(lastName).trim(),
+          email: String(email).toLowerCase().trim(),
+          phoneCode: String(phoneCode || '+27'),
+          phoneCountryCode: String(phoneCountryCode || 'ZA').toUpperCase(),
+          contactNumber: String(contactNumber || '000000000'),
+          
+          shipping: {
+            address1: String(shippingData.address1 || 'Address Pending').trim(),
+            address2: String(shippingData.address2 || '').trim(),
+            city: String(shippingData.city || 'City').trim(),
+            state: String(shippingData.state || shippingData.city || 'State').trim(),
+            country: String(shippingData.country || 'South Africa').trim(),
+            countryCode: alpha3CountryCode,
+            postalCode: String(shippingData.postalCode || '0000').trim(),
+            landmark: String(shippingData.landmark || '').trim(),
+          },
+          
+          // Minimal medical record with safe defaults (required by Dr. Green API)
+          medicalRecord: {
+            dob: '1990-01-01',
+            gender: 'prefer_not_to_say',
+            medicalHistory0: false,
+            medicalHistory1: false,
+            medicalHistory2: false,
+            medicalHistory3: false,
+            medicalHistory4: false,
+            medicalHistory5: ['none'],
+            medicalHistory8: false,
+            medicalHistory9: false,
+            medicalHistory10: false,
+            medicalHistory12: false,
+            medicalHistory13: 'never',
+            medicalHistory14: ['never'],
+          },
+        };
+        
+        console.log("[admin-reregister-client] Calling Dr. Green API with payload for:", String(email).slice(0, 5) + '***');
+        
+        // Call the Dr. Green API to create the client under current key pair
+        response = await drGreenRequestBody("/dapp/clients", "POST", reregisterPayload, true);
+        
+        const clonedResp = response.clone();
+        const respBody = await clonedResp.text();
+        
+        console.log("[admin-reregister-client] API Response status:", response.status);
+        console.log("[admin-reregister-client] API Response body:", respBody.slice(0, 500));
+        
+        if (response.ok) {
+          try {
+            const rawData = JSON.parse(respBody);
+            
+            // Extract clientId and kycLink from response
+            const newClientId = rawData.client?.id || rawData.data?.id || rawData.clientId || rawData.id;
+            const newKycLink = rawData.client?.kycLink || rawData.data?.kycLink || rawData.kycLink;
+            
+            console.log("[admin-reregister-client] Success! New client ID:", newClientId);
+            
+            // Look up user by email and update their drgreen_clients record
+            const { data: userLookup, error: lookupError } = await supabaseClient
+              .from('profiles')
+              .select('id')
+              .ilike('full_name', `%${firstName}%`)
+              .limit(1);
+            
+            // Also try to find by checking auth.users via the drgreen_clients email
+            // Since we can't query auth.users directly, we'll upsert based on email matching
+            const { data: existingClient, error: existingError } = await supabaseClient
+              .from('drgreen_clients')
+              .select('user_id')
+              .eq('email', String(email).toLowerCase().trim())
+              .maybeSingle();
+            
+            if (existingClient?.user_id) {
+              // Update existing record with new Dr. Green IDs
+              const { error: updateError } = await supabaseClient
+                .from('drgreen_clients')
+                .update({
+                  drgreen_client_id: newClientId,
+                  kyc_link: newKycLink,
+                  is_kyc_verified: false, // Reset - they need to re-verify
+                  admin_approval: 'PENDING',
+                  updated_at: new Date().toISOString(),
+                  shipping_address: reregisterPayload.shipping,
+                })
+                .eq('user_id', existingClient.user_id);
+              
+              if (updateError) {
+                console.error("[admin-reregister-client] Failed to update local record:", updateError);
+              }
+            }
+            
+            return new Response(JSON.stringify({
+              success: true,
+              clientId: newClientId,
+              kycLink: newKycLink,
+              message: `Client re-registered successfully. New KYC verification required.`,
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } catch (parseError) {
+            console.error("[admin-reregister-client] Failed to parse success response:", parseError);
+          }
+        } else {
+          console.error("[admin-reregister-client] API returned error status:", response.status);
+        }
+        
         break;
       }
       

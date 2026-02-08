@@ -17,6 +17,7 @@ import {
   Globe,
   ExternalLink,
   Info,
+  KeyRound,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ const DRGREEN_ADMIN_URL = "https://dapp.drgreennft.com";
 
 export function AdminClientManager() {
   const { toast } = useToast();
-  const { getDappClients, getClientsSummary, syncClientStatus } = useDrGreenApi();
+  const { getDappClients, getClientsSummary, syncClientStatus, reregisterClient } = useDrGreenApi();
   
   const [clients, setClients] = useState<DrGreenClient[]>([]);
   const [summary, setSummary] = useState<ClientsSummary | null>(null);
@@ -68,6 +69,7 @@ export function AdminClientManager() {
   const [isRefetching, setIsRefetching] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [syncingClientId, setSyncingClientId] = useState<string | null>(null);
+  const [reregisteringClientId, setReregisteringClientId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -211,6 +213,57 @@ export function AdminClientManager() {
       });
     } finally {
       setSyncingClientId(null);
+    }
+  };
+
+  // Re-register client with current API key pair
+  const handleReregister = async (client: DrGreenClient) => {
+    if (!confirm(`Re-register ${client.firstName} ${client.lastName} (${client.email}) with the current API key?\n\nThis will create a new Dr. Green client ID and require fresh KYC verification.`)) {
+      return;
+    }
+    
+    setReregisteringClientId(client.id);
+    try {
+      const result = await reregisterClient({
+        email: client.email,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        countryCode: 'ZA', // Default, could be enhanced to detect from client data
+      });
+      
+      if (result.error) {
+        toast({
+          title: "Re-Registration Failed",
+          description: result.error,
+          variant: "destructive",
+        });
+      } else if (result.data?.success) {
+        toast({
+          title: "Client Re-Registered",
+          description: `New client ID: ${result.data.clientId?.slice(0, 8)}... KYC link generated.`,
+        });
+        
+        // Refresh the client list
+        fetchData({ showToast: false });
+        
+        // Show KYC link if available
+        if (result.data.kycLink) {
+          navigator.clipboard.writeText(result.data.kycLink);
+          toast({
+            title: "KYC Link Copied",
+            description: "The new KYC verification link has been copied to your clipboard.",
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Re-registration error:", err);
+      toast({
+        title: "Re-Registration Error",
+        description: "Failed to re-register client.",
+        variant: "destructive",
+      });
+    } finally {
+      setReregisteringClientId(null);
     }
   };
 
@@ -458,8 +511,35 @@ export function AdminClientManager() {
                           </div>
                         </div>
 
-                        {/* Action Buttons - Replaced with Sync Status */}
-                        <div className="flex items-center gap-2">
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Re-Register Button - Always available for admin to re-sync with current API key */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleReregister(client)}
+                                  disabled={reregisteringClientId === client.id}
+                                  className="border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                                >
+                                  {reregisteringClientId === client.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <KeyRound className="w-4 h-4 mr-1" />
+                                      Re-Register
+                                    </>
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>Re-register this client with the current API key pair. Use when clients were created with old credentials.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          
                           {client.adminApproval === "PENDING" && (
                             <TooltipProvider>
                               <div className="flex items-center gap-2">
