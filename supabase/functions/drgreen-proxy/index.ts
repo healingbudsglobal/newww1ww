@@ -119,7 +119,7 @@ const AUTH_ONLY_ACTIONS: string[] = ['get-user-me', 'get-client-by-auth-email'];
 
 // Admin debug mode: allows bypassing auth for specific actions when debug header is present
 // Uses first 16 chars of DRGREEN_PRIVATE_KEY as the debug secret
-const DEBUG_ACTIONS = ['create-client-legacy'];
+const DEBUG_ACTIONS = ['create-client-legacy', 'admin-reregister-client'];
 
 // Retry configuration for transient failures
 const RETRY_CONFIG = {
