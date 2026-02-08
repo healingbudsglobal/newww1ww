@@ -358,6 +358,28 @@ const WRITE_ACTIONS: string[] = [
   'bootstrap-test-client',
 ];
 
+// dApp admin read actions that also need production-write credentials
+// These endpoints require operator-level NFT keys (same as write actions)
+const DAPP_ADMIN_READ_ACTIONS: string[] = [
+  'dashboard-summary',
+  'dashboard-analytics',
+  'sales-summary',
+  'dapp-clients',
+  'dapp-client-details',
+  'dapp-clients-list',
+  'dapp-orders',
+  'dapp-order-details',
+  'dapp-carts',
+  'dapp-nfts',
+  'dapp-strains',
+  'get-clients-summary',
+  'get-sales-summary',
+  'get-sales',
+  'admin-list-all-clients',
+  'sync-client-status',
+  'dapp-update-order',
+];
+
 const ENV_CONFIG: Record<string, EnvConfig> = {
   production: {
     apiUrl: 'https://api.drgreennft.com/api/v1',
@@ -421,8 +443,8 @@ function getEnvironment(requestedEnv?: string): EnvConfig {
  * @param requestedEnv - The environment requested by the client
  */
 function getWriteEnvironment(action: string, requestedEnv?: string): EnvConfig {
-  // Check if this is a write action
-  if (!WRITE_ACTIONS.includes(action)) {
+  // Check if this is a write action OR a dApp admin read action
+  if (!WRITE_ACTIONS.includes(action) && !DAPP_ADMIN_READ_ACTIONS.includes(action)) {
     return getEnvironment(requestedEnv);
   }
   
@@ -1882,8 +1904,13 @@ serve(async (req) => {
     // Extract requested environment from body (supports production, staging, railway)
     const requestedEnv = body?.env as string | undefined;
     const envConfig = getEnvironment(requestedEnv);
+    // Auto-route dApp admin reads AND write actions to production-write credentials
+    const adminEnvConfig = getWriteEnvironment(action, requestedEnv);
     if (requestedEnv) {
       console.log(`[drgreen-proxy] Using environment: ${envConfig.name} (${requestedEnv})`);
+    }
+    if (adminEnvConfig !== envConfig) {
+      console.log(`[drgreen-proxy] Admin/write env override: ${adminEnvConfig.name} for action: ${action}`);
     }
     
     let response: Response;
@@ -2262,7 +2289,7 @@ serve(async (req) => {
       
       case "dashboard-summary": {
         // Use query string signing for GET endpoint (fixes 401)
-        response = await drGreenRequestQuery("/dapp/dashboard/summary", {});
+        response = await drGreenRequestQuery("/dapp/dashboard/summary", {}, false, adminEnvConfig);
         break;
       }
       
@@ -2275,13 +2302,13 @@ serve(async (req) => {
         if (endDate) queryParams.endDate = endDate;
         if (filterBy) queryParams.filterBy = filterBy;
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/dapp/dashboard/analytics", queryParams);
+        response = await drGreenRequestQuery("/dapp/dashboard/analytics", queryParams, false, adminEnvConfig);
         break;
       }
       
       case "sales-summary": {
         // Use query string signing for GET endpoint (fixes 401)
-        response = await drGreenRequestQuery("/dapp/sales/summary", {});
+        response = await drGreenRequestQuery("/dapp/sales/summary", {}, false, adminEnvConfig);
         break;
       }
       
@@ -2305,7 +2332,7 @@ serve(async (req) => {
         if (adminApproval) queryParams.adminApproval = adminApproval;
         
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/dapp/clients", queryParams);
+        response = await drGreenRequestQuery("/dapp/clients", queryParams, false, adminEnvConfig);
         break;
       }
       
@@ -2314,7 +2341,7 @@ serve(async (req) => {
         if (!clientId) throw new Error("clientId is required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
         // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
         break;
       }
       
@@ -2445,7 +2472,7 @@ serve(async (req) => {
         
         // GET /dapp/clients/{clientId} returns current adminApproval status
         // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
         break;
       }
       
@@ -2468,7 +2495,7 @@ serve(async (req) => {
         if (clientIds) queryParams.clientIds = JSON.stringify(clientIds);
         
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/dapp/orders", queryParams);
+        response = await drGreenRequestQuery("/dapp/orders", queryParams, false, adminEnvConfig);
         break;
       }
       
@@ -2477,7 +2504,7 @@ serve(async (req) => {
         if (!orderId) throw new Error("orderId is required");
         if (!validateStringLength(orderId, 100)) throw new Error("Invalid order ID format");
         // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/orders/${orderId}`, {});
+        response = await drGreenRequestQuery(`/dapp/orders/${orderId}`, {}, false, adminEnvConfig);
         break;
       }
       
@@ -2485,7 +2512,7 @@ serve(async (req) => {
         const { orderId, orderStatus, paymentStatus } = body || {};
         if (!orderId) throw new Error("orderId is required");
         if (!validateStringLength(orderId, 100)) throw new Error("Invalid order ID format");
-        response = await drGreenRequest(`/dapp/orders/${orderId}`, "PATCH", { orderStatus, paymentStatus });
+        response = await drGreenRequest(`/dapp/orders/${orderId}`, "PATCH", { orderStatus, paymentStatus }, adminEnvConfig);
         break;
       }
       
@@ -2506,13 +2533,13 @@ serve(async (req) => {
         if (searchBy) queryParams.searchBy = searchBy;
         
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/dapp/carts", queryParams);
+        response = await drGreenRequestQuery("/dapp/carts", queryParams, false, adminEnvConfig);
         break;
       }
       
       case "dapp-nfts": {
         // Use query string signing for GET endpoint (fixes 401)
-        response = await drGreenRequestQuery("/dapp/users/nfts", {});
+        response = await drGreenRequestQuery("/dapp/users/nfts", {}, false, adminEnvConfig);
         break;
       }
       
@@ -2532,7 +2559,7 @@ serve(async (req) => {
         if (searchBy) queryParams.searchBy = searchBy;
         
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/strains", queryParams);
+        response = await drGreenRequestQuery("/strains", queryParams, false, adminEnvConfig);
         break;
       }
       
@@ -2547,7 +2574,7 @@ serve(async (req) => {
         if (kyc !== undefined) queryParams.kyc = String(kyc);
         
         // Use query string signing for GET with params (fixes 401)
-        response = await drGreenRequestQuery("/dapp/clients/list", queryParams);
+        response = await drGreenRequestQuery("/dapp/clients/list", queryParams, false, adminEnvConfig);
         break;
       }
       
@@ -3411,7 +3438,7 @@ serve(async (req) => {
               orderBy: 'desc',
             };
             
-            const response = await drGreenRequestQuery("/dapp/clients", queryParams);
+            const response = await drGreenRequestQuery("/dapp/clients", queryParams, false, adminEnvConfig);
             
             if (!response.ok) {
               logWarn(`Failed to fetch page ${page}`, { status: response.status });
@@ -3482,7 +3509,7 @@ serve(async (req) => {
               orderBy: 'desc',
             };
             
-            const response = await drGreenRequestQuery("/dapp/clients", queryParams);
+            const response = await drGreenRequestQuery("/dapp/clients", queryParams, false, adminEnvConfig);
             
             if (!response.ok) {
               logWarn(`Failed to fetch page ${page}`, { status: response.status });
@@ -3945,7 +3972,7 @@ serve(async (req) => {
         if (body.clientIds.length > 50) {
           throw new Error("Cannot delete more than 50 clients at once");
         }
-        response = await drGreenRequest("/dapp/clients/bulk-delete", "POST", { clientIds: body.clientIds });
+        response = await drGreenRequest("/dapp/clients/bulk-delete", "POST", { clientIds: body.clientIds }, adminEnvConfig);
         break;
       }
       
@@ -3955,7 +3982,7 @@ serve(async (req) => {
       
       case "get-clients-summary": {
         // GET /dapp/clients/summary - Get client summary stats
-        response = await drGreenRequestBody("/dapp/clients/summary", "GET", {});
+        response = await drGreenRequestBody("/dapp/clients/summary", "GET", {}, false, adminEnvConfig);
         break;
       }
       
@@ -3978,13 +4005,13 @@ serve(async (req) => {
           queryParams.stage = stage;
         }
         
-        response = await drGreenRequestQuery("/dapp/sales", queryParams);
+        response = await drGreenRequestQuery("/dapp/sales", queryParams, false, adminEnvConfig);
         break;
       }
       
       case "get-sales-summary": {
         // GET /dapp/sales/summary - Get sales summary by stage
-        response = await drGreenRequestBody("/dapp/sales/summary", "GET", {});
+        response = await drGreenRequestBody("/dapp/sales/summary", "GET", {}, false, adminEnvConfig);
         break;
       }
       
@@ -4319,13 +4346,15 @@ serve(async (req) => {
     logInfo(`Response status: ${response.status}`);
 
     if (response.status === 401 && ADMIN_ACTIONS.includes(action)) {
+      const usedEnv = DAPP_ADMIN_READ_ACTIONS.includes(action) || WRITE_ACTIONS.includes(action)
+        ? adminEnvConfig : envConfig;
       return new Response(
         JSON.stringify({
           success: false,
           apiStatus: 401,
           error: 'drgreen_unauthorized',
           message:
-            'Dr. Green API credentials are not authorized for dApp endpoints. Update DRGREEN_API_KEY and DRGREEN_PRIVATE_KEY with admin credentials.',
+            `Dr. Green API credentials (${usedEnv.name}: ${usedEnv.apiKeyEnv}) are not authorized for this dApp endpoint. The API key may lack admin dashboard permissions.`,
           upstream: data,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
