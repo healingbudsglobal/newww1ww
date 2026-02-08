@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ApiEnvironment = 'production' | 'alt-production' | 'staging' | 'railway';
+export type ApiEnvironment = 'production' | 'alt-production' | 'staging' | 'railway' | 'production-write';
 
 interface ApiEnvironmentContextType {
   environment: ApiEnvironment;
@@ -13,6 +13,7 @@ const ENVIRONMENT_LABELS: Record<ApiEnvironment, string> = {
   'alt-production': 'Alt Production (Test)',
   staging: 'Staging (Official)',
   railway: 'Railway (Dev)',
+  'production-write': 'Production (Write)',
 };
 
 const ApiEnvironmentContext = createContext<ApiEnvironmentContextType | undefined>(undefined);
@@ -24,7 +25,7 @@ export function ApiEnvironmentProvider({ children }: { children: ReactNode }) {
     // Load from localStorage on init (default to production)
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && ['production', 'alt-production', 'staging', 'railway'].includes(stored)) {
+      if (stored && ['production', 'alt-production', 'staging', 'railway', 'production-write'].includes(stored)) {
         return stored as ApiEnvironment;
       }
     }

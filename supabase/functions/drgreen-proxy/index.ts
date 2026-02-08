@@ -351,6 +351,14 @@ function getStagingApiUrl(): string {
   return 'https://stage-api.drgreennft.com/api/v1';
 }
 
+// Actions that require write-enabled API keys (client creation permissions)
+const WRITE_ACTIONS: string[] = [
+  'create-client',
+  'create-client-legacy', 
+  'admin-reregister-client',
+  'bootstrap-test-client',
+];
+
 const ENV_CONFIG: Record<string, EnvConfig> = {
   production: {
     apiUrl: 'https://api.drgreennft.com/api/v1',
@@ -376,6 +384,13 @@ const ENV_CONFIG: Record<string, EnvConfig> = {
     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
     name: 'Railway (Dev)',
   },
+  // Write-enabled environment for client creation (requires operator-level NFT keys)
+  'production-write': {
+    apiUrl: 'https://api.drgreennft.com/api/v1',
+    apiKeyEnv: 'DRGREEN_WRITE_API_KEY',
+    privateKeyEnv: 'DRGREEN_WRITE_PRIVATE_KEY',
+    name: 'Production (Write)',
+  },
 };
 
 /**
@@ -398,6 +413,32 @@ function getEnvironment(requestedEnv?: string): EnvConfig {
   
   // Default to production
   return ENV_CONFIG.production;
+}
+
+/**
+ * Get write-enabled environment for client creation actions
+ * Falls back to production-write if configured, otherwise uses requested environment
+ * @param action - The action being performed
+ * @param requestedEnv - The environment requested by the client
+ */
+function getWriteEnvironment(action: string, requestedEnv?: string): EnvConfig {
+  // Check if this is a write action
+  if (!WRITE_ACTIONS.includes(action)) {
+    return getEnvironment(requestedEnv);
+  }
+  
+  // Check if write credentials are available
+  const writeApiKey = Deno.env.get('DRGREEN_WRITE_API_KEY');
+  const writePrivateKey = Deno.env.get('DRGREEN_WRITE_PRIVATE_KEY');
+  
+  if (writeApiKey && writePrivateKey) {
+    logInfo(`Using write environment for action: ${action}`);
+    return ENV_CONFIG['production-write'];
+  }
+  
+  // Fall back to requested environment or default
+  logWarn(`Write credentials not configured for action: ${action}, falling back to ${requestedEnv || 'production'}`);
+  return getEnvironment(requestedEnv);
 }
 
 /**
@@ -2009,8 +2050,12 @@ serve(async (req) => {
           hasClientBusiness: !!dappPayload.clientBusiness,
         });
         
+        // Use write-enabled credentials for client creation
+        const writeEnvConfig = getWriteEnvironment("create-client-legacy", body.environment);
+        console.log("[create-client-legacy] Using environment:", writeEnvConfig.name, `(${writeEnvConfig.apiKeyEnv})`);
+        
         // Call API with detailed logging enabled
-        response = await drGreenRequestBody("/dapp/clients", "POST", dappPayload, true);
+        response = await drGreenRequestBody("/dapp/clients", "POST", dappPayload, true, writeEnvConfig);
         
         // Log response details for debugging
         const clonedResp = response.clone();
@@ -2541,7 +2586,10 @@ serve(async (req) => {
         };
         
         logInfo("Creating client with KYC payload");
-        response = await drGreenRequest("/dapp/clients", "POST", kycPayload);
+        // Use write-enabled credentials for client creation
+        const writeEnvConfig = getWriteEnvironment("create-client", body.environment);
+        logInfo(`Using write environment: ${writeEnvConfig.name} (${writeEnvConfig.apiKeyEnv})`);
+        response = await drGreenRequestBody("/dapp/clients", "POST", kycPayload, false, writeEnvConfig);
         break;
       }
       
@@ -3662,8 +3710,12 @@ serve(async (req) => {
         
         console.log("[admin-reregister-client] Calling Dr. Green API with payload for:", String(email).slice(0, 5) + '***');
         
-        // Call the Dr. Green API to create the client under current key pair
-        response = await drGreenRequestBody("/dapp/clients", "POST", reregisterPayload, true);
+        // Use write-enabled credentials for client creation
+        const writeEnvConfig = getWriteEnvironment("admin-reregister-client", body.environment);
+        console.log("[admin-reregister-client] Using environment:", writeEnvConfig.name, `(${writeEnvConfig.apiKeyEnv})`);
+        
+        // Call the Dr. Green API to create the client under write-enabled key pair
+        response = await drGreenRequestBody("/dapp/clients", "POST", reregisterPayload, true, writeEnvConfig);
         
         const clonedResp = response.clone();
         const respBody = await clonedResp.text();
@@ -3746,9 +3798,9 @@ serve(async (req) => {
           throw new Error("firstName and lastName are required");
         }
         
-        // Get the environment configuration (supports production, alt-production, staging, railway)
-        const envConfig = getEnvironment(environment);
-        console.log("[bootstrap-test-client] Using environment:", envConfig.name);
+        // Get the environment configuration - prefer write-enabled credentials for client creation
+        const envConfig = getWriteEnvironment("bootstrap-test-client", environment);
+        console.log("[bootstrap-test-client] Using environment:", envConfig.name, `(${envConfig.apiKeyEnv})`);
         console.log("[bootstrap-test-client] Creating client for:", String(email).slice(0, 5) + '***');
         
         const countryCodeMap: Record<string, string> = {
