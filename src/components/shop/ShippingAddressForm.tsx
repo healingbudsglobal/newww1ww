@@ -23,6 +23,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
+import { supabase } from '@/integrations/supabase/client';
 
 // Country code mapping for Dr. Green API (Alpha-2 to Alpha-3)
 const countryCodeMap: Record<string, string> = {
@@ -166,6 +167,38 @@ export function ShippingAddressForm({
       } catch (apiError) {
         console.warn('Address sync to API failed:', apiError);
         // Continue anyway
+      }
+
+      // CRITICAL: Also save to local database for fallback
+      // This ensures checkout works even if Dr. Green API is unreachable
+      try {
+        // Cast to a plain object for JSON storage
+        const shippingJson = {
+          address1: shippingData.address1,
+          address2: shippingData.address2,
+          landmark: shippingData.landmark,
+          city: shippingData.city,
+          state: shippingData.state,
+          country: shippingData.country,
+          countryCode: shippingData.countryCode,
+          postalCode: shippingData.postalCode,
+        };
+        
+        const { error: localUpdateError } = await supabase
+          .from('drgreen_clients')
+          .update({ 
+            shipping_address: shippingJson,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('drgreen_client_id', clientId);
+        
+        if (localUpdateError) {
+          console.warn('Could not save address to local DB:', localUpdateError);
+        } else {
+          console.log('[ShippingAddressForm] Address saved to local DB successfully');
+        }
+      } catch (localError) {
+        console.warn('Local DB address save failed:', localError);
       }
 
       // Always succeed and pass address to checkout

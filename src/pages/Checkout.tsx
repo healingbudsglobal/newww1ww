@@ -90,7 +90,7 @@ const Checkout = () => {
   const [addressManuallySaved, setAddressManuallySaved] = useState(false);
 
   // Fetch client details to check for shipping address
-  // Skip if address was manually saved in this session
+  // Priority: 1) Manual session save, 2) Local DB, 3) Dr. Green API, 4) Prompt user
   useEffect(() => {
     const checkShippingAddress = async () => {
       // Skip re-fetch if user already saved address manually
@@ -104,6 +104,20 @@ const Checkout = () => {
         return;
       }
 
+      // First, check local database for shipping address (faster, more reliable)
+      const localShipping = drGreenClient.shipping_address;
+      if (localShipping && localShipping.address1) {
+        console.log('[Checkout] Using shipping address from local DB');
+        const addr = localShipping as ShippingAddress;
+        setSavedAddress(addr);
+        setShippingAddress(addr);
+        setNeedsShippingAddress(false);
+        setAddressMode('saved');
+        setIsLoadingAddress(false);
+        return;
+      }
+
+      // Fallback: try Dr. Green API
       try {
         const result = await getClientDetails(drGreenClient.drgreen_client_id);
         
