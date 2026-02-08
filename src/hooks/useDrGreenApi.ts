@@ -697,5 +697,21 @@ export function useDrGreenApi() {
         message?: string;
       }>('admin-reregister-client', clientData);
     },
+    // Sync/link existing client by email
+    syncClientByEmail: async (email: string, localUserId?: string) => {
+      return callProxy<{
+        success: boolean;
+        client?: {
+          id: string;
+          email: string;
+          firstName: string;
+          lastName: string;
+          isKYCVerified: boolean;
+          adminApproval: string;
+        };
+        synced?: boolean;
+        message?: string;
+      }>('sync-client-by-email', { email, localUserId });
+    },
   };
 }
