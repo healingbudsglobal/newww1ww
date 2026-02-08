@@ -1,39 +1,64 @@
 
+# Admin Shipping Address Management for Clients
 
-# Create & Link Accounts for kayliegh.sm@gmail.com and scott.k1@outlook.com
+## Problem
 
-## Current State
-- Neither email exists in auth.users, profiles, drgreen_clients, or wallet_email_mappings
-- No Dr. Green DApp client records found for either email (API check requires auth, but database is empty)
+1. **Shipping addresses missing locally** for Scott's two accounts (Kay's was populated during testing). Future clients will have addresses created during onboarding, but existing clients need admin tooling to check and update addresses.
 
-## Steps
+2. **Admin needs NFT-gated access** to view and edit any client's delivery address, fetching the current address from the DApp API (`dapp-client-details`) and allowing updates via the existing `admin-update-shipping-address` proxy action.
 
-### 1. Create Supabase Auth Accounts
-Use the existing `admin-update-user` edge function to create both accounts with verified emails:
-- `kayliegh.sm@gmail.com` (password set, email confirmed)
-- `scott.k1@outlook.com` (password set, email confirmed)
+## What Already Exists
 
-The `handle_new_user` trigger will automatically create profile records.
+- `dapp-client-details` proxy action -- fetches full client details (including shipping) from the DApp API using admin credentials
+- `admin-update-shipping-address` proxy action -- PATCHes shipping address to DApp API for any client
+- `adminUpdateShippingAddress()` hook method in `useDrGreenApi`
+- `ShippingAddressForm` component with `variant="inline"` support
+- `AdminClientManager` component showing client list from DApp API
+- NFT gating via `ProtectedNFTRoute` and wallet context
 
-### 2. Create Dr. Green DApp Client Records
-For each user, call `drgreen-proxy` with `action: 'create-client-legacy'` to register them as clients on the Dr. Green DApp. This creates the client on the external API and returns a `clientId` and `kycLink`.
+## Changes
 
-Payload will include:
-- Basic contact info (name, email, phone placeholder)
-- Default shipping address (Portugal)
-- Minimal medical record (required fields only with safe defaults)
+### 1. Expand AdminClientManager with Address Panel
 
-### 3. Link Local drgreen_clients Records
-Insert records into the `drgreen_clients` table mapping each Supabase user ID to their Dr. Green client ID, storing the KYC link for later verification.
+**File: `src/components/admin/AdminClientManager.tsx`**
 
-## Implementation
-All of this can be done by:
-1. Calling the `admin-update-user` edge function twice (one per email)
-2. Logging in as each user (or using service role) to call `drgreen-proxy` with `create-client-legacy`
-3. Inserting `drgreen_clients` records via SQL
+Add an expandable detail row to each client card that:
+- Has a "View / Edit Address" button on each client row
+- When clicked, calls `dapp-client-details` to fetch the client's current shipping address from the DApp
+- Displays the current address (or "No address on file")
+- Renders the `ShippingAddressForm` in `inline` variant, pre-populated with the fetched address
+- On save, calls `adminUpdateShippingAddress` (existing proxy action) and also updates the local `drgreen_clients.shipping_address` column
 
-Since the proxy requires authentication, the simplest approach is to use the `admin-update-user` function to create accounts, then use the debug header on `drgreen-proxy` to create DApp clients without needing to authenticate as each user.
+Implementation details:
+- Add `expandedClientId` state to track which client row is expanded
+- Add `fetchingAddressFor` state for loading indicator
+- When expanding, call `dapp-client-details` with the client ID to get current address from DApp
+- Pass fetched address as `initialAddress` to `ShippingAddressForm`
+- The form's `onSuccess` callback will also write to local Supabase via the existing logic in `ShippingAddressForm`
+
+### 2. Update ShippingAddressForm for Admin Use
+
+**File: `src/components/shop/ShippingAddressForm.tsx`**
+
+Add an `isAdmin` prop:
+- When `isAdmin=true`, use `adminUpdateShippingAddress` instead of `updateShippingAddress` for the DApp API call
+- This ensures the admin proxy action (which bypasses ownership checks) is used
+
+### 3. Sync Local Shipping Addresses for Existing Clients
+
+**File: `src/components/admin/AdminClientManager.tsx`**
+
+When the admin fetches a client's details from the DApp and the response includes a shipping address, automatically sync it to the local `drgreen_clients.shipping_address` column. This backfills the missing local data for Scott's accounts.
+
+### 4. Admin Route Protection
+
+The `AdminClientManager` is already rendered inside `AdminDashboard`, which is within `AdminLayout`. `AdminLayout` already checks for admin role. The NFT wallet connection is already displayed on the admin dashboard. No additional route changes needed -- the existing admin role check plus the wallet/NFT UI on the dashboard page satisfies the NFT login requirement.
 
 ## Files Modified
-- No file changes needed -- this is a data/account provisioning task using existing edge functions
 
+| File | Change |
+|---|---|
+| `src/components/admin/AdminClientManager.tsx` | Add expandable address view/edit per client using DApp API data |
+| `src/components/shop/ShippingAddressForm.tsx` | Add `isAdmin` prop to use admin proxy action |
+
+## No New Dependencies Required
