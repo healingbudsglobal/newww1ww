@@ -1,53 +1,59 @@
 
 
-# Fix: RainbowKit + Wagmi Dependency Conflict
+## Gate Admin Settings and Role Management to Root Admin Only
 
-## Problem
+### Problem
+Currently, all admin-tier users (including delegated NFT holder admins) can see and access Settings, Role Management, Wallet Mappings, and Developer Tools in the admin sidebar. These should be restricted to `root_admin` only.
 
-`@rainbow-me/rainbowkit@2.2.10` requires `wagmi@^2.9.0` as a peer dependency, but the project has `wagmi@^3.1.3` installed. RainbowKit v2 does **not** support wagmi v3 -- the upstream PR for wagmi v3 compatibility (#2591) is stalled and not merged.
+### Changes
 
-## Recommended Approach: Downgrade wagmi to 2.x
+#### 1. AdminLayout — Conditional sidebar navigation
+**File:** `src/layout/AdminLayout.tsx`
 
-This is the safest option. The wallet features in this project (NFT ownership checks, wallet connect modal) do not use any wagmi v3-specific APIs.
+- Pass `isRootAdmin` from the existing `useUserRole()` hook (already called in AdminLayout)
+- Split `secondaryNavItems` into two groups:
+  - **Root-only items:** User Roles, Wallet Mappings, Settings, Developer Tools
+  - **All-admin items:** (none currently, but the pattern supports future additions)
+- Filter the secondary nav items based on `isRootAdmin` before rendering
+- This applies to both desktop sidebar and mobile menu
 
-## Changes
+#### 2. Route-level protection for root-only pages
+**File:** `src/App.tsx`
 
-### 1. Update `package.json` versions
+- Wrap the following routes with a `RootAdminGuard` component:
+  - `/admin/roles`
+  - `/admin/wallet-mappings`
+  - `/admin/settings`
+  - `/admin/tools`
 
-| Package | Current | Target |
-|---------|---------|--------|
-| `wagmi` | `^3.1.3` | `^2.14.0` |
-| `viem` | `^2.43.4` | `^2.43.4` (no change needed) |
-| `@rainbow-me/rainbowkit` | `^2.2.10` | `^2.2.10` (no change needed) |
-| `@tanstack/react-query` | `^5.90.16` | `^5.90.16` (no change needed) |
+#### 3. New RootAdminGuard component
+**File:** `src/components/RootAdminGuard.tsx` (new)
 
-Only `wagmi` needs to change. `viem` v2 is compatible with both wagmi v2 and v3.
+- Uses `useUserRole()` to check `isRootAdmin`
+- If not root admin, shows "Access Denied" with redirect back
+- If loading, shows spinner
+- If root admin, renders children
 
-### 2. Check for wagmi v3-only API usage
+### Technical Details
 
-Review all files importing from `wagmi` to ensure no v3-only APIs are used:
+```text
+Current sidebar:
++-- Dashboard
++-- Clients
++-- Orders
++-- Prescriptions
++-- Strains
++-- Strain Sync
++-- ─────────────
++-- User Roles        <-- root_admin only
++-- Wallet Mappings   <-- root_admin only
++-- Settings          <-- root_admin only
++-- Developer Tools   <-- root_admin only
 
-- `src/providers/WalletProvider.tsx` -- uses `WagmiProvider`, `http` from wagmi and `getDefaultConfig` from RainbowKit. All compatible with wagmi v2.
-- `src/hooks/useNFTOwnership.ts` -- uses `useAccount`, `useReadContract`. These exist in wagmi v2.
-- `src/components/WalletConnectionModal.tsx` -- uses `useAccount`, `useDisconnect`, `useBalance`, `useChainId`, `useSwitchChain`. All available in wagmi v2.
-- `src/context/WalletContext.tsx` -- uses `useAccount`. Compatible.
-- `src/hooks/useWalletAuth.ts` -- needs review but likely uses standard hooks.
+After change:
+- admin role sees: Dashboard, Clients, Orders, Prescriptions, Strains, Strain Sync
+- root_admin sees: all of the above + User Roles, Wallet Mappings, Settings, Dev Tools
+```
 
-No code changes expected -- just the version pin in `package.json`.
-
-### 3. Remove `@metamask/sdk` if unused directly
-
-`@metamask/sdk@^0.34.0` is listed as a direct dependency. RainbowKit already bundles MetaMask connector support. If nothing imports `@metamask/sdk` directly, it can be removed to reduce conflicts. This will be verified before removal.
-
-## Why not the other options?
-
-- **Force install (`--legacy-peer-deps`)**: Risks runtime crashes if wagmi v3 changed internal APIs that RainbowKit calls.
-- **Remove RainbowKit**: Would require rewriting the entire wallet connection UI (modal, connectors, chain switching) from scratch. Not worth it.
-- **Upgrade RainbowKit to support wagmi v3**: No official release exists yet. Using an unofficial fork introduces maintenance risk.
-
-## Files to modify
-
-| File | Change |
-|------|--------|
-| `package.json` | Change `wagmi` from `^3.1.3` to `^2.14.0` |
+**No database changes required** — the `isRootAdmin` flag is already computed in `useUserRole()` from the existing `user_roles` table.
 
