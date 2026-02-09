@@ -35,8 +35,11 @@ import {
   RefreshCw,
   Search,
   Download,
+  PlayCircle,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 const AdminOrders = () => {
   const [activeTab, setActiveTab] = useState<SyncStatus | "all">("all");
@@ -53,6 +56,7 @@ const AdminOrders = () => {
     isLoadingStats,
     isSyncing,
     isUpdating,
+    isProcessing,
     selectedOrders,
     toggleOrderSelection,
     selectAllOrders,
@@ -62,6 +66,8 @@ const AdminOrders = () => {
     resetSyncStatus,
     flagForReview,
     updateOrderStatus,
+    processOrder,
+    batchProcessPending,
     fetchOrders,
     refetch,
   } = useAdminOrderSync();
@@ -146,6 +152,14 @@ const AdminOrders = () => {
     await flagForReview({ orderId, reason: reason || "Flagged by admin" });
   };
 
+  const handleProcessOrder = async (orderId: string) => {
+    await processOrder(orderId);
+  };
+
+  const handleBatchProcess = async () => {
+    await batchProcessPending();
+  };
+
   const handleUpdateStatus = async (
     orderId: string,
     status?: string,
@@ -224,6 +238,43 @@ const AdminOrders = () => {
       title="Orders Management"
       description="View and sync orders with Dr. Green API"
     >
+      {/* Pending Queue Banner */}
+      {(stats?.pending || 0) > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="mb-6 border-amber-500/30 bg-amber-500/5">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10">
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {stats.pending} Pending Order{stats.pending !== 1 ? 's' : ''} Awaiting Processing
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      These orders were saved locally and need manual confirmation.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleBatchProcess}
+                  disabled={isProcessing}
+                  className="whitespace-nowrap"
+                >
+                  <PlayCircle className={cn("w-4 h-4 mr-2", isProcessing && "animate-spin")} />
+                  Confirm All Pending
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {statCards.map((stat, index) => (
@@ -320,7 +371,9 @@ const AdminOrders = () => {
                 onSyncOrder={handleSyncOrder}
                 onResetSync={handleResetSync}
                 onFlagForReview={(id) => handleFlagForReview(id)}
+                onProcessOrder={handleProcessOrder}
                 isSyncing={isSyncing}
+                isProcessing={isProcessing}
               />
             </div>
           </Tabs>

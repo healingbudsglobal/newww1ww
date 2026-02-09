@@ -40,6 +40,7 @@ import {
   XCircle,
   RotateCcw,
   Flag,
+  PlayCircle,
 } from "lucide-react";
 import { LocalOrder, SyncStatus, OrderStatus, PaymentStatus } from "@/hooks/useAdminOrderSync";
 import { cn } from "@/lib/utils";
@@ -54,7 +55,9 @@ interface AdminOrdersTableProps {
   onSyncOrder: (orderId: string) => void;
   onResetSync: (orderId: string) => void;
   onFlagForReview: (orderId: string) => void;
+  onProcessOrder?: (orderId: string) => void;
   isSyncing: boolean;
+  isProcessing?: boolean;
 }
 
 const getSyncStatusBadge = (status: SyncStatus) => {
@@ -138,7 +141,9 @@ export function AdminOrdersTable({
   onSyncOrder,
   onResetSync,
   onFlagForReview,
+  onProcessOrder,
   isSyncing,
+  isProcessing,
 }: AdminOrdersTableProps) {
   const allSelected = orders.length > 0 && selectedOrders.length === orders.length;
   const someSelected = selectedOrders.length > 0 && selectedOrders.length < orders.length;
@@ -266,41 +271,66 @@ export function AdminOrdersTable({
                 )}
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onViewOrder(order)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {order.sync_status !== "synced" && (
-                      <DropdownMenuItem
-                        onClick={() => onSyncOrder(order.id)}
-                        disabled={isSyncing}
-                      >
-                        <RefreshCw className={cn("h-4 w-4 mr-2", isSyncing && "animate-spin")} />
-                        Sync to API
+                <div className="flex items-center gap-1">
+                  {/* Quick Process button for pending orders */}
+                  {order.sync_status === "pending" && order.status === "PENDING" && onProcessOrder && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                          onClick={() => onProcessOrder(order.id)}
+                          disabled={isProcessing}
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Confirm & Process</TooltipContent>
+                    </Tooltip>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onViewOrder(order)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
                       </DropdownMenuItem>
-                    )}
-                    {order.sync_status === "failed" && (
-                      <DropdownMenuItem onClick={() => onResetSync(order.id)}>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Reset Status
-                      </DropdownMenuItem>
-                    )}
-                    {order.sync_status !== "manual_review" && (
-                      <DropdownMenuItem onClick={() => onFlagForReview(order.id)}>
-                        <Flag className="h-4 w-4 mr-2" />
-                        Flag for Review
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuSeparator />
+                      {order.sync_status === "pending" && order.status === "PENDING" && onProcessOrder && (
+                        <DropdownMenuItem onClick={() => onProcessOrder(order.id)}>
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          Confirm & Process
+                        </DropdownMenuItem>
+                      )}
+                      {order.sync_status !== "synced" && (
+                        <DropdownMenuItem
+                          onClick={() => onSyncOrder(order.id)}
+                          disabled={isSyncing}
+                        >
+                          <RefreshCw className={cn("h-4 w-4 mr-2", isSyncing && "animate-spin")} />
+                          Sync to API
+                        </DropdownMenuItem>
+                      )}
+                      {order.sync_status === "failed" && (
+                        <DropdownMenuItem onClick={() => onResetSync(order.id)}>
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reset Status
+                        </DropdownMenuItem>
+                      )}
+                      {order.sync_status !== "manual_review" && (
+                        <DropdownMenuItem onClick={() => onFlagForReview(order.id)}>
+                          <Flag className="h-4 w-4 mr-2" />
+                          Flag for Review
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </TableCell>
             </motion.tr>
           ))}

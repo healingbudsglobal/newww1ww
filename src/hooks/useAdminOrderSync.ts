@@ -475,6 +475,83 @@ export function useAdminOrderSync() {
     },
   });
 
+  // Process a pending order: mark as CONFIRMED + PAID
+  const processOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase
+        .from("drgreen_orders")
+        .update({
+          status: "CONFIRMED",
+          payment_status: "PAID",
+          sync_status: "manual_review",
+          sync_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+      toast({
+        title: "Order processed",
+        description: "Order confirmed and marked as paid.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Process failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Batch process all pending orders
+  const batchProcessMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error: fetchError } = await supabase
+        .from("drgreen_orders")
+        .select("id")
+        .eq("sync_status", "pending")
+        .eq("status", "PENDING");
+
+      if (fetchError) throw fetchError;
+      if (!data || data.length === 0) throw new Error("No pending orders to process");
+
+      const { error } = await supabase
+        .from("drgreen_orders")
+        .update({
+          status: "CONFIRMED",
+          payment_status: "PAID",
+          sync_status: "manual_review",
+          sync_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("sync_status", "pending")
+        .eq("status", "PENDING");
+
+      if (error) throw error;
+      return data.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+      toast({
+        title: "Batch process complete",
+        description: `${count} orders confirmed and marked as paid.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Batch process failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     // Queries
     orders: ordersQuery.data?.orders || [],
@@ -494,11 +571,14 @@ export function useAdminOrderSync() {
     updateOrderStatus: updateOrderStatusMutation.mutateAsync,
     flagForReview: flagForReviewMutation.mutateAsync,
     resetSyncStatus: resetSyncStatusMutation.mutateAsync,
+    processOrder: processOrderMutation.mutateAsync,
+    batchProcessPending: batchProcessMutation.mutateAsync,
 
     // Mutation states
     isSyncing: syncOrderMutation.isPending,
     isBatchSyncing: batchSyncMutation.isPending,
     isUpdating: updateOrderStatusMutation.isPending,
+    isProcessing: processOrderMutation.isPending || batchProcessMutation.isPending,
 
     // Selection
     selectedOrders,
