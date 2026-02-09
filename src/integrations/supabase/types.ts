@@ -650,6 +650,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_root_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "root_admin" | "operator"
