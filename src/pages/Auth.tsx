@@ -17,8 +17,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useShop } from "@/context/ShopContext";
 import { getProductionPath } from "@/lib/urls";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import { useWallet } from "@/context/WalletContext";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
