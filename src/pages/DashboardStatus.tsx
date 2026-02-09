@@ -143,12 +143,23 @@ export default function DashboardStatus() {
     }
   }, [drGreenClient, isLoading, navigate]);
 
-  // Auto-redirect unregistered users to registration after 5 seconds
+  // Auto-trigger lookup when no client found (seamless discovery)
+  const [autoLookupDone, setAutoLookupDone] = useState(false);
+  
+  useEffect(() => {
+    if (!isLoading && !drGreenClient && isAuthenticated && !isLookingUp && !autoLookupDone) {
+      setAutoLookupDone(true);
+      handleManualLookup();
+    }
+  }, [isLoading, drGreenClient, isAuthenticated, isLookingUp, autoLookupDone, handleManualLookup]);
+
+  // Auto-redirect unregistered users to registration after 15 seconds (gives lookup time)
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   
   useEffect(() => {
-    if (!isLoading && !drGreenClient && isAuthenticated) {
-      setRedirectCountdown(5);
+    // Only start countdown after auto-lookup has completed and still no client
+    if (!isLoading && !drGreenClient && isAuthenticated && autoLookupDone && !isLookingUp) {
+      setRedirectCountdown(15);
       const interval = setInterval(() => {
         setRedirectCountdown(prev => {
           if (prev === null || prev <= 1) {
@@ -161,7 +172,7 @@ export default function DashboardStatus() {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [drGreenClient, isLoading, isAuthenticated, navigate]);
+  }, [drGreenClient, isLoading, isAuthenticated, autoLookupDone, isLookingUp, navigate]);
 
   if (isAuthenticated === null || isLoading) {
     return (

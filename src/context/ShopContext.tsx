@@ -159,15 +159,17 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Attempt to auto-discover and link existing Dr. Green client by email
-  const linkClientFromDrGreenByAuthEmail = useCallback(async (userId: string): Promise<boolean> => {
+  const linkClientFromDrGreenByAuthEmail = useCallback(async (userId: string, silent = false): Promise<boolean> => {
     try {
       console.log('[ShopContext] Attempting auto-discovery of Dr. Green client...');
       
-      // Show toast to user
-      toast({
-        title: 'Checking records...',
-        description: 'Looking up your profile in our system',
-      });
+      // Show toast to user (unless silent mode for auto-login)
+      if (!silent) {
+        toast({
+          title: 'Checking records...',
+          description: 'Looking up your profile in our system',
+        });
+      }
       
       const { data, error } = await supabase.functions.invoke('drgreen-proxy', {
         body: { action: 'get-client-by-auth-email' },
@@ -175,11 +177,13 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         console.error('[ShopContext] Auto-discovery API error:', error);
-        toast({
-          title: 'Lookup Failed',
-          description: 'Could not verify your profile. Please try again later.',
-          variant: 'destructive',
-        });
+        if (!silent) {
+          toast({
+            title: 'Lookup Failed',
+            description: 'Could not verify your profile. Please try again later.',
+            variant: 'destructive',
+          });
+        }
         return false;
       }
       
@@ -206,11 +210,13 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         
         if (upsertError) {
           console.error('[ShopContext] Failed to upsert client mapping:', upsertError);
-          toast({
-            title: 'Sync Error',
-            description: 'Could not save profile data locally.',
-            variant: 'destructive',
-          });
+          if (!silent) {
+            toast({
+              title: 'Sync Error',
+              description: 'Could not save profile data locally.',
+              variant: 'destructive',
+            });
+          }
           return false;
         }
         
@@ -220,28 +226,34 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           ? 'Profile found - awaiting verification'
           : 'Profile found - status: ' + data.adminApproval;
         
-        toast({
-          title: 'Profile Found!',
-          description: statusMsg,
-        });
+        if (!silent) {
+          toast({
+            title: 'Profile Found!',
+            description: statusMsg,
+          });
+        }
         
         console.log('[ShopContext] Successfully linked Dr. Green client:', data.clientId);
         return true;
       } else {
         console.log('[ShopContext] No existing Dr. Green client found for this email');
-        toast({
-          title: 'No Profile Found',
-          description: 'Please complete registration to access the dispensary.',
-        });
+        if (!silent) {
+          toast({
+            title: 'No Profile Found',
+            description: 'Please complete registration to access the dispensary.',
+          });
+        }
         return false;
       }
     } catch (err) {
       console.error('[ShopContext] Auto-discovery error:', err);
-      toast({
-        title: 'Connection Error',
-        description: 'Please check your connection and try again.',
-        variant: 'destructive',
-      });
+      if (!silent) {
+        toast({
+          title: 'Connection Error',
+          description: 'Please check your connection and try again.',
+          variant: 'destructive',
+        });
+      }
       return false;
     }
   }, [toast]);
@@ -271,7 +283,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     // Step 2: If no local mapping, try auto-discovery from Dr. Green API
     if (!localRecord) {
       console.log('[ShopContext] No local client mapping, attempting auto-discovery...');
-      const linked = await linkClientFromDrGreenByAuthEmail(user.id);
+      const linked = await linkClientFromDrGreenByAuthEmail(user.id, true);
       
       if (linked) {
         // Refetch the newly created mapping
