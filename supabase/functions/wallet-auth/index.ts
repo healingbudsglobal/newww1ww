@@ -301,23 +301,33 @@ async function createSessionForWallet(
     console.log(`[wallet-auth] Legacy wallet user found (${legacyWalletUser.id.slice(0, 8)}...), linked account used instead`);
   }
 
-  // Ensure admin role
+  // Ensure admin role — ONLY for whitelisted wallets
   if (userId) {
-    const { data: hasRole } = await adminClient.rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin',
-    });
+    const adminWallets = (Deno.env.get('ADMIN_WALLET_ADDRESSES') || '')
+      .split(',')
+      .map(a => a.trim().toLowerCase())
+      .filter(Boolean);
+    const isAdminWallet = adminWallets.includes(address.toLowerCase());
 
-    if (!hasRole) {
-      const { error: roleError } = await adminClient
-        .from('user_roles')
-        .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' });
+    if (isAdminWallet) {
+      const { data: hasRole } = await adminClient.rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin',
+      });
 
-      if (roleError) {
-        console.error('[wallet-auth] Role assignment failed:', roleError.message);
-      } else {
-        console.log(`[wallet-auth] Admin role assigned to ${userId.slice(0, 8)}...`);
+      if (!hasRole) {
+        const { error: roleError } = await adminClient
+          .from('user_roles')
+          .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' });
+
+        if (roleError) {
+          console.error('[wallet-auth] Role assignment failed:', roleError.message);
+        } else {
+          console.log(`[wallet-auth] Admin role assigned to whitelisted wallet ${address.slice(0, 10)}...`);
+        }
       }
+    } else {
+      console.log(`[wallet-auth] Wallet ${address.slice(0, 10)}... is not in admin whitelist — no admin role assigned`);
     }
   }
 

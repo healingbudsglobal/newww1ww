@@ -15,7 +15,7 @@ secp256k1.etc.hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]) => {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-debug-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // Log level configuration - defaults to INFO in production
@@ -117,9 +117,7 @@ const OPEN_COUNTRIES = ['ZAF', 'THA'];
 // Authenticated but no ownership check needed
 const AUTH_ONLY_ACTIONS: string[] = ['get-user-me', 'get-client-by-auth-email'];
 
-// Admin debug mode: allows bypassing auth for specific actions when debug header is present
-// Uses first 16 chars of DRGREEN_PRIVATE_KEY as the debug secret
-const DEBUG_ACTIONS = ['create-client-legacy', 'admin-reregister-client', 'admin-list-all-clients'];
+// Debug mode REMOVED for security — all actions require proper authentication
 
 // Retry configuration for transient failures
 const RETRY_CONFIG = {
@@ -169,11 +167,7 @@ function isRetryable(error: unknown, statusCode?: number): boolean {
   return false;
 }
 
-function getDebugSecret(): string | null {
-  const privateKey = Deno.env.get("DRGREEN_PRIVATE_KEY");
-  if (!privateKey || privateKey.length < 16) return null;
-  return privateKey.slice(0, 16);
-}
+// getDebugSecret REMOVED — debug mode eliminated for security
 
 /**
  * Input validation schemas
@@ -1725,20 +1719,8 @@ serve(async (req) => {
         logInfo(`Authenticated user accessing ${action}`);
       }
     } else if (!isPublicAction) {
-      // Check for admin debug mode bypass FIRST (before any auth checks)
-      const debugHeader = req.headers.get('x-admin-debug-key');
-      const debugSecret = getDebugSecret();
-      const isDebugMode = debugHeader && debugSecret && debugHeader === debugSecret && DEBUG_ACTIONS.includes(action);
-      
-      if (isDebugMode) {
-        logInfo(`[ADMIN DEBUG MODE] Bypassing auth for ${action}`, { 
-          action, 
-          debugHeaderPresent: true,
-          timestamp: new Date().toISOString() 
-        });
-        // Skip ALL authentication and admin checks, proceed directly to route processing
-      } else {
-        // Non-country-gated, non-public actions require authentication
+      {
+        // All non-country-gated, non-public actions require authentication
         const authResult = await verifyAuthentication(req);
         
         if (!authResult) {
@@ -1800,7 +1782,7 @@ serve(async (req) => {
         if (action === 'create-client-legacy' || action === 'create-client') {
           logInfo(`User creating new client`);
         }
-      } // end else (not debug mode)
+      }
     }
 
     // ==========================================
