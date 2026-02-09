@@ -1,98 +1,60 @@
 
 
-# Local Order Confirmation System
+# Admin Pending Orders Queue + Navigation & Wire Fixes
 
-## Problem
-The Dr. Green DApp API is returning 401 Unauthorized errors, preventing clients from completing orders. Verified clients with products in their cart are blocked at checkout.
+## 1. Admin Pending Orders Queue
 
-## Solution
-Implement a **local-first order flow** that:
-1. Saves the order directly to the `drgreen_orders` table with a `PENDING_SYNC` status
-2. Shows the client a professional order confirmation immediately
-3. Clears the cart as normal
-4. Queues the order for later API sync when the DApp issue is resolved
+The admin orders page (`/admin/orders`) already exists with filtering by sync status. However, we'll add a dedicated **"Pending Queue"** tab/view that surfaces `PENDING_SYNC` orders prominently with one-click processing actions:
 
-This ensures clients can place orders now, and admins can process/sync them once API access is restored.
+- **Add a prominent "Pending Queue" card** at the top of the Admin Orders page that shows the count of `PENDING_SYNC` orders with a call-to-action
+- **Add quick-action buttons** on each pending order row: "Mark as Confirmed", "Process Manually", "Flag for Review"
+- **Add a "Process Order" workflow**: Admin clicks "Confirm & Process" on a pending order, which updates the status from `PENDING_SYNC` to `CONFIRMED` and payment status from `AWAITING_PROCESSING` to `PAID`
+- **Add bulk actions**: "Confirm All Pending" button to batch-process multiple orders
 
----
-
-## Changes
-
-### 1. Update Checkout Logic (`src/pages/Checkout.tsx`)
-
-Modify `handlePlaceOrder` to use a **local-first fallback**:
-
-- **Try** the existing DApp API order flow first (current behavior)
-- **On API failure** (401, 500, timeout), fall back to saving the order locally with:
-  - `drgreen_order_id`: Generate a local reference like `LOCAL-{timestamp}-{random}`
-  - `status`: `PENDING_SYNC`
-  - `payment_status`: `AWAITING_PROCESSING`
-  - `sync_status`: `pending`
-  - `sync_error`: The original API error message
-- Show a tailored confirmation screen that explains the order is received and will be processed
-
-### 2. Update Order Confirmation UI (`src/pages/Checkout.tsx`)
-
-Modify the `orderComplete` confirmation view to handle two states:
-
-- **API-confirmed order**: Current green checkmark + "Order Confirmed!" (unchanged)
-- **Locally-saved order**: Amber/blue info state + "Order Received!" with messaging:
-  - "Your order has been received and saved securely"
-  - "Our team will process your order and confirm via email"
-  - "Reference number: LOCAL-xxxx"
-  - "No payment has been taken yet"
-
-### 3. Update Orders Page Display (`src/components/shop/OrdersTable.tsx`)
-
-Add visual distinction for `PENDING_SYNC` orders:
-- Show an amber "Awaiting Processing" badge instead of the regular status
-- Add a subtle info note: "This order is queued for processing"
+### Files to modify:
+- `src/pages/AdminOrders.tsx` -- Add pending queue banner and quick-process actions
+- `src/components/admin/AdminOrdersTable.tsx` -- Add "Process" button for PENDING_SYNC orders
 
 ---
 
-## Technical Details
+## 2. Navigation Bar Fix (Links Not Visible / Overlapping)
 
-### Modified files:
-- `src/pages/Checkout.tsx` -- Add local fallback in `handlePlaceOrder`, update confirmation UI
-- `src/components/shop/OrdersTable.tsx` -- Add `PENDING_SYNC` status badge styling
+From the screenshot, the nav links in the header are overlapping and unreadable. The issue is that the navigation items are clashing with each other when space is tight. The text "The Wire" is rendering on top of other nav items.
 
-### No database changes required
-The `drgreen_orders` table already has `sync_status` and `sync_error` columns, and `drgreen_order_id` accepts any text value. The existing schema fully supports this flow.
+### Root cause:
+The `NavigationMenu` component uses `hidden xl:flex` so it only shows on xl+ screens, but the nav items with icons + text + padding (`px-5 py-2.5`) can still overflow or overlap when there are too many items in the available space.
 
-### Local Order ID Format
-```text
-LOCAL-{YYYYMMDD}-{4-char-random}
-Example: LOCAL-20260209-A3F7
-```
+### Fix:
+- Reduce padding on nav items from `px-5` to `px-4`
+- Add `whitespace-nowrap` to prevent label wrapping
+- Add `overflow-hidden` on the nav container to prevent spillover
+- Ensure the nav uses `flex-shrink-0` on items so they don't compress
 
-### Order Flow Diagram
+### File to modify:
+- `src/components/NavigationMenu.tsx`
 
-```text
-Client clicks "Place Order"
-        |
-        v
-  Try DApp API order
-        |
-   +---------+
-   | Success? |
-   +----+----+
-   Yes  |  No (401/error)
-    |   |      |
-    v   |      v
- Normal |  Save locally with
- flow   |  PENDING_SYNC status
-    |   |      |
-    v   v      v
- Confirmation shown to client
- (adapted messaging per state)
-    |          |
-    v          v
- Cart cleared  Cart cleared
-```
+---
 
-### Security and Compliance Notes
-- No eligibility or KYC checks are bypassed -- the `EligibilityGate` component still wraps the checkout
-- Payment is NOT processed for local orders -- messaging clearly states "no payment taken yet"
-- Orders are traceable via the local reference ID
-- Admin can view and manually process these orders from the admin panel
+## 3. The Wire Text Overlap Fix
+
+The screenshot shows text overlapping on The Wire section (likely in the hero or article cards). This is a layout issue where content is not properly contained.
+
+### Fix:
+- Ensure the hero section has proper `pt-28` padding to clear the fixed header
+- Add `overflow-hidden` and `text-ellipsis` where needed
+- Add `line-clamp` utilities to article titles and summaries to prevent overflow
+
+### File to modify:
+- `src/pages/TheWire.tsx` -- Minor spacing adjustments if needed (the current code already has `pt-28` so the issue may be specifically the nav overlap bleeding into the page content)
+
+---
+
+## Technical Summary
+
+| Change | File | Description |
+|--------|------|-------------|
+| Pending queue banner | `src/pages/AdminOrders.tsx` | Add prominent pending orders banner with batch process button |
+| Quick process actions | `src/components/admin/AdminOrdersTable.tsx` | Add "Confirm" button for PENDING_SYNC rows |
+| Nav link overflow | `src/components/NavigationMenu.tsx` | Fix padding, add whitespace-nowrap, prevent overflow |
+| Wire text overlap | `src/pages/TheWire.tsx` | Ensure proper spacing and text containment |
 
