@@ -1,59 +1,26 @@
 
 
-## Gate Admin Settings and Role Management to Root Admin Only
+## Cleanup: Remove Dead Code
 
-### Problem
-Currently, all admin-tier users (including delegated NFT holder admins) can see and access Settings, Role Management, Wallet Mappings, and Developer Tools in the admin sidebar. These should be restricted to `root_admin` only.
+Two small changes to remove legacy references that are no longer relevant after the role simplification.
 
-### Changes
+### 1. useUserRole.ts — Remove dead `root_admin` check
 
-#### 1. AdminLayout — Conditional sidebar navigation
-**File:** `src/layout/AdminLayout.tsx`
+Line 55 contains a fallback check for the removed `root_admin` role. This will be simplified to only check for `'admin'`.
 
-- Pass `isRootAdmin` from the existing `useUserRole()` hook (already called in AdminLayout)
-- Split `secondaryNavItems` into two groups:
-  - **Root-only items:** User Roles, Wallet Mappings, Settings, Developer Tools
-  - **All-admin items:** (none currently, but the pattern supports future additions)
-- Filter the secondary nav items based on `isRootAdmin` before rendering
-- This applies to both desktop sidebar and mobile menu
+### 2. Auth.tsx — Remove Dev Admin Bypass button
 
-#### 2. Route-level protection for root-only pages
-**File:** `src/App.tsx`
+The "Dev Admin Bypass (Testing Only)" button (roughly lines 310-340) will be removed entirely. This was a development shortcut that should not ship to production.
 
-- Wrap the following routes with a `RootAdminGuard` component:
-  - `/admin/roles`
-  - `/admin/wallet-mappings`
-  - `/admin/settings`
-  - `/admin/tools`
-
-#### 3. New RootAdminGuard component
-**File:** `src/components/RootAdminGuard.tsx` (new)
-
-- Uses `useUserRole()` to check `isRootAdmin`
-- If not root admin, shows "Access Denied" with redirect back
-- If loading, shows spinner
-- If root admin, renders children
+---
 
 ### Technical Details
 
-```text
-Current sidebar:
-+-- Dashboard
-+-- Clients
-+-- Orders
-+-- Prescriptions
-+-- Strains
-+-- Strain Sync
-+-- ─────────────
-+-- User Roles        <-- root_admin only
-+-- Wallet Mappings   <-- root_admin only
-+-- Settings          <-- root_admin only
-+-- Developer Tools   <-- root_admin only
+**File: `src/hooks/useUserRole.ts`**
+- Remove the `|| role === 'root_admin'` condition from the `isAdmin` derivation around line 55.
 
-After change:
-- admin role sees: Dashboard, Clients, Orders, Prescriptions, Strains, Strain Sync
-- root_admin sees: all of the above + User Roles, Wallet Mappings, Settings, Dev Tools
-```
+**File: `src/pages/Auth.tsx`**
+- Delete the entire Dev Admin Bypass `<Button>` block (the ghost button with the wrench emoji and its `onClick` handler that creates/signs in with `admin-test@healingbuds.dev`).
 
-**No database changes required** — the `isRootAdmin` flag is already computed in `useUserRole()` from the existing `user_roles` table.
+Both changes are safe removals with no downstream impact since `root_admin` no longer exists in the enum and the bypass button is a dev-only artifact.
 
