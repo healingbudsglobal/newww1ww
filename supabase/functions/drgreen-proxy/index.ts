@@ -2318,7 +2318,7 @@ serve(async (req) => {
         if (!clientId) throw new Error("clientId is required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
         // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
+        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
         break;
       }
       
@@ -2352,7 +2352,7 @@ serve(async (req) => {
         let apiData: Record<string, unknown> | null = null;
         
         try {
-          apiResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {});
+          apiResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, { orderBy: 'desc', take: 1, page: 1 });
           
           if (apiResponse.ok) {
             apiData = await apiResponse.json() as Record<string, unknown>;
@@ -2656,7 +2656,7 @@ serve(async (req) => {
           throw new Error("Invalid client ID format");
         }
         // GET request - use query string signing with write credentials (NFT-scoped)
-        response = await drGreenRequestQuery(`/dapp/clients/${body.clientId}`, {}, false, adminEnvConfig);
+        response = await drGreenRequestQuery(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
         break;
       }
       
@@ -2715,7 +2715,7 @@ serve(async (req) => {
           throw new Error("Invalid cart ID format");
         }
         // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/carts/${body.cartId}`, {});
+        response = await drGreenRequestQuery(`/dapp/carts/${body.cartId}`, { orderBy: 'desc', take: 1, page: 1 });
         break;
       }
       
