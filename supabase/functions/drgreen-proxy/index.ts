@@ -2372,8 +2372,12 @@ serve(async (req) => {
           });
         }
         
-        // If we have API data, return it
+        // If we have API data, normalize and return it
         if (apiData) {
+          // Normalize shippings array to shipping object (API returns shippings[], frontend expects shipping{})
+          if (Array.isArray(apiData.shippings) && (apiData.shippings as unknown[]).length > 0) {
+            apiData.shipping = (apiData.shippings as unknown[])[0];
+          }
           return new Response(JSON.stringify(apiData), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -2656,7 +2660,19 @@ serve(async (req) => {
           throw new Error("Invalid client ID format");
         }
         // GET request - use query string signing with write credentials (NFT-scoped)
-        response = await drGreenRequestQuery(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
+        const clientResponse = await drGreenRequestQuery(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
+        if (clientResponse && clientResponse.ok) {
+          const clientData = await clientResponse.json();
+          // Normalize shippings array to shipping object
+          if (Array.isArray(clientData.shippings) && clientData.shippings.length > 0) {
+            clientData.shipping = clientData.shippings[0];
+          }
+          return new Response(JSON.stringify(clientData), {
+            status: clientResponse.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        response = clientResponse;
         break;
       }
       
