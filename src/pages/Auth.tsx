@@ -42,11 +42,11 @@ const Auth = () => {
   
   // Wallet auth
   const { authenticateWithWallet, isAuthenticating, isWalletConnected, walletAddress } = useWalletAuth();
-  const { openWalletModal } = useWallet();
+  const { openConnectModal } = useConnectModal();
 
   const handleWalletLogin = async () => {
     if (!isWalletConnected) {
-      openWalletModal();
+      openConnectModal?.();
       return;
     }
     const success = await authenticateWithWallet();
