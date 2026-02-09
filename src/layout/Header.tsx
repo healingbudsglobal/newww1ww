@@ -289,8 +289,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                           "text-sm flex items-center gap-2"
                         )}
                       >
-                        <User className="w-4 h-4" />
-                        {t('nav.patientLogin')}
+                        <Shield className="w-4 h-4" />
+                        Admin Login
                         <ChevronDown className="w-3 h-3 opacity-60" />
                       </button>
                     </DropdownMenuTrigger>
