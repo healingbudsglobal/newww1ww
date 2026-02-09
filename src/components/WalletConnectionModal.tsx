@@ -237,9 +237,11 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
  */
 interface WalletButtonProps {
   className?: string;
+  /** Data attribute for programmatic triggering */
+  'data-wallet-trigger'?: string;
 }
 
-export function WalletButton({ className }: WalletButtonProps) {
+export function WalletButton({ className, ...props }: WalletButtonProps) {
   const { isConnected, address } = useAccount();
   const [modalOpen, setModalOpen] = useState(false);
   const { hasNFT } = useDrGreenKeyOwnership();
@@ -254,6 +256,8 @@ export function WalletButton({ className }: WalletButtonProps) {
         variant={isConnected ? 'outline' : 'default'}
         onClick={() => setModalOpen(true)}
         className={cn('gap-2', className)}
+        data-wallet-trigger="true"
+        {...props}
       >
         {isConnected ? (
           <>
