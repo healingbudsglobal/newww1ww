@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { SmokeParticles } from "@/components/SmokeParticles";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -7,7 +7,10 @@ import {
   Shield,
   Stethoscope,
   Play,
-  ChevronDown
+  ChevronDown,
+  ShoppingBag,
+  ClipboardList,
+  LayoutDashboard,
 } from "lucide-react";
 import Header from "@/layout/Header";
 import Footer from "@/components/Footer";
@@ -28,26 +31,32 @@ import hbLogoTeal from "@/assets/hb-logo-teal.png";
 import hbIconWhiteTraceability from "@/assets/hb-icon-white-traceability.png";
 import hbIconCta from "@/assets/hb-icon-cta.webp";
 
-// Define sections for navigation
-const sections = [
-  { id: 'hero', label: 'Welcome' },
-  { id: 'how-it-works', label: 'How It Works' },
-  { id: 'compliance', label: 'Our Standards' },
-  { id: 'get-started', label: 'Get Started' },
-];
-
 const eligibilitySteps = [
   { step: 1, title: "Complete Assessment", description: "Fill out our secure medical questionnaire" },
   { step: 2, title: "Verify Identity", description: "Quick KYC verification process" },
   { step: 3, title: "Get Approved", description: "Medical team reviews your application" }
 ];
 
+const verifiedQuickLinks = [
+  { icon: ShoppingBag, title: "Browse Strains", description: "Explore our medical cannabis products", to: "/shop" },
+  { icon: ClipboardList, title: "Order History", description: "Track and manage your orders", to: "/orders" },
+  { icon: LayoutDashboard, title: "My Dashboard", description: "View your patient dashboard", to: "/dashboard" },
+];
+
 const Index = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [ctaIconHovered, setCtaIconHovered] = useState(false);
   const navigate = useNavigate();
-  const { drGreenClient, isEligible } = useShop();
+  const { drGreenClient, isEligible, isLoading } = useShop();
   const heroRef = useRef<HTMLElement>(null);
+
+  // Dynamic section labels based on user state
+  const sections = useMemo(() => [
+    { id: 'hero', label: 'Welcome' },
+    { id: 'how-it-works', label: isEligible ? 'Quick Links' : 'How It Works' },
+    { id: 'compliance', label: 'Our Standards' },
+    { id: 'get-started', label: isEligible ? 'Welcome Back' : 'Get Started' },
+  ], [isEligible]);
   
   // Parallax scroll effect for video
   const { scrollYProgress } = useScroll({
@@ -120,35 +129,65 @@ const Index = () => {
                     Access quality-controlled, lab-tested medical cannabis with complete transparency.
                   </p>
 
-                  {/* Primary CTAs */}
+                  {/* Primary CTAs - state-aware */}
                   <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                    <Button 
-                      size="lg" 
-                      className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
-                      onClick={() => navigate('/eligibility')}
-                    >
-                      Check Eligibility
-                      <ArrowRight className="ml-2 w-5 h-5" />
-                    </Button>
-                    
                     {isEligible ? (
-                      <Button 
-                        size="lg" 
-                        variant="outline"
-                        className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
-                        onClick={() => navigate('/shop')}
-                      >
-                        Browse Products
-                      </Button>
+                      <>
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
+                          onClick={() => navigate('/shop')}
+                        >
+                          Browse Strains
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button 
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
+                          onClick={() => navigate('/dashboard')}
+                        >
+                          My Dashboard
+                        </Button>
+                      </>
+                    ) : drGreenClient && !isLoading ? (
+                      <>
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
+                          onClick={() => navigate('/eligibility')}
+                        >
+                          View Status
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button 
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
+                          onClick={() => navigate('/support')}
+                        >
+                          Need Help?
+                        </Button>
+                      </>
                     ) : (
-                      <Button 
-                        size="lg" 
-                        variant="outline"
-                        className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
-                        onClick={() => navigate(drGreenClient ? '/eligibility' : '/auth')}
-                      >
-                        {drGreenClient ? 'Continue Assessment' : 'Sign In'}
-                      </Button>
+                      <>
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6 bg-highlight hover:bg-highlight/90 text-highlight-foreground shadow-lg"
+                          onClick={() => navigate('/eligibility')}
+                        >
+                          Check Eligibility
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button 
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
+                          onClick={() => navigate('/auth')}
+                        >
+                          Sign In
+                        </Button>
+                      </>
                     )}
                   </div>
 
@@ -200,8 +239,8 @@ const Index = () => {
             </motion.button>
           </section>
 
-          {/* Eligibility Status Banner (for logged in users) */}
-          {drGreenClient && !isEligible && (
+          {/* Eligibility Status Banner - only show when loaded and pending */}
+          {!isLoading && drGreenClient && !isEligible && (
             <section className="py-6 bg-highlight/10 border-y border-highlight/30">
               <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
@@ -227,55 +266,102 @@ const Index = () => {
           {/* Featured Strains - visible only for verified users */}
           {isEligible && <FeaturedStrains />}
 
-          {/* Quick Eligibility Process */}
+          {/* State-aware section: How It Works (visitors/pending) or Quick Links (verified) */}
           <section id="how-it-works" className="py-16 lg:py-24 bg-muted/30">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-5xl mx-auto">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  className="text-center mb-12"
-                >
-                  <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-                    Get Started in 3 Simple Steps
-                  </h2>
-                  <p className="font-body text-muted-foreground max-w-2xl mx-auto">
-                    Our streamlined verification process ensures safe and legal access to medical cannabis.
-                  </p>
-                </motion.div>
-
-                <div className="grid md:grid-cols-3 gap-6">
-                  {eligibilitySteps.map((item, index) => (
+                {isEligible ? (
+                  /* VERIFIED PATIENT: Quick Links */
+                  <>
                     <motion.div
-                      key={item.step}
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ delay: index * 0.1 }}
+                      className="text-center mb-12"
                     >
-                      <Card className="h-full bg-card/50 border-border/50 hover:border-highlight/40 transition-colors group">
-                        <CardContent className="p-6 text-center">
-                          <div className="w-12 h-12 rounded-full bg-highlight/10 group-hover:bg-highlight/20 flex items-center justify-center mx-auto mb-4 transition-colors">
-                            <span className="text-xl font-bold text-highlight">{item.step}</span>
-                          </div>
-                          <h3 className="font-semibold text-lg text-foreground mb-2">{item.title}</h3>
-                          <p className="text-sm text-muted-foreground">{item.description}</p>
-                        </CardContent>
-                      </Card>
+                      <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                        Your Medical Cannabis Journey
+                      </h2>
+                      <p className="font-body text-muted-foreground max-w-2xl mx-auto">
+                        You're verified and ready to go. Access your treatments and manage your care.
+                      </p>
                     </motion.div>
-                  ))}
-                </div>
 
-                <div className="text-center mt-10">
-                  <Button 
-                    size="lg"
-                    onClick={() => navigate('/eligibility')}
-                  >
-                    Start Your Assessment
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </div>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {verifiedQuickLinks.map((item, index) => (
+                        <motion.div
+                          key={item.title}
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <Card 
+                            className="h-full bg-card/50 border-border/50 hover:border-primary/40 transition-colors group cursor-pointer"
+                            onClick={() => navigate(item.to)}
+                          >
+                            <CardContent className="p-6 text-center">
+                              <div className="w-12 h-12 rounded-full bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center mx-auto mb-4 transition-colors">
+                                <item.icon className="w-6 h-6 text-primary" />
+                              </div>
+                              <h3 className="font-semibold text-lg text-foreground mb-2">{item.title}</h3>
+                              <p className="text-sm text-muted-foreground">{item.description}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  /* VISITOR / PENDING: Onboarding Steps */
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      className="text-center mb-12"
+                    >
+                      <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                        Get Started in 3 Simple Steps
+                      </h2>
+                      <p className="font-body text-muted-foreground max-w-2xl mx-auto">
+                        Our streamlined verification process ensures safe and legal access to medical cannabis.
+                      </p>
+                    </motion.div>
+
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {eligibilitySteps.map((item, index) => (
+                        <motion.div
+                          key={item.step}
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <Card className="h-full bg-card/50 border-border/50 hover:border-highlight/40 transition-colors group">
+                            <CardContent className="p-6 text-center">
+                              <div className="w-12 h-12 rounded-full bg-highlight/10 group-hover:bg-highlight/20 flex items-center justify-center mx-auto mb-4 transition-colors">
+                                <span className="text-xl font-bold text-highlight">{item.step}</span>
+                              </div>
+                              <h3 className="font-semibold text-lg text-foreground mb-2">{item.title}</h3>
+                              <p className="text-sm text-muted-foreground">{item.description}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="text-center mt-10">
+                      <Button 
+                        size="lg"
+                        onClick={() => navigate(drGreenClient ? '/eligibility' : '/eligibility')}
+                      >
+                        {drGreenClient ? 'View Your Status' : 'Start Your Assessment'}
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -368,41 +454,88 @@ const Index = () => {
                       }}
                     />
                   </div>
-                  <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-                    Ready to Get Started?
-                  </h2>
-                  <p className="font-body text-lg text-muted-foreground mb-8">
-                    Check your eligibility for medical cannabis treatment today.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    {isEligible ? (
-                      <Button 
-                        size="lg" 
-                        className="text-lg px-8 py-6"
-                        onClick={() => navigate('/shop')}
-                      >
-                        Browse Our Strains
-                        <ArrowRight className="ml-2 w-5 h-5" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        size="lg" 
-                        className="text-lg px-8 py-6"
-                        onClick={() => navigate('/eligibility')}
-                      >
-                        Start Medical Assessment
-                        <ArrowRight className="ml-2 w-5 h-5" />
-                      </Button>
-                    )}
-                    <Button
-                      size="lg" 
-                      variant="outline"
-                      className="text-lg px-8 py-6"
-                      onClick={() => navigate('/support')}
-                    >
-                      Have Questions?
-                    </Button>
-                  </div>
+                  {isEligible ? (
+                    <>
+                      <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                        Welcome Back
+                      </h2>
+                      <p className="font-body text-lg text-muted-foreground mb-8">
+                        Browse our latest strains or manage your prescriptions.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/shop')}
+                        >
+                          Browse Our Strains
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/dashboard')}
+                        >
+                          My Dashboard
+                        </Button>
+                      </div>
+                    </>
+                  ) : drGreenClient && !isLoading ? (
+                    <>
+                      <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                        Verification In Progress
+                      </h2>
+                      <p className="font-body text-lg text-muted-foreground mb-8">
+                        We're reviewing your application. You'll have full access once approved.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/eligibility')}
+                        >
+                          View Status
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/support')}
+                        >
+                          Have Questions?
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                        Ready to Get Started?
+                      </h2>
+                      <p className="font-body text-lg text-muted-foreground mb-8">
+                        Check your eligibility for medical cannabis treatment today.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          size="lg" 
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/eligibility')}
+                        >
+                          Start Medical Assessment
+                          <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                        <Button
+                          size="lg" 
+                          variant="outline"
+                          className="text-lg px-8 py-6"
+                          onClick={() => navigate('/support')}
+                        >
+                          Have Questions?
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               </div>
             </div>
