@@ -15,13 +15,13 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/hooks/useTenant";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "next-themes";
+import { EnvironmentSelector } from "@/components/admin/EnvironmentSelector";
 
 import {
   LayoutDashboard,
   FileText,
   Leaf,
   RefreshCw,
-  Database,
   Settings,
   LogOut,
   ChevronLeft,
@@ -30,7 +30,6 @@ import {
   Menu,
   X,
   User,
-  Package,
   Users,
   ShoppingCart,
   Bug,
@@ -69,6 +68,7 @@ const navItems: NavItem[] = [
 const secondaryNavItems: NavItem[] = [
   { to: "/admin/roles", label: "User Roles", icon: Shield },
   { to: "/admin/wallet-mappings", label: "Wallet Mappings", icon: Wallet },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/admin/tools", label: "Developer Tools", icon: Bug },
 ];
 
@@ -395,9 +395,9 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
         "lg:pt-0 pt-16" // Account for mobile header
       )}>
         {/* Page Header */}
-        {(title || description) && (
-          <div className="border-b border-border bg-card/50 px-6 py-4 lg:px-8">
-            <div className="max-w-7xl mx-auto">
+        <div className="border-b border-border bg-card/50 px-6 py-4 lg:px-8">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div>
               {title && (
                 <h1 className="text-2xl font-bold text-foreground">{title}</h1>
               )}
@@ -405,8 +405,9 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
                 <p className="text-muted-foreground mt-1">{description}</p>
               )}
             </div>
+            <EnvironmentSelector />
           </div>
-        )}
+        </div>
 
         {/* Page Content */}
         <div className="p-6 lg:p-8">
