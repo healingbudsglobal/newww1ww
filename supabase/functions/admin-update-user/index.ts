@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, verify } = await req.json();
+    const { email, password, verify, action, userId } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -24,6 +24,18 @@ serve(async (req) => {
         },
       }
     );
+
+    // Handle delete action
+    if (action === 'delete' && userId) {
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (deleteError) {
+        throw new Error(`Failed to delete user: ${deleteError.message}`);
+      }
+      return new Response(
+        JSON.stringify({ success: true, message: "User deleted successfully", userId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Find user by email
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
