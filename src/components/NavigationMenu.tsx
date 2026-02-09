@@ -29,7 +29,7 @@ const NavigationMenu = ({ scrolled, isDark = true }: NavigationMenuProps) => {
   ];
 
   return (
-    <nav className="hidden xl:flex items-center justify-center gap-1 overflow-hidden">
+    <nav className="hidden xl:flex items-center justify-center gap-1.5 overflow-hidden">
       {navItems.map((item) => {
         const active = item.isShop ? isShopActive : isActive(item.path);
         const Icon = item.icon;
@@ -44,7 +44,7 @@ const NavigationMenu = ({ scrolled, isDark = true }: NavigationMenuProps) => {
               "group",
               active
                 ? "text-white bg-white/15 border-b-2 border-[#EAB308]"
-                : "text-white/85 hover:text-white hover:bg-white/10"
+                : "text-white/90 hover:text-white hover:bg-white/10"
             )}
           >
             <Icon className={cn(

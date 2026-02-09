@@ -122,8 +122,12 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const portalLabel = isAdmin && !roleLoading ? "Admin" : "Portal";
   const PortalIcon = isAdmin && !roleLoading ? Shield : LayoutDashboard;
 
-  // Hide eligibility CTA for: admins, verified clients, or clients with pending registration
-  const shouldHideEligibilityCTA = isAdmin || isEligible || !!drGreenClient;
+  // Hide eligibility CTA for: admins (including while loading), verified clients, or clients with pending registration
+  const shouldHideEligibilityCTA = isAdmin || roleLoading || isEligible || !!drGreenClient;
+  
+  // Truncate email for display
+  const userEmail = user?.email || '';
+  const truncatedEmail = userEmail.length > 18 ? userEmail.substring(0, 15) + '...' : userEmail;
 
   return (
     <>
@@ -193,105 +197,132 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
               <NavigationMenu scrolled={scrolled} isDark={isDark} />
               
               {/* Right Actions - Desktop */}
-              <div className="hidden xl:flex items-center gap-3 flex-shrink-0">
+              <div className="hidden xl:flex items-center gap-2 flex-shrink-0">
                 <LanguageSwitcher scrolled={scrolled} />
                 <ThemeToggle isDark={isDark} />
-                
-                {/* Wallet Connection Button - dApp Hydration Layer */}
-                <WalletButton className="ml-1" />
 
-                {/* KYC Status Badge - Persistent indicator for logged-in users (not admins) */}
-                {user && !isAdmin && <KYCStatusBadge />}
+                {/* Wallet Button - only for non-admin users or when not logged in */}
+                {(!user || !isAdmin) && <WalletButton className="ml-1" />}
 
-                <div className="flex items-center gap-2 ml-3">
-                  {/* Check Eligibility - Hide for admins and verified/registered clients */}
-                  {!shouldHideEligibilityCTA && (
-                    <button
-                      onClick={() => setEligibilityDialogOpen(true)}
-                      className={cn(
-                        "font-semibold px-5 py-2.5 rounded-lg transition-all duration-300",
-                        "bg-emerald-500 text-white hover:bg-emerald-400",
-                        "shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50",
-                        "text-sm whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                      )}
-                    >
-                      {t('nav.checkEligibility')}
-                    </button>
-                  )}
-                  
-                  {user ? (
-                    <>
-                      {/* Role-aware Portal Button */}
-                      <Link
-                        to={portalLink}
+                {/* KYC Status Badge - only for non-admin logged-in users */}
+                {user && !isAdmin && !roleLoading && <KYCStatusBadge />}
+
+                {/* Check Eligibility CTA */}
+                {!shouldHideEligibilityCTA && (
+                  <button
+                    onClick={() => setEligibilityDialogOpen(true)}
+                    className={cn(
+                      "font-semibold px-5 py-2.5 rounded-lg transition-all duration-300",
+                      "bg-emerald-500 text-white hover:bg-emerald-400",
+                      "shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50",
+                      "text-sm whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                    )}
+                  >
+                    {t('nav.checkEligibility')}
+                  </button>
+                )}
+
+                {/* Account Dropdown - Unified for admin and patient */}
+                {user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
                         className={cn(
-                          "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
+                          "font-medium px-3 py-2 rounded-lg transition-all duration-300",
                           "text-sm flex items-center gap-2",
                           isAdmin && !roleLoading
-                            ? "bg-primary/20 text-primary-foreground hover:bg-primary/30 border border-primary/50"
+                            ? "bg-white/15 text-white hover:bg-white/25 border border-[#EAB308]/40"
                             : "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50"
                         )}
                       >
                         <PortalIcon className="w-4 h-4" />
-                        {portalLabel}
-                      </Link>
-                      <button
+                        <span className="max-w-[120px] truncate text-xs">{truncatedEmail}</span>
+                        <ChevronDown className="w-3 h-3 opacity-60" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 bg-popover border-border shadow-xl z-[100]">
+                      <DropdownMenuLabel className="flex flex-col gap-1 pb-2">
+                        <span className="text-sm font-medium text-foreground truncate">{userEmail}</span>
+                        <span className={cn(
+                          "text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full w-fit",
+                          isAdmin && !roleLoading
+                            ? "bg-[#EAB308]/20 text-[#EAB308]"
+                            : "bg-emerald-500/20 text-emerald-400"
+                        )}>
+                          {isAdmin && !roleLoading ? 'Admin' : 'Patient'}
+                        </span>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {isAdmin && !roleLoading && (
+                        <DropdownMenuItem
+                          onClick={() => navigate('/admin')}
+                          className="cursor-pointer gap-2"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin Portal
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => navigate('/dashboard')}
+                        className="cursor-pointer gap-2"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        {isAdmin && !roleLoading ? 'Patient Dashboard' : 'Dashboard'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
                         onClick={handleLogout}
-                        className={cn(
-                          "p-2.5 rounded-lg transition-all duration-300",
-                          "text-white/70 hover:text-white hover:bg-white/10"
-                        )}
-                        title={t('nav.signOut')}
+                        className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                       >
                         <LogOut className="w-4 h-4" />
+                        {t('nav.signOut')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={cn(
+                          "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
+                          "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50 hover:text-[#EAB308]",
+                          "text-sm flex items-center gap-2"
+                        )}
+                      >
+                        <User className="w-4 h-4" />
+                        {t('nav.patientLogin')}
+                        <ChevronDown className="w-3 h-3 opacity-60" />
                       </button>
-                    </>
-                  ) : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          className={cn(
-                            "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
-                            "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50 hover:text-[#EAB308]",
-                            "text-sm flex items-center gap-2"
-                          )}
-                        >
-                          <User className="w-4 h-4" />
-                          {t('nav.patientLogin')}
-                          <ChevronDown className="w-3 h-3 opacity-60" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 bg-popover border-border shadow-xl z-[100]">
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">Choose login type</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => navigate('/auth')}
-                          className="cursor-pointer gap-2"
-                        >
-                          <User className="w-4 h-4" />
-                          <div>
-                            <p className="font-medium">Patient Login</p>
-                            <p className="text-xs text-muted-foreground">Email &amp; password</p>
-                          </div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            // Trigger wallet connection for admin NFT login
-                            const walletBtn = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement;
-                            if (walletBtn) walletBtn.click();
-                          }}
-                          className="cursor-pointer gap-2"
-                        >
-                          <Wallet className="w-4 h-4" />
-                          <div>
-                            <p className="font-medium">Admin Login</p>
-                            <p className="text-xs text-muted-foreground">NFT wallet connection</p>
-                          </div>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-popover border-border shadow-xl z-[100]">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">Choose login type</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => navigate('/auth')}
+                        className="cursor-pointer gap-2"
+                      >
+                        <User className="w-4 h-4" />
+                        <div>
+                          <p className="font-medium">Patient Login</p>
+                          <p className="text-xs text-muted-foreground">Email &amp; password</p>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const walletBtn = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement;
+                          if (walletBtn) walletBtn.click();
+                        }}
+                        className="cursor-pointer gap-2"
+                      >
+                        <Wallet className="w-4 h-4" />
+                        <div>
+                          <p className="font-medium">Admin Login</p>
+                          <p className="text-xs text-muted-foreground">NFT wallet connection</p>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               {/* Mobile Menu Button - EXTREME RIGHT */}
