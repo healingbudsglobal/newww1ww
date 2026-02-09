@@ -54,12 +54,21 @@ function getStatusColor(status: string): string {
       return 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30';
     case 'pending':
       return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
+    case 'pending_sync':
+    case 'awaiting_processing':
+      return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
     case 'cancelled':
     case 'failed':
       return 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30';
     default:
       return 'bg-muted text-muted-foreground';
   }
+}
+
+function getDisplayStatus(status: string): string {
+  if (status === 'PENDING_SYNC') return 'Awaiting Processing';
+  if (status === 'AWAITING_PROCESSING') return 'Awaiting Processing';
+  return status;
 }
 
 function calculateTotalQty(items: OrderItem[]): number {
@@ -101,12 +110,12 @@ export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProp
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge className={`${getStatusColor(order.payment_status)} border`}>
-                  {order.payment_status}
+                  {getDisplayStatus(order.payment_status)}
                 </Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge className={`${getStatusColor(order.status)} border`}>
-                  {order.status}
+                  {getDisplayStatus(order.status)}
                 </Badge>
               </TableCell>
               <TableCell className="hidden md:table-cell text-center">

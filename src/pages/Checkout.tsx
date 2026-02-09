@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2, MapPin, Home, Building2 } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, CreditCard, CheckCircle2, AlertCircle, Loader2, MapPin, Home, Building2, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -80,6 +80,7 @@ const Checkout = () => {
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('');
+  const [isLocalOrder, setIsLocalOrder] = useState(false);
   
   // Shipping address state
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
@@ -306,41 +307,62 @@ const Checkout = () => {
         description: `Your order ${createdOrderId} has been ${finalPaymentStatus === 'PAID' ? 'confirmed' : 'submitted for processing'}.`,
       });
     } catch (error) {
-      console.error('Checkout error:', error);
-      
-      // Parse error message for user-friendly display
+      console.error('Checkout error — attempting local fallback:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      let userFriendlyMessage = 'There was an error processing your order. Please try again.';
-      let errorTitle = 'Order Failed';
-      
-      // Handle specific API error messages
-      if (errorMessage.includes('Client is not active')) {
-        errorTitle = 'Account Not Active';
-        userFriendlyMessage = 'Your account is pending verification. Please wait for admin approval or contact support.';
-      } else if (errorMessage.includes('Client does not have any item in the cart')) {
-        errorTitle = 'Cart Sync Error';
-        userFriendlyMessage = 'There was an issue syncing your cart. Please try again or refresh the page.';
-      } else if (errorMessage.includes('shipping address')) {
-        errorTitle = 'Shipping Error';
-        userFriendlyMessage = 'There was an issue with your shipping address. Please verify and try again.';
-      } else if (errorMessage.includes('KYC') || errorMessage.includes('kyc')) {
-        errorTitle = 'Verification Required';
-        userFriendlyMessage = 'Your identity verification is incomplete. Please complete the KYC process to continue.';
-      } else if (errorMessage.includes('stock') || errorMessage.includes('Stock') || errorMessage.includes('availability')) {
-        errorTitle = 'Stock Issue';
-        userFriendlyMessage = 'Some items in your cart may no longer be available. Please review your cart and try again.';
-      } else if (errorMessage.includes('payment') || errorMessage.includes('Payment')) {
-        errorTitle = 'Payment Error';
-        userFriendlyMessage = 'There was an issue processing your payment. Please try again or use a different payment method.';
-      } else if (errorMessage) {
-        userFriendlyMessage = errorMessage;
+
+      // --- LOCAL-FIRST FALLBACK ---
+      try {
+        const now = new Date();
+        const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const localOrderId = `LOCAL-${datePart}-${rand}`;
+
+        const clientCountryCode = drGreenClient.country_code || countryCode || 'PT';
+
+        await saveOrder({
+          drgreen_order_id: localOrderId,
+          status: 'PENDING_SYNC',
+          payment_status: 'AWAITING_PROCESSING',
+          total_amount: cartTotal,
+          items: cart.map(item => ({
+            strain_id: item.strain_id,
+            strain_name: item.strain_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+          })),
+          client_id: drGreenClient.drgreen_client_id,
+          shipping_address: {
+            address1: shippingAddress.address1,
+            address2: shippingAddress.address2 || '',
+            city: shippingAddress.city,
+            state: shippingAddress.state || shippingAddress.city,
+            postalCode: shippingAddress.postalCode,
+            country: shippingAddress.country,
+            countryCode: shippingAddress.countryCode,
+          },
+          customer_email: drGreenClient.email || undefined,
+          customer_name: drGreenClient.full_name || undefined,
+          country_code: clientCountryCode,
+          currency: getCurrencyForCountry(clientCountryCode),
+        });
+
+        setOrderId(localOrderId);
+        setIsLocalOrder(true);
+        setOrderComplete(true);
+        clearCart();
+
+        toast({
+          title: 'Order Received',
+          description: 'Your order has been saved and will be processed by our team.',
+        });
+      } catch (fallbackError) {
+        console.error('Local order fallback also failed:', fallbackError);
+        toast({
+          title: 'Order Failed',
+          description: 'We could not save your order. Please try again or contact support.',
+          variant: 'destructive',
+        });
       }
-      
-      toast({
-        title: errorTitle,
-        description: userFriendlyMessage,
-        variant: 'destructive',
-      });
     } finally {
       setIsProcessing(false);
       setPaymentStatus('');
@@ -360,21 +382,54 @@ const Checkout = () => {
             >
               <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                 <CardContent className="pt-12 pb-8">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
-                    <CheckCircle2 className="w-10 h-10 text-primary" />
-                  </div>
-                  <h1 className="text-3xl font-bold text-foreground mb-4">
-                    Order Confirmed!
-                  </h1>
-                  <p className="text-muted-foreground mb-2">
-                    Thank you for your order. Your order ID is:
-                  </p>
-                  <p className="text-xl font-mono text-primary mb-8">
-                    {orderId}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-8">
-                    You will receive an email confirmation shortly with tracking information.
-                  </p>
+                  {isLocalOrder ? (
+                    <>
+                      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                        <Clock className="w-10 h-10 text-amber-500" />
+                      </div>
+                      <h1 className="text-3xl font-bold text-foreground mb-4">
+                        Order Received!
+                      </h1>
+                      <p className="text-muted-foreground mb-2">
+                        Your order has been received and saved securely.
+                      </p>
+                      <p className="text-xl font-mono text-amber-600 dark:text-amber-400 mb-4">
+                        {orderId}
+                      </p>
+                      <div className="mx-auto max-w-md mb-8 rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-left space-y-2">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-muted-foreground">
+                            Our team will process your order and confirm via email.
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-muted-foreground">
+                            No payment has been taken yet — you'll receive payment instructions separately.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
+                        <CheckCircle2 className="w-10 h-10 text-primary" />
+                      </div>
+                      <h1 className="text-3xl font-bold text-foreground mb-4">
+                        Order Confirmed!
+                      </h1>
+                      <p className="text-muted-foreground mb-2">
+                        Thank you for your order. Your order ID is:
+                      </p>
+                      <p className="text-xl font-mono text-primary mb-8">
+                        {orderId}
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-8">
+                        You will receive an email confirmation shortly with tracking information.
+                      </p>
+                    </>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button variant="outline" onClick={() => navigate('/shop')}>
                       Continue Shopping
