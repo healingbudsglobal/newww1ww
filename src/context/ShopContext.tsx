@@ -254,38 +254,96 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { data, error } = await supabase
+    // Step 1: Check if we have a local mapping (user_id → drgreen_client_id)
+    const { data: localRecord, error } = await supabase
       .from('drgreen_clients')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching client:', error);
+      console.error('Error fetching client mapping:', error);
     }
 
-    // If no local client record exists, try to auto-discover from Dr. Green API
-    if (!data) {
-      console.log('[ShopContext] No local client record, attempting auto-discovery...');
+    // Step 2: If no local mapping, try auto-discovery from Dr. Green API
+    if (!localRecord) {
+      console.log('[ShopContext] No local client mapping, attempting auto-discovery...');
       const linked = await linkClientFromDrGreenByAuthEmail(user.id);
       
       if (linked) {
-        // Refetch after linking
-        const { data: newData } = await supabase
+        // Refetch the newly created mapping
+        const { data: newRecord } = await supabase
           .from('drgreen_clients')
           .select('*')
           .eq('user_id', user.id)
           .maybeSingle();
         
-        setDrGreenClient(newData);
-        setIsLoading(false);
-        return;
+        if (newRecord) {
+          setDrGreenClient(newRecord);
+        }
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    // Step 3: ALWAYS fetch live status from Dr. Green API for data integrity
+    // Skip for local-only clients (API registration failed)
+    if (localRecord.drgreen_client_id && !localRecord.drgreen_client_id.startsWith('local-')) {
+      try {
+        console.log('[ShopContext] Fetching live client status from Dr. Green API...');
+        const { data: apiResponse, error: apiError } = await supabase.functions.invoke('drgreen-proxy', {
+          body: {
+            action: 'get-client',
+            clientId: localRecord.drgreen_client_id,
+          },
+        });
+
+        if (!apiError && apiResponse?.success && apiResponse?.data) {
+          const liveData = apiResponse.data;
+          const liveKyc = liveData.isKYCVerified ?? liveData.is_kyc_verified ?? false;
+          const liveApproval = liveData.adminApproval ?? liveData.admin_approval ?? 'PENDING';
+          const liveKycLink = liveData.kycLink ?? liveData.kyc_link ?? null;
+
+          // Update local cache if status changed (fire-and-forget)
+          if (
+            localRecord.is_kyc_verified !== liveKyc ||
+            localRecord.admin_approval !== liveApproval ||
+            localRecord.kyc_link !== liveKycLink
+          ) {
+            console.log('[ShopContext] Status changed on Dr. Green, updating local cache...');
+            supabase
+              .from('drgreen_clients')
+              .update({
+                is_kyc_verified: liveKyc,
+                admin_approval: liveApproval,
+                kyc_link: liveKycLink,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', user.id)
+              .then(({ error: updateErr }) => {
+                if (updateErr) console.error('[ShopContext] Cache update error:', updateErr);
+              });
+          }
+
+          // Always use live data for the UI state
+          setDrGreenClient({
+            ...localRecord,
+            is_kyc_verified: liveKyc,
+            admin_approval: liveApproval,
+            kyc_link: liveKycLink,
+          });
+          setIsLoading(false);
+          return;
+        } else {
+          console.warn('[ShopContext] Could not fetch live status, falling back to cached data');
+        }
+      } catch (err) {
+        console.warn('[ShopContext] API call failed, using cached data:', err);
       }
     }
 
-    setDrGreenClient(data);
-    // NOTE: Country is determined by URL domain, NOT client record
-    // Client's stored country_code is for their registration, not for browsing
+    // Fallback: use cached local data if API call fails
+    setDrGreenClient(localRecord);
     setIsLoading(false);
   }, [linkClientFromDrGreenByAuthEmail]);
 
@@ -294,56 +352,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [fetchClient]);
 
   // Sync verification status from Dr Green API
+  // Now simply re-fetches client which always calls API directly
   const syncVerificationFromDrGreen = useCallback(async (): Promise<boolean> => {
     if (!drGreenClient?.drgreen_client_id) return false;
-    
-    // Skip sync for local-only clients (API registration failed)
-    if (drGreenClient.drgreen_client_id.startsWith('local-')) {
-      console.log('[ShopContext] Skipping sync for local-only client - re-registration required');
-      return false;
-    }
+    if (drGreenClient.drgreen_client_id.startsWith('local-')) return false;
     
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('drgreen-proxy', {
-        body: {
-          action: 'get-client',
-          clientId: drGreenClient.drgreen_client_id,
-        },
-      });
-
-      if (error) {
-        console.error('Error syncing from Dr Green:', error);
-        return false;
-      }
-
-      if (data?.success && data?.data) {
-        const clientData = data.data;
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          // Update local database with fresh status
-          const { error: updateError } = await supabase
-            .from('drgreen_clients')
-            .update({
-              is_kyc_verified: clientData.isKYCVerified ?? clientData.is_kyc_verified ?? false,
-              admin_approval: clientData.adminApproval ?? clientData.admin_approval ?? 'PENDING',
-              kyc_link: clientData.kycLink ?? clientData.kyc_link ?? null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('user_id', user.id);
-
-          if (updateError) {
-            console.error('Error updating client status:', updateError);
-            return false;
-          }
-
-          // Refresh local state
-          await fetchClient();
-          return true;
-        }
-      }
-      return false;
+      await fetchClient();
+      return true;
     } catch (err) {
       console.error('Sync verification error:', err);
       return false;
