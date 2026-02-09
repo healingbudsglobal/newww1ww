@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Server, Cloud, Train, FlaskConical, PenTool } from 'lucide-react';
+import { Server, Train } from 'lucide-react';
 
 const environments: { value: ApiEnvironment; label: string; icon: React.ReactNode; color: string }[] = [
   { 
@@ -17,28 +17,10 @@ const environments: { value: ApiEnvironment; label: string; icon: React.ReactNod
     color: 'bg-green-500'
   },
   { 
-    value: 'alt-production', 
-    label: 'Alt Production (Test)', 
-    icon: <FlaskConical className="w-4 h-4" />,
-    color: 'bg-blue-500'
-  },
-  { 
-    value: 'staging', 
-    label: 'Staging (Official)', 
-    icon: <Cloud className="w-4 h-4" />,
-    color: 'bg-amber-500'
-  },
-  { 
     value: 'railway', 
     label: 'Railway (Dev)', 
     icon: <Train className="w-4 h-4" />,
     color: 'bg-purple-500'
-  },
-  { 
-    value: 'production-write', 
-    label: 'Production (Write)', 
-    icon: <PenTool className="w-4 h-4" />,
-    color: 'bg-rose-500'
   },
 ];
 

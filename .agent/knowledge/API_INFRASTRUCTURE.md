@@ -1,7 +1,7 @@
 # API Infrastructure Knowledge Base
 
 > **Project:** Healing Buds / Dr. Green DApp Integration
-> **Last Updated:** 2026-02-08
+> **Last Updated:** 2026-02-09
 > **Scope:** Reusable patterns for external API integration via edge function proxies
 
 ---
@@ -38,7 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 const { data, error } = await supabase.functions.invoke("drgreen-proxy", {
   body: {
     action: "get-products",
-    environment: "production",  // optional, defaults to production
+    environment: "production",  // "production" or "railway"
     params: { countryCode: "PRT" },
   },
 });
@@ -46,19 +46,16 @@ const { data, error } = await supabase.functions.invoke("drgreen-proxy", {
 
 ---
 
-## 2. Multi-Environment Credential Management
+## 2. Credential Management
 
-### Five Environments
+### Two Environments
 
-The project supports 5 distinct API environments, each with its own key pair:
+The project supports **2 environments**, each with its own key pair. **All actions (read and write) use the same credentials per environment.** There is no separate write key.
 
 | Environment | Secret Prefix | Purpose | API URL |
 |-------------|---------------|---------|---------|
-| **Production** | `DRGREEN_` | Live patient data | `api.drgreennft.com` |
-| **Alt-Production** | `DRGREEN_ALT_` | Testing on production API | `api.drgreennft.com` |
-| **Staging** | `DRGREEN_STAGING_` | Official staging environment | `stage-api.drgreennft.com` |
-| **Railway** | `DRGREEN_RAILWAY_` | Development environment | Varies |
-| **Production-Write** | `DRGREEN_WRITE_` | Dedicated write credentials | `api.drgreennft.com` |
+| **Production** | `DRGREEN_` | Live patient data, all operations | `api.drgreennft.com` |
+| **Railway** | `DRGREEN_STAGING_` | Development/testing | Railway URL |
 
 ### Secret Naming Convention
 
@@ -69,39 +66,20 @@ Each environment requires two secrets:
 | API Key | `{PREFIX}API_KEY` | `DRGREEN_API_KEY`, `DRGREEN_STAGING_API_KEY` |
 | Secret/Private Key | `{PREFIX}PRIVATE_KEY` | `DRGREEN_PRIVATE_KEY`, `DRGREEN_STAGING_PRIVATE_KEY` |
 
-Some environments also have a custom base URL:
-
-| Secret | Format | Example |
-|--------|--------|---------|
-| Base URL | `{PREFIX}API_URL` | `DRGREEN_STAGING_API_URL` |
-
 ### Credential Resolution Logic
 
 ```typescript
-function getCredentials(environment: string) {
-  switch (environment) {
-    case 'production':
-      return {
-        apiKey: Deno.env.get("DRGREEN_API_KEY"),
-        secretKey: Deno.env.get("DRGREEN_PRIVATE_KEY"),
-        baseUrl: "https://api.drgreennft.com/api/v1",
-      };
-    case 'staging':
-      return {
-        apiKey: Deno.env.get("DRGREEN_STAGING_API_KEY"),
-        secretKey: Deno.env.get("DRGREEN_STAGING_PRIVATE_KEY"),
-        baseUrl: Deno.env.get("DRGREEN_STAGING_API_URL") || "https://stage-api.drgreennft.com/api/v1",
-      };
-    // ... etc for alt-production, railway, production-write
+function getEnvironment(requestedEnv?: string): EnvConfig {
+  if (requestedEnv === 'railway') {
+    return ENV_CONFIG.railway;
   }
+  return ENV_CONFIG.production; // default
 }
 ```
 
-### Write vs Read Credential Separation
+### No Read/Write Credential Separation
 
-- **Read credentials** (Production, Alt-Production, Staging, Railway) are used for GET operations: listing strains, fetching clients, viewing orders
-- **Write credentials** (Production-Write) are dedicated to POST/PATCH/DELETE operations: creating clients, placing orders, updating records
-- This separation allows for different NFT scopes and audit trails
+All operations — reads, writes, client creation, cart, orders — use the **same single credential set** per environment. This avoids NFT-scope mismatches.
 
 ---
 
@@ -118,10 +96,9 @@ The Dr. Green API enforces **strict NFT-scoped access**:
 
 ### Implications
 
+- **All operations must use the same key** — read, write, cart, orders
 - **Client migration**: When credentials change, existing clients become inaccessible under new keys
 - **Re-registration required**: Users must re-register under the new API key scope
-- **KYC re-verification**: New client records require fresh KYC verification
-- **"Find & Link" tool**: The admin dashboard includes a tool to search for clients under different key scopes and link them
 
 ### Current Identity
 
@@ -134,11 +111,9 @@ The Dr. Green API enforces **strict NFT-scoped access**:
 
 ## 4. Authentication Mechanism
 
-### HMAC-SHA256 Signing
+### Signing Method
 
-> **See:** [DRGREEN-API-SIGNING-KNOWLEDGE.md](../../docs/DRGREEN-API-SIGNING-KNOWLEDGE.md) for complete details
-
-**Summary:**
+The Dr. Green API uses **secp256k1 ECDSA** asymmetric signing for `/dapp/*` endpoints. HMAC-SHA256 also works for public endpoints like `/strains`.
 
 | Property | Value |
 |----------|-------|
@@ -149,21 +124,11 @@ The Dr. Green API enforces **strict NFT-scoped access**:
 | API key header | `x-auth-apikey` — raw Base64 PEM, no processing |
 | Signature header | `x-auth-signature` — Base64 DER-encoded ECDSA signature |
 
-### Critical Rule: Use secp256k1 ECDSA, NOT HMAC-SHA256
-
-The Dr. Green API requires **secp256k1 ECDSA** signing. HMAC-SHA256 was incorrectly used
-and caused persistent 401 errors on all `/dapp/*` endpoints. The correct approach:
-
-- ✅ Use `generateSecp256k1Signature()` — extracts PKCS#8 private key bytes, signs with `secp256k1.sign()`
-- ✅ Output DER-formatted signature, Base64-encoded
-- ❌ Do NOT use `signWithHmac()` for API requests (HMAC only works for `/strains`, not `/dapp/*`)
-- ❌ Do NOT use `extractPemBody()` or strip PEM headers from the API key
+> See [DRGREEN-API-SIGNING-KNOWLEDGE.md](../../docs/DRGREEN-API-SIGNING-KNOWLEDGE.md) for complete details.
 
 ---
 
 ## 5. Health Check Pattern
-
-### Architecture
 
 A dedicated `drgreen-health` edge function provides API connectivity monitoring:
 
@@ -175,36 +140,15 @@ GET /functions/v1/drgreen-health
 
 ```json
 {
-  "status": "healthy",         // healthy | degraded | unhealthy
+  "status": "healthy",
   "checks": {
-    "credentials": {
-      "status": "ok",
-      "message": "API credentials configured"
-    },
-    "api_connectivity": {
-      "status": "ok",
-      "message": "API reachable",
-      "duration": 497
-    }
+    "credentials": { "status": "ok", "message": "API credentials configured" },
+    "api_connectivity": { "status": "ok", "message": "API reachable", "duration": 497 }
   },
   "totalDuration": 512,
-  "timestamp": "2026-02-08T12:00:00.000Z"
+  "timestamp": "2026-02-09T12:00:00.000Z"
 }
 ```
-
-### Health Check Behaviour
-
-1. Verifies credentials are configured (fast, no network call)
-2. Makes authenticated GET request to `/strains?orderBy=desc&take=1&page=1`
-3. Reports status based on response
-4. Includes timing information for latency monitoring
-
-### Usage in Admin Dashboard
-
-The health check is called from the admin dashboard to show real-time API status. It should be called:
-- On admin dashboard load
-- Every 5 minutes while the dashboard is open
-- On-demand via a "Check API Health" button
 
 ---
 
@@ -228,7 +172,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promis
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  throw new Error("Retry exhausted"); // unreachable but satisfies TS
+  throw new Error("Retry exhausted");
 }
 ```
 
@@ -260,66 +204,13 @@ console.log(`[API] Using key: ${apiKey.substring(0, 8)}...`);
 
 // ❌ Bad: Full key exposed
 console.log(`[API] Using key: ${apiKey}`);
-
-// ✅ Good: Sanitized error
-return { error: "API authentication failed" };
-
-// ❌ Bad: Internal details leaked
-return { error: `HMAC verification failed for key ${apiKey} with secret ${secretKey}` };
 ```
 
-### Request Validation
-
-All proxy requests must validate:
-1. `action` parameter is a known, whitelisted action
-2. `environment` parameter is one of the 5 valid environments
-3. Request body matches expected schema for the action
-4. JWT authentication (user is logged in) for sensitive actions
-
 ---
 
-## 8. Key Rotation & Migration
-
-### When Credentials Change
-
-1. **Update secrets** in Lovable Cloud for the affected environment
-2. **Test with `drgreen-health`** to verify new credentials work
-3. **Run `debug-compare-keys`** to verify all environments
-4. **Existing clients become inaccessible** under new NFT scope
-5. **Prompt re-registration** for affected users via dashboard
-
-### Migration Checklist
-
-- [ ] New credentials obtained from Dr. Green team
-- [ ] Secrets updated in Lovable Cloud
-- [ ] Health check passes with new credentials
-- [ ] Admin notified of client re-registration requirement
-- [ ] "Re-Sync Account" flow tested end-to-end
-- [ ] Old credentials documented for reference
-
----
-
-## 9. Local-First Data Strategy
-
-### Architecture
+## 8. Local-First Data Strategy
 
 Records are persisted locally before syncing with the external API:
-
-```
-1. User action (e.g., add to cart)
-2. Save to local Supabase table (drgreen_cart)
-3. Sync to Dr. Green API via proxy
-4. Update local record with API response (drgreen_client_id, etc.)
-```
-
-### Benefits
-
-- **Resilience**: App works even if Dr. Green API is temporarily down
-- **Speed**: Local reads are fast; API sync is async
-- **Audit trail**: Local records provide a secondary audit log
-- **Eligibility checks**: Can be done locally without API calls
-
-### Tables
 
 | Local Table | Purpose | Syncs With |
 |-------------|---------|------------|
@@ -330,16 +221,12 @@ Records are persisted locally before syncing with the external API:
 
 ---
 
-## 10. Lessons Learned
+## 9. Lessons Learned
 
-### The Top 5 Mistakes to Avoid
+### The Top 3 Mistakes to Avoid
 
-1. **Don't assume signing method from documentation code samples** — the Dr. Green docs show `crypto.sign()` (asymmetric) but the API actually uses HMAC-SHA256 (symmetric). Always verify with a working reference implementation.
+1. **Don't use separate read/write credentials** — all operations for a client must use the same API key pair. NFT-scope isolation means a client created with Key A cannot have cart/order operations performed with Key B.
 
 2. **Don't process API keys** — send them exactly as stored. The `extractPemBody()` function corrupted the key by treating it as PEM when it was raw Base64.
 
-3. **Don't sign an empty payload for GET requests** — the API expects the query string to be signed, not `"{}"` or an empty string.
-
-4. **Don't mix up environments** — each environment has distinct credentials. A 401 on staging with production keys is expected behavior, not a bug.
-
-5. **Always build a health check first** — the `drgreen-health` endpoint was the tool that proved the API was working and the credentials were valid, isolating the bug to the proxy's signing logic.
+3. **Always build a health check first** — the `drgreen-health` endpoint was the tool that proved the API was working and the credentials were valid.
