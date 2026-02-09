@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
 import { formatPrice, getCurrencyForCountry } from '@/lib/currency';
+import { supabase } from '@/integrations/supabase/client';
 
 // Retry utility with exponential backoff - preserves real error messages
 async function retryOperation<T>(
@@ -68,8 +69,30 @@ async function retryOperation<T>(
     error: lastError || `${operationName} failed after ${maxRetries} attempts` 
   };
 }
+// Fire-and-forget email — never blocks checkout
+async function sendOrderConfirmationEmail(payload: {
+  email: string;
+  customerName: string;
+  orderId: string;
+  items: { strain_name: string; quantity: number; unit_price: number }[];
+  totalAmount: number;
+  currency: string;
+  shippingAddress: ShippingAddress;
+  isLocalOrder: boolean;
+  region?: string;
+}) {
+  try {
+    if (!payload.email) return;
+    const { error } = await supabase.functions.invoke('send-order-confirmation', { body: payload });
+    if (error) console.warn('[OrderEmail] Failed:', error.message);
+    else console.log('[OrderEmail] Sent for', payload.orderId);
+  } catch (e) {
+    console.warn('[OrderEmail] Error:', e);
+  }
+}
 
 const Checkout = () => {
+
   const { cart, cartTotal, cartTotalConverted, clearCart, drGreenClient, countryCode, convertFromEUR } = useShop();
   const navigate = useNavigate();
   const { t } = useTranslation('shop');
@@ -301,6 +324,19 @@ const Checkout = () => {
       setOrderId(createdOrderId);
       setOrderComplete(true);
       clearCart();
+
+      // Send confirmation email (fire-and-forget)
+      sendOrderConfirmationEmail({
+        email: drGreenClient.email || '',
+        customerName: drGreenClient.full_name || '',
+        orderId: createdOrderId,
+        items: cart.map(i => ({ strain_name: i.strain_name, quantity: i.quantity, unit_price: i.unit_price })),
+        totalAmount: cartTotal,
+        currency: getCurrencyForCountry(clientCountryCode),
+        shippingAddress,
+        isLocalOrder: false,
+        region: clientCountryCode,
+      });
       
       toast({
         title: finalPaymentStatus === 'PAID' ? 'Order Placed Successfully' : 'Order Submitted',
@@ -350,6 +386,19 @@ const Checkout = () => {
         setIsLocalOrder(true);
         setOrderComplete(true);
         clearCart();
+
+        // Send confirmation email (fire-and-forget)
+        sendOrderConfirmationEmail({
+          email: drGreenClient.email || '',
+          customerName: drGreenClient.full_name || '',
+          orderId: localOrderId,
+          items: cart.map(i => ({ strain_name: i.strain_name, quantity: i.quantity, unit_price: i.unit_price })),
+          totalAmount: cartTotal,
+          currency: getCurrencyForCountry(clientCountryCode),
+          shippingAddress,
+          isLocalOrder: true,
+          region: clientCountryCode,
+        });
 
         toast({
           title: 'Order Received',
