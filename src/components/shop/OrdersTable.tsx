@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Eye } from 'lucide-react';
+import { formatPrice } from '@/lib/currency';
 
 interface OrderItem {
   strain_id: string;
@@ -19,6 +20,8 @@ interface Order {
   total_amount: number;
   items: OrderItem[];
   created_at: string;
+  country_code?: string | null;
+  currency?: string | null;
 }
 
 interface OrdersTableProps {
@@ -122,7 +125,7 @@ export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProp
                 {calculateTotalQty(order.items)}
               </TableCell>
               <TableCell className="hidden md:table-cell text-right font-semibold">
-                €{order.total_amount.toFixed(2)}
+                {formatPrice(order.total_amount, order.country_code || 'ZA')}
               </TableCell>
               <TableCell className="text-right">
                 {onReorder && (
