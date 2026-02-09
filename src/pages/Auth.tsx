@@ -10,14 +10,12 @@ import { z } from "zod";
 import Header from "@/layout/Header";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
-import { Mail, Lock, User as UserIcon, ArrowRight, Loader2, Wallet } from "lucide-react";
+import { Mail, Lock, User as UserIcon, ArrowRight, Loader2 } from "lucide-react";
 import hbLogoWhite from "@/assets/hb-logo-white-new.png";
 import { useTranslation } from "react-i18next";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useShop } from "@/context/ShopContext";
 import { getProductionPath } from "@/lib/urls";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -40,20 +38,6 @@ const Auth = () => {
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { isEligible, isLoading: clientLoading } = useShop();
   
-  // Wallet auth
-  const { authenticateWithWallet, isAuthenticating, isWalletConnected, walletAddress } = useWalletAuth();
-  const { openConnectModal } = useConnectModal();
-
-  const handleWalletLogin = async () => {
-    if (!isWalletConnected) {
-      openConnectModal?.();
-      return;
-    }
-    const success = await authenticateWithWallet();
-    if (success) {
-      // Navigation handled by role-based useEffect
-    }
-  };
 
   const loginSchema = z.object({
     email: z.string().trim().email({ message: t('validationErrors.invalidEmail') }),
@@ -493,41 +477,6 @@ const Auth = () => {
                     {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                   </Button>
 
-                  {/* Wallet Sign-In (Admin) */}
-                  {isLogin && (
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-border" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or admin sign in
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {isLogin && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full gap-2"
-                      onClick={handleWalletLogin}
-                      disabled={loading || isAuthenticating}
-                    >
-                      {isAuthenticating ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Wallet className="w-4 h-4" />
-                      )}
-                      {!isWalletConnected
-                        ? 'Connect Wallet'
-                        : isAuthenticating
-                          ? 'Signing in...'
-                          : `Sign in with ${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
-                      }
-                    </Button>
-                  )}
 
                   <div className="text-center pt-4 border-t border-border">
                     <p className="text-muted-foreground text-sm">
