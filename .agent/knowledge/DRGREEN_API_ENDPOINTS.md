@@ -10,8 +10,10 @@
 
 All requests require:
 - `x-auth-apikey` — Base64-encoded API key (sent as-is, no processing)
-- `x-auth-signature` — HMAC-SHA256 signature of the request payload
+- `x-auth-signature` — secp256k1 ECDSA signature for `/dapp/*` endpoints, HMAC-SHA256 for `/strains`
 - `Content-Type: application/json`
+
+**Environments:** Only `production` and `railway` exist. All operations (read + write) use the same credentials per environment. No separate write keys.
 
 See [DRGREEN-API-SIGNING-KNOWLEDGE.md](../../docs/DRGREEN-API-SIGNING-KNOWLEDGE.md) for signing details.
 

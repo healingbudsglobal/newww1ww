@@ -350,16 +350,9 @@ function getStagingApiUrl(): string {
   return 'https://stage-api.drgreennft.com/api/v1';
 }
 
-// Actions that require write-enabled API keys (NFT-scoped write permissions)
-// These actions MUST use the same credentials that created the client (DRGREEN_WRITE_*)
-// to avoid "Client shipping address not found" errors from NFT scope mismatch
-const WRITE_ACTIONS: string[] = [
-  'create-client', 'create-client-legacy',
-  'add-to-cart', 'remove-from-cart', 'empty-cart',
-  'place-order', 'create-order',
-  'update-shipping-address',
-  'admin-reregister-client', 'bootstrap-test-client',
-];
+// All environments use the same credentials — no separate write keys
+// Production and Railway are the only two environments
+const WRITE_ACTIONS: string[] = []; // No longer needed — all actions use the same key
 
 const DAPP_ADMIN_READ_ACTIONS: string[] = [];
 
@@ -370,30 +363,11 @@ const ENV_CONFIG: Record<string, EnvConfig> = {
     privateKeyEnv: 'DRGREEN_PRIVATE_KEY',
     name: 'Production',
   },
-  'alt-production': {
-    apiUrl: 'https://api.drgreennft.com/api/v1',
-    apiKeyEnv: 'DRGREEN_ALT_API_KEY',
-    privateKeyEnv: 'DRGREEN_ALT_PRIVATE_KEY',
-    name: 'Alt Production (Test)',
-  },
-  staging: {
-    apiUrl: getStagingApiUrl(),
-    apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
-    privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
-    name: 'Staging (Official)',
-  },
   railway: {
     apiUrl: 'https://budstack-backend-main-development.up.railway.app/api/v1',
     apiKeyEnv: 'DRGREEN_STAGING_API_KEY',
     privateKeyEnv: 'DRGREEN_STAGING_PRIVATE_KEY',
     name: 'Railway (Dev)',
-  },
-  // Write-enabled environment for client creation (requires operator-level NFT keys)
-  'production-write': {
-    apiUrl: 'https://api.drgreennft.com/api/v1',
-    apiKeyEnv: 'DRGREEN_WRITE_API_KEY',
-    privateKeyEnv: 'DRGREEN_WRITE_PRIVATE_KEY',
-    name: 'Production (Write)',
   },
 };
 
@@ -420,28 +394,10 @@ function getEnvironment(requestedEnv?: string): EnvConfig {
 }
 
 /**
- * Get write-enabled environment for client creation actions
- * Falls back to production-write if configured, otherwise uses requested environment
- * @param action - The action being performed
- * @param requestedEnv - The environment requested by the client
+ * Get environment for any action — no separate write credentials needed.
+ * All actions use the same key pair per environment.
  */
-function getWriteEnvironment(action: string, requestedEnv?: string): EnvConfig {
-  // Check if this is a write action OR a dApp admin read action
-  if (!WRITE_ACTIONS.includes(action) && !DAPP_ADMIN_READ_ACTIONS.includes(action)) {
-    return getEnvironment(requestedEnv);
-  }
-  
-  // Check if write credentials are available
-  const writeApiKey = Deno.env.get('DRGREEN_WRITE_API_KEY');
-  const writePrivateKey = Deno.env.get('DRGREEN_WRITE_PRIVATE_KEY');
-  
-  if (writeApiKey && writePrivateKey) {
-    logInfo(`Using write environment for action: ${action}`);
-    return ENV_CONFIG['production-write'];
-  }
-  
-  // Fall back to requested environment or default
-  logWarn(`Write credentials not configured for action: ${action}, falling back to ${requestedEnv || 'production'}`);
+function getWriteEnvironment(_action: string, requestedEnv?: string): EnvConfig {
   return getEnvironment(requestedEnv);
 }
 

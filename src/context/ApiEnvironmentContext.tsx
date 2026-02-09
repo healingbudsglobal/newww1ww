@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ApiEnvironment = 'production' | 'alt-production' | 'staging' | 'railway' | 'production-write';
+export type ApiEnvironment = 'production' | 'railway';
 
 interface ApiEnvironmentContextType {
   environment: ApiEnvironment;
@@ -10,10 +10,7 @@ interface ApiEnvironmentContextType {
 
 const ENVIRONMENT_LABELS: Record<ApiEnvironment, string> = {
   production: 'Production',
-  'alt-production': 'Alt Production (Test)',
-  staging: 'Staging (Official)',
   railway: 'Railway (Dev)',
-  'production-write': 'Production (Write)',
 };
 
 const ApiEnvironmentContext = createContext<ApiEnvironmentContextType | undefined>(undefined);
@@ -22,10 +19,9 @@ const STORAGE_KEY = 'hb-api-environment';
 
 export function ApiEnvironmentProvider({ children }: { children: ReactNode }) {
   const [environment, setEnvironmentState] = useState<ApiEnvironment>(() => {
-    // Load from localStorage on init (default to production)
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && ['production', 'alt-production', 'staging', 'railway', 'production-write'].includes(stored)) {
+      if (stored && ['production', 'railway'].includes(stored)) {
         return stored as ApiEnvironment;
       }
     }
@@ -38,7 +34,6 @@ export function ApiEnvironmentProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Ensure localStorage is synced
     localStorage.setItem(STORAGE_KEY, environment);
   }, [environment]);
 
