@@ -1,60 +1,85 @@
 
 
-# Admin Pending Orders Queue + Navigation & Wire Fixes
+# Header & Admin UX Improvements
 
-## 1. Admin Pending Orders Queue
+## Issues Identified
 
-The admin orders page (`/admin/orders`) already exists with filtering by sync status. However, we'll add a dedicated **"Pending Queue"** tab/view that surfaces `PENDING_SYNC` orders prominently with one-click processing actions:
+1. **"Check Eligibility" visible for admin** -- The eligibility CTA should be completely hidden for admin users
+2. **No admin account dropdown** -- Admin needs a dropdown showing their email and account info instead of separate Portal/Logout buttons
+3. **Portal button shows text** -- Should be icon-only to save space
+4. **Nav bar crowded** -- Too many items competing for space (Language, Theme, Cursor toggle, Wallet, KYC badge, Eligibility CTA, Portal, Logout)
+5. **Nav links hard to see** -- Contrast/spacing can be improved
 
-- **Add a prominent "Pending Queue" card** at the top of the Admin Orders page that shows the count of `PENDING_SYNC` orders with a call-to-action
-- **Add quick-action buttons** on each pending order row: "Mark as Confirmed", "Process Manually", "Flag for Review"
-- **Add a "Process Order" workflow**: Admin clicks "Confirm & Process" on a pending order, which updates the status from `PENDING_SYNC` to `CONFIRMED` and payment status from `AWAITING_PROCESSING` to `PAID`
-- **Add bulk actions**: "Confirm All Pending" button to batch-process multiple orders
+## Changes
 
-### Files to modify:
-- `src/pages/AdminOrders.tsx` -- Add pending queue banner and quick-process actions
-- `src/components/admin/AdminOrdersTable.tsx` -- Add "Process" button for PENDING_SYNC orders
+### 1. Replace Portal + Logout with Admin Account Dropdown (`src/layout/Header.tsx`)
 
----
+When logged in as admin, replace the separate "Portal" link + "Logout" button with a single dropdown that shows:
+- **Trigger**: Shield icon + truncated email (e.g., "scott@heal...")
+- **Dropdown content**:
+  - Email address (full, as label)
+  - Role badge ("Admin")
+  - Separator
+  - "Admin Portal" link (with Shield icon)
+  - "Patient Dashboard" link (with LayoutDashboard icon)
+  - Separator
+  - "Sign Out" (with LogOut icon)
 
-## 2. Navigation Bar Fix (Links Not Visible / Overlapping)
+For patient users, show a similar dropdown:
+- **Trigger**: User icon + truncated email
+- **Dropdown content**:
+  - Email address
+  - "Dashboard" link
+  - Separator
+  - "Sign Out"
 
-From the screenshot, the nav links in the header are overlapping and unreadable. The issue is that the navigation items are clashing with each other when space is tight. The text "The Wire" is rendering on top of other nav items.
+### 2. Remove "Check Eligibility" for Admin (`src/layout/Header.tsx`)
 
-### Root cause:
-The `NavigationMenu` component uses `hidden xl:flex` so it only shows on xl+ screens, but the nav items with icons + text + padding (`px-5 py-2.5`) can still overflow or overlap when there are too many items in the available space.
+The `shouldHideEligibilityCTA` logic already checks `isAdmin`, but timing issues with role loading may cause a flash. We will:
+- Ensure the CTA is hidden while `roleLoading` is true (don't show it during loading)
+- Keep the existing `isAdmin` check
 
-### Fix:
-- Reduce padding on nav items from `px-5` to `px-4`
-- Add `whitespace-nowrap` to prevent label wrapping
-- Add `overflow-hidden` on the nav container to prevent spillover
-- Ensure the nav uses `flex-shrink-0` on items so they don't compress
+### 3. Remove KYC Badge and Wallet Button for Admin (`src/layout/Header.tsx`)
 
-### File to modify:
-- `src/components/NavigationMenu.tsx`
+Admins don't need the KYC status badge or the eligibility CTA. Clean up the right actions area:
+- Hide KYC badge for admins (already done)
+- Hide "Check Eligibility" for admins (fix loading state)
+- Potentially hide wallet connect for admin email users (they logged in via email, not wallet)
 
----
+### 4. Streamline Right Actions (`src/layout/Header.tsx`)
 
-## 3. The Wire Text Overlap Fix
+Reorganize the right side of the nav bar for clarity:
+- Language switcher + Theme toggle (utility group)
+- Wallet button (only if relevant)
+- Account dropdown (single unified control replacing Portal + Logout)
 
-The screenshot shows text overlapping on The Wire section (likely in the hero or article cards). This is a layout issue where content is not properly contained.
+Remove the cursor toggle button from the header if present -- it's not a critical nav action.
 
-### Fix:
-- Ensure the hero section has proper `pt-28` padding to clear the fixed header
-- Add `overflow-hidden` and `text-ellipsis` where needed
-- Add `line-clamp` utilities to article titles and summaries to prevent overflow
+### 5. Improve Nav Link Visibility (`src/components/NavigationMenu.tsx`)
 
-### File to modify:
-- `src/pages/TheWire.tsx` -- Minor spacing adjustments if needed (the current code already has `pt-28` so the issue may be specifically the nav overlap bleeding into the page content)
+- Increase text opacity from `text-white/85` to `text-white/90` for inactive items
+- Slightly increase gap between items from `gap-1` to `gap-1.5`
+- Keep icons at smaller size to save space
 
 ---
 
 ## Technical Summary
 
-| Change | File | Description |
-|--------|------|-------------|
-| Pending queue banner | `src/pages/AdminOrders.tsx` | Add prominent pending orders banner with batch process button |
-| Quick process actions | `src/components/admin/AdminOrdersTable.tsx` | Add "Confirm" button for PENDING_SYNC rows |
-| Nav link overflow | `src/components/NavigationMenu.tsx` | Fix padding, add whitespace-nowrap, prevent overflow |
-| Wire text overlap | `src/pages/TheWire.tsx` | Ensure proper spacing and text containment |
+| File | Change |
+|------|--------|
+| `src/layout/Header.tsx` | Replace Portal+Logout with unified account dropdown; hide eligibility CTA during role loading; streamline right actions |
+| `src/components/NavigationMenu.tsx` | Improve link visibility with better contrast and spacing |
 
+## Account Dropdown Design
+
+```text
++---------------------------+
+| scott@healingbuds.global  |
+| Role: Admin               |
+|---------------------------|
+| Shield  Admin Portal      |
+| Grid    Patient Dashboard |
+|---------------------------|
+| LogOut  Sign Out           |
++---------------------------+
+```
