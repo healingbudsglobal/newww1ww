@@ -202,7 +202,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                 <ThemeToggle isDark={isDark} />
 
                 {/* Wallet Button - only for non-admin users or when not logged in */}
-                {(!user || !isAdmin) && <WalletButton className="ml-1" />}
+                {user && isAdmin && !roleLoading && <WalletButton className="ml-1" />}
 
                 {/* KYC Status Badge - only for non-admin logged-in users */}
                 {user && !isAdmin && !roleLoading && <KYCStatusBadge />}
