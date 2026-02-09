@@ -36,7 +36,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { useDrGreenClientSync } from "@/hooks/useDrGreenClientSync";
-import { EnvironmentSelector } from "@/components/admin/EnvironmentSelector";
 import { useApiEnvironment } from "@/context/ApiEnvironmentContext";
 import { useAccount, useDisconnect, useChainId } from "wagmi";
 import { useDrGreenKeyOwnership } from "@/hooks/useNFTOwnership";
@@ -285,9 +284,8 @@ const AdminDashboard = () => {
       description={`Live overview • ${environmentLabel}`}
     >
       <div className="space-y-8">
-        {/* Top Bar: Environment + Refresh */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <EnvironmentSelector />
+        {/* Top Bar: Refresh */}
+        <div className="flex flex-wrap items-center justify-end gap-4">
           <Button
             variant="outline"
             size="sm"

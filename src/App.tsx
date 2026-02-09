@@ -55,6 +55,7 @@ const AdminRoles = lazy(() => import("./pages/AdminRoles"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
 const AdminWalletMappings = lazy(() => import("./pages/AdminWalletMappings"));
 const AdminTools = lazy(() => import("./pages/AdminTools"));
+const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const Research = lazy(() => import("./pages/Research"));
 const TheWire = lazy(() => import("./pages/TheWire"));
 const ArticleDetail = lazy(() => import("./pages/ArticleDetail"));
@@ -122,6 +123,7 @@ const AnimatedRoutes = () => {
           <Route path="/admin/roles" element={<AdminRoles />} />
           <Route path="/admin/wallet-mappings" element={<AdminWalletMappings />} />
           <Route path="/admin/tools" element={<AdminTools />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
           
           
           {/* Legal */}
