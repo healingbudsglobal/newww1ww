@@ -51,8 +51,7 @@ export const useUserRole = (): UserRoleState => {
 
       const roleNames = (roles || []).map(r => r.role as string);
       
-      // admin or root_admin both grant admin access
-      const hasAdmin = roleNames.includes('admin') || roleNames.includes('root_admin');
+      const hasAdmin = roleNames.includes('admin');
       const hasModerator = roleNames.includes('moderator');
 
       setIsAdmin(hasAdmin);

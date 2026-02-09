@@ -530,39 +530,6 @@ const Auth = () => {
                     </Button>
                   )}
 
-                  {/* DEV ONLY: Quick admin bypass for testing */}
-                  {isLogin && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-xs text-muted-foreground hover:text-amber-500 border border-dashed border-muted-foreground/30"
-                      disabled={loading}
-                      onClick={async () => {
-                        setLoading(true);
-                        const testEmail = "admin-test@healingbuds.dev";
-                        const testPass = "TestAdmin2026!";
-                        // Try sign in first
-                        let { error } = await supabase.auth.signInWithPassword({ email: testEmail, password: testPass });
-                        if (error) {
-                          // If doesn't exist, sign up
-                          const { error: signUpErr } = await supabase.auth.signUp({ email: testEmail, password: testPass, options: { data: { full_name: "Dev Admin" } } });
-                          if (signUpErr) {
-                            toast({ title: "Bypass failed", description: signUpErr.message, variant: "destructive" });
-                            setLoading(false);
-                            return;
-                          }
-                          // Now sign in
-                          await supabase.auth.signInWithPassword({ email: testEmail, password: testPass });
-                        }
-                        toast({ title: "Dev Admin Login", description: "Signed in as test admin" });
-                        setLoading(false);
-                      }}
-                    >
-                      🔧 Dev Admin Bypass (Testing Only)
-                    </Button>
-                  )}
-
                   <div className="text-center pt-4 border-t border-border">
                     <p className="text-muted-foreground text-sm">
                       {isLogin ? t('noAccount') : t('hasAccount')}
