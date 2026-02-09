@@ -1,86 +1,56 @@
 
 
-## Fix: Auto-Sync Client Discovery on Login
+## Email System Audit and Dispatch Email Implementation
 
-### Problem
-When a user logs in, there's a race condition between the auto-discovery of their Dr. Green profile and the Auth page redirect logic. The ShopContext `isLoading` flag goes `false` before the auto-discovery API call finishes, causing the user to land on `/dashboard/status` which shows "No Profile Found" with a manual "Look Up My Profile" button. This is unacceptable for a healthcare platform -- the lookup should be seamless.
+### Current State
 
-### Root Cause
-In `ShopContext.tsx` line 288, `setIsLoading(false)` is called inside the `fetchClient` function at the end of the auto-discovery branch, but the issue is that `isLoading` starts as `true` and the `linkClientFromDrGreenByAuthEmail` call is async. The redirect in Auth.tsx fires as soon as `clientLoading` is false, which can happen before discovery completes.
+**Existing email functions:**
+1. `send-onboarding-email` -- Triggered on signup (welcome + registration CTA)
+2. `send-order-confirmation` -- Triggered at checkout (order received/confirmed)
+3. `send-client-email` -- Handles: welcome, kyc-link, kyc-approved, kyc-rejected, eligibility-approved, eligibility-rejected
+4. `send-contact-email` -- Contact form submissions
 
-### Solution
+**Missing:**
+- **Dispatch/Shipping notification email** -- No email is sent when an admin changes order status to SHIPPED
 
-**Step 1: Keep `isLoading` true during auto-discovery** (`src/context/ShopContext.tsx`)
+**Issue with all existing emails:**
+- All use `onboarding@resend.dev` as sender (Resend's sandbox address). This only delivers to the Resend account owner's email. Production requires a verified domain.
 
-In the `fetchClient` function (around lines 272-290), ensure `isLoading` stays `true` until the full auto-discovery flow completes, including the re-fetch of the newly created local record. Currently `setIsLoading(false)` is called at line 288 which is correct, but we need to make sure it doesn't get set to false prematurely by any other code path during the async operation.
+### Plan
 
-The key fix: Move the `setIsLoading(false)` to run AFTER the auto-discovery await, and ensure no early return sets it to false before discovery finishes.
+#### 1. Create `send-dispatch-email` Edge Function
 
-**Step 2: Auto-trigger lookup on DashboardStatus mount** (`src/pages/DashboardStatus.tsx`)
+A new edge function that sends a shipping notification email when an order is dispatched. Includes:
+- Order reference number
+- Tracking information (optional field)
+- Items being shipped
+- Shipping address confirmation
+- Estimated delivery timeframe
+- Region-aware branding (ZA/PT/GB/global)
+- Same HTML email template style as existing functions
 
-As a safety net, when a user lands on `/dashboard/status` without a client record, automatically trigger the `handleManualLookup` function instead of waiting for the user to click the button. This makes the "Look Up My Profile" action happen seamlessly on page load.
+#### 2. Auto-Trigger Dispatch Email on Status Change
 
-Changes:
-- Add an auto-lookup effect that fires when `!hasClient && isAuthenticated && !isLoading`
-- Remove the 5-second auto-redirect to registration (or increase it to 15 seconds) so the lookup has time to complete
-- If lookup finds a profile, refresh client and let the existing redirect logic handle navigation to `/shop`
+Update `useAdminOrderSync.ts` -- the `updateOrderStatusMutation` to automatically invoke `send-dispatch-email` when an admin changes order status to `SHIPPED`. The mutation will:
+- Fetch the order details (customer email, name, items, shipping address)
+- Call the edge function non-blocking (fire-and-forget, errors logged but don't block status update)
 
-**Step 3: Suppress noisy toasts during auto-discovery** (`src/context/ShopContext.tsx`)
+#### 3. Password Reset Flow Verification
 
-The `linkClientFromDrGreenByAuthEmail` function shows toasts like "Checking records..." and "No Profile Found" during auto-login discovery. These are disruptive during the normal login flow. Add a `silent` parameter to suppress toasts when called automatically (keep them for manual lookups).
+The password reset flow is already implemented in `Auth.tsx` using `supabase.auth.resetPasswordForEmail()`. The redirect URL correctly uses `getProductionPath('/auth')`. No changes needed here -- this works with the built-in auth email system.
 
 ### Technical Details
 
-#### ShopContext.tsx changes:
-```text
-// fetchClient function - ensure isLoading stays true during discovery
-if (!localRecord) {
-  // DO NOT set isLoading false until discovery completes
-  const linked = await linkClientFromDrGreenByAuthEmail(user.id, true); // silent=true
-  if (linked) {
-    const { data: newRecord } = await supabase
-      .from('drgreen_clients')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (newRecord) {
-      setDrGreenClient(newRecord);
-    }
-  }
-  setIsLoading(false); // Only NOW set loading false
-  return;
-}
-```
+**New file:** `supabase/functions/send-dispatch-email/index.ts`
+- Accepts: `{ email, customerName, orderId, items, shippingAddress, trackingNumber?, estimatedDelivery?, region? }`
+- Requires auth (same pattern as `send-order-confirmation`)
+- Uses Resend API with region-aware branding
+- Logs to `kyc_journey_logs` if client ID provided
 
-#### linkClientFromDrGreenByAuthEmail signature change:
-```text
-const linkClientFromDrGreenByAuthEmail = useCallback(
-  async (userId: string, silent = false): Promise<boolean> => {
-    // Only show toasts if not silent
-    if (!silent) {
-      toast({ title: 'Checking records...', ... });
-    }
-    ...
-  }
-);
-```
+**Modified file:** `src/hooks/useAdminOrderSync.ts`
+- In `updateOrderStatusMutation.mutationFn`, after successful DB update:
+  - If `status === "SHIPPED"`, fetch order details and invoke `send-dispatch-email`
+  - Non-blocking: wrapped in try/catch, errors logged but don't fail the mutation
 
-#### DashboardStatus.tsx changes:
-```text
-// Auto-trigger lookup when no client found
-useEffect(() => {
-  if (!isLoading && !drGreenClient && isAuthenticated && !isLookingUp) {
-    handleManualLookup();
-  }
-}, [isLoading, drGreenClient, isAuthenticated]);
-
-// Increase redirect timer from 5s to 15s to allow lookup to complete
-// Or: only start countdown AFTER lookup returns "not found"
-```
-
-### Impact
-- Login flow becomes seamless: user logs in, auto-discovery runs silently, redirect happens based on actual profile status
-- No manual "sync" or "lookup" button click needed
-- DashboardStatus page still works as a fallback with auto-lookup on mount
-- No breaking changes to existing flows
+**No test accounts will be created.** All client data comes exclusively from the Dr. Green API via the existing sync and auto-discovery mechanisms.
 
