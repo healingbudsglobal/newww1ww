@@ -33,6 +33,17 @@ const dataSourceInfo: Record<DataSource, { icon: typeof Cloud; label: string; co
   none: { icon: AlertCircle, label: 'No Data', color: 'text-amber-400' },
 };
 
+// Extract unique effects and terpenes from loaded products
+function extractFilterOptions(products: Product[]) {
+  const effects = new Set<string>();
+  const terpenes = new Set<string>();
+  for (const p of products) {
+    p.effects.forEach(e => effects.add(e));
+    p.terpenes.forEach(t => terpenes.add(t));
+  }
+  return { effects: Array.from(effects).sort(), terpenes: Array.from(terpenes).sort() };
+}
+
 export function ProductGrid() {
   const { countryCode } = useShop();
   const { isAdmin } = useUserRole();
@@ -46,6 +57,11 @@ export function ProductGrid() {
   const [showDebug, setShowDebug] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [lastStockUpdate, setLastStockUpdate] = useState<string | null>(null);
+  const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
+  const [selectedTerpene, setSelectedTerpene] = useState<string | null>(null);
+
+  // Extract filter options from loaded products
+  const filterOptions = extractFilterOptions(products);
 
   // Handle real-time stock updates
   const handleStockChange = useCallback((update: StockUpdate) => {
@@ -79,7 +95,9 @@ export function ProductGrid() {
       const matchesCategory =
         selectedCategory === 'All' || product.category === selectedCategory;
       const matchesAvailability = !showAvailableOnly || product.availability;
-      return matchesSearch && matchesCategory && matchesAvailability;
+      const matchesEffect = !selectedEffect || product.effects.includes(selectedEffect);
+      const matchesTerpene = !selectedTerpene || product.terpenes.includes(selectedTerpene);
+      return matchesSearch && matchesCategory && matchesAvailability && matchesEffect && matchesTerpene;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -101,10 +119,12 @@ export function ProductGrid() {
     setSelectedCategory('All');
     setSortBy('name');
     setShowAvailableOnly(false);
+    setSelectedEffect(null);
+    setSelectedTerpene(null);
   };
 
   const hasActiveFilters =
-    searchQuery || selectedCategory !== 'All' || sortBy !== 'name' || showAvailableOnly;
+    searchQuery || selectedCategory !== 'All' || sortBy !== 'name' || showAvailableOnly || selectedEffect || selectedTerpene;
 
   const SourceIcon = dataSourceInfo[dataSource].icon;
 
@@ -226,6 +246,54 @@ export function ProductGrid() {
           </Button>
         )}
       </div>
+
+      {/* Effect-based filter pills — horizontal scroll */}
+      {filterOptions.effects.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Filter by Effect</span>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {filterOptions.effects.map((effect) => (
+              <button
+                key={effect}
+                onClick={() => setSelectedEffect(selectedEffect === effect ? null : effect)}
+                className={`
+                  whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 shrink-0
+                  ${selectedEffect === effect
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                    : 'bg-background/50 text-muted-foreground border-border/50 hover:border-primary/40 hover:text-foreground'
+                  }
+                `}
+              >
+                {effect}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Terpene filter pills */}
+      {filterOptions.terpenes.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Filter by Terpene</span>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {filterOptions.terpenes.map((terpene) => (
+              <button
+                key={terpene}
+                onClick={() => setSelectedTerpene(selectedTerpene === terpene ? null : terpene)}
+                className={`
+                  whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 shrink-0
+                  ${selectedTerpene === terpene
+                    ? 'bg-secondary text-secondary-foreground border-secondary shadow-sm'
+                    : 'bg-background/50 text-muted-foreground border-border/50 hover:border-secondary/40 hover:text-foreground'
+                  }
+                `}
+              >
+                {terpene}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Results count and data source indicator */}
       <div className="flex flex-wrap items-center justify-between gap-3">

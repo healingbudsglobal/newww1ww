@@ -885,6 +885,21 @@ async function generatePrivateKeySignature(
   return bytesToBase64(new Uint8Array(signatureBuffer));
 }
 
+// Deep-normalize a shipping address object for frontend consistency
+function normalizeShippingObject(shipping: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...shipping,
+    postalCode: String(shipping.postalCode || shipping.zipCode || shipping.zip_code || '').trim(),
+    address1: String(shipping.address1 || shipping.address_line_1 || '').trim(),
+    address2: String(shipping.address2 || shipping.address_line_2 || '').trim(),
+    city: String(shipping.city || '').trim(),
+    state: String(shipping.state || shipping.city || '').trim(),
+    country: String(shipping.country || '').trim(),
+    countryCode: String(shipping.countryCode || shipping.country_code || '').trim().toUpperCase(),
+    landmark: String(shipping.landmark || '').trim(),
+  };
+}
+
 
 /**
  * HMAC-SHA256 signing - THE CORRECT METHOD for Dr Green API
@@ -2375,12 +2390,11 @@ serve(async (req) => {
         // If we have API data, normalize and return it
         if (apiData) {
           // Normalize shippings array to shipping object (API returns shippings[], frontend expects shipping{})
-          // The API wraps responses in {success, data: {...}} so check both levels
           const innerData = apiData.data as Record<string, unknown> | undefined;
           if (innerData && Array.isArray(innerData.shippings) && (innerData.shippings as unknown[]).length > 0) {
-            innerData.shipping = (innerData.shippings as unknown[])[0];
+            innerData.shipping = normalizeShippingObject((innerData.shippings as Record<string, unknown>[])[0]);
           } else if (Array.isArray(apiData.shippings) && (apiData.shippings as unknown[]).length > 0) {
-            apiData.shipping = (apiData.shippings as unknown[])[0];
+            apiData.shipping = normalizeShippingObject((apiData.shippings as Record<string, unknown>[])[0]);
           }
           return new Response(JSON.stringify(apiData), {
             status: 200,
@@ -2670,9 +2684,9 @@ serve(async (req) => {
           // Normalize shippings array to shipping object - check both wrapper and inner data levels
           const innerClientData = clientData?.data;
           if (innerClientData && Array.isArray(innerClientData.shippings) && innerClientData.shippings.length > 0) {
-            innerClientData.shipping = innerClientData.shippings[0];
+            innerClientData.shipping = normalizeShippingObject(innerClientData.shippings[0]);
           } else if (Array.isArray(clientData.shippings) && clientData.shippings.length > 0) {
-            clientData.shipping = clientData.shippings[0];
+            clientData.shipping = normalizeShippingObject(clientData.shippings[0]);
           }
           return new Response(JSON.stringify(clientData), {
             status: clientResponse.status,

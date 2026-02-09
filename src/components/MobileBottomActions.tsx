@@ -65,8 +65,8 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
               <div className={cn(
                 "rounded-3xl overflow-hidden backdrop-blur-xl",
                 isDark 
-                  ? "bg-[hsl(180,8%,10%)]/98 border border-white/20 shadow-[0_-8px_40px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_0_rgba(255,255,255,0.05)]"
-                  : "bg-gradient-to-r from-[hsl(var(--pharma-teal-dark))] via-[hsl(175,45%,22%)] to-[hsl(var(--pharma-teal-dark))] border border-white/10 shadow-[0_-8px_32px_-4px_rgba(0,0,0,0.25),inset_0_1px_0_0_rgba(255,255,255,0.1)]"
+                  ? "bg-[hsl(180,8%,10%)]/98 border border-white/20 shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.3),inset_0_1px_0_0_rgba(255,255,255,0.05)]"
+                  : "bg-gradient-to-r from-[hsl(var(--pharma-teal-dark))] via-[hsl(178,48%,21%)] to-[hsl(var(--pharma-teal-dark))] border border-white/10 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.15),inset_0_1px_0_0_rgba(255,255,255,0.1)]"
               )}>
                 {/* Subtle top accent line */}
                 <div className={cn(
@@ -88,8 +88,8 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
                             "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
                             "transition-all duration-300 ease-out active:scale-[0.97]",
                             isDark
-                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35)]"
-                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)]"
+                              ? "bg-gradient-to-r from-teal-700 via-teal-600 to-teal-700 shadow-[0_4px_20px_-4px_rgba(13,148,136,0.3)]"
+                              : "bg-gradient-to-r from-[hsl(178,48%,28%)] via-[hsl(175,42%,35%)] to-[hsl(178,48%,28%)] shadow-[0_4px_16px_-4px_rgba(13,148,136,0.35)]"
                           )}
                         >
                           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-active:translate-x-full transition-transform duration-500" />
@@ -125,8 +125,8 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
                             "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
                             "transition-all duration-300 ease-out active:scale-[0.97]",
                             isDark
-                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35)]"
-                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)]"
+                              ? "bg-gradient-to-r from-teal-700 via-teal-600 to-teal-700 shadow-[0_4px_20px_-4px_rgba(13,148,136,0.3)]"
+                              : "bg-gradient-to-r from-[hsl(178,48%,28%)] via-[hsl(175,42%,35%)] to-[hsl(178,48%,28%)] shadow-[0_4px_16px_-4px_rgba(13,148,136,0.35)]"
                           )}
                         >
                           <Leaf className="relative w-4 h-4" />
@@ -163,8 +163,8 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
                             "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
                             "transition-all duration-300 ease-out active:scale-[0.97]",
                             isDark
-                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35),inset_0_1px_0_0_rgba(255,255,255,0.15)] active:shadow-[0_2px_16px_-2px_rgba(16,185,129,0.3)]"
-                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5),inset_0_1px_0_0_rgba(255,255,255,0.2)] active:shadow-[0_2px_12px_-2px_rgba(16,185,129,0.4)]"
+                              ? "bg-gradient-to-r from-teal-700 via-teal-600 to-teal-700 shadow-[0_4px_20px_-4px_rgba(13,148,136,0.3),inset_0_1px_0_0_rgba(255,255,255,0.15)] active:shadow-[0_2px_12px_-2px_rgba(13,148,136,0.25)]"
+                              : "bg-gradient-to-r from-[hsl(178,48%,28%)] via-[hsl(175,42%,35%)] to-[hsl(178,48%,28%)] shadow-[0_4px_16px_-4px_rgba(13,148,136,0.35),inset_0_1px_0_0_rgba(255,255,255,0.2)] active:shadow-[0_2px_10px_-2px_rgba(13,148,136,0.3)]"
                           )}
                         >
                           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-active:translate-x-full transition-transform duration-500" />
