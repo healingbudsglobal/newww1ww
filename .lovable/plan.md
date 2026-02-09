@@ -1,25 +1,45 @@
 
 
-# Use Production Credentials for All API Calls
+# Fix: Single-Resource GET Endpoints Returning 401
 
-## Problem
-The `drgreen-proxy` edge function routes many actions (client reads, cart, orders, etc.) to the `production-write` credentials (`DRGREEN_WRITE_API_KEY` / `DRGREEN_WRITE_PRIVATE_KEY`), which are returning `401 Unauthorized`. The user wants all calls to use the standard production credentials (`DRGREEN_API_KEY` / `DRGREEN_PRIVATE_KEY`) instead.
+## Problem Identified
+
+The Dr. Green API requires a non-empty signature payload for all authenticated requests. Currently:
+
+- **Working**: `dapp-clients` (list) signs query string `orderBy=desc&take=10&page=1` -- returns 200
+- **Failing**: `get-client` and `dapp-client-details` sign an empty string `""` -- returns 401
+
+The API rejects signatures over empty strings for `/dapp/*` endpoints.
 
 ## Root Cause
-The `DAPP_ADMIN_READ_ACTIONS` array (lines 365-395) contains a large list of actions that get routed to `production-write` via `getWriteEnvironment()`. This includes client reads, cart operations, orders, and more. The write credentials appear to lack the necessary permissions.
 
-## Solution
-Remove all entries from the `DAPP_ADMIN_READ_ACTIONS` array so that every action falls through to the standard `production` environment. This is a single change in one file.
+In `drGreenRequestGet()` (line 1220), when `queryParams` is `{}`, the query string is empty, so the signature is generated over `""`. The Dr. Green API does not accept this for dApp-scoped endpoints.
 
-## Technical Details
+## Fix
 
-**File:** `supabase/functions/drgreen-proxy/index.ts`
+Update all single-resource GET endpoint calls that currently pass empty query params `{}` to include at minimum a dummy pagination param (matching the pattern used by working endpoints). This ensures the signature is always generated over actual data.
 
-1. **Empty the `DAPP_ADMIN_READ_ACTIONS` array** (lines 365-395) -- remove all action strings so it becomes an empty array `[]`. This stops `getWriteEnvironment()` from ever routing to `production-write`.
+### Affected Actions
 
-2. **Empty the `WRITE_ACTIONS` array** as well (if it also routes to write credentials), OR alternatively, remove the write credential check in `getWriteEnvironment()` so it always returns the standard production environment.
+| Action | Current Call | Fix |
+|--------|------------|-----|
+| `get-client` (line 2659) | `drGreenRequestQuery('/dapp/clients/{id}', {})` | Add `{ orderBy: 'desc', take: 1, page: 1 }` |
+| `dapp-client-details` (line 2321) | `drGreenRequestQuery('/dapp/clients/{id}', {})` | Add `{ orderBy: 'desc', take: 1, page: 1 }` |
+| `get-my-details` | Uses same pattern via `drGreenRequestQuery` | Same fix |
+| `get-cart` (line 2718) | `drGreenRequestQuery('/dapp/carts/{id}', {})` | Add `{ orderBy: 'desc', take: 1, page: 1 }` |
 
-The net effect: every action uses `DRGREEN_API_KEY` + `DRGREEN_PRIVATE_KEY` (production), regardless of whether it's a read or write operation. The `production-write` environment remains configured but unused unless explicitly requested via the `environment` parameter.
+### Technical Changes
 
-**Deployment:** The `drgreen-proxy` edge function will be redeployed after the change.
+**File**: `supabase/functions/drgreen-proxy/index.ts`
+
+1. For each affected action, replace empty `{}` query params with `{ orderBy: 'desc', take: 1, page: 1 }` to ensure there's always a non-empty query string to sign
+2. Redeploy the edge function
+3. Test `get-client` with client ID `dfd81e64-c17d-4a1b-8111-cdf49f879e82` to confirm 200 response
+
+### Verification
+
+After deployment:
+- Test `get-client` action with the target client ID
+- Test `get-my-details` for the logged-in user
+- Confirm the dashboard/status page stops showing 401 errors
 
