@@ -78,7 +78,12 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isAdmin, isLoading } = useUserRole();
+  const { user, isAdmin, isRootAdmin, isLoading } = useUserRole();
+
+  // Filter secondary nav: root-only items hidden from regular admins
+  const visibleSecondaryNavItems = isRootAdmin
+    ? secondaryNavItems
+    : secondaryNavItems.filter(() => false); // No secondary items for non-root admins
   const { tenant } = useTenant();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
@@ -233,11 +238,11 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
             <NavLink key={item.to} item={item} collapsed={sidebarCollapsed} />
           ))}
 
-          {/* Divider */}
-          <div className="my-4 border-t border-border" />
+          {/* Divider - only show if there are secondary items */}
+          {visibleSecondaryNavItems.length > 0 && <div className="my-4 border-t border-border" />}
 
-          {/* Secondary Nav */}
-          {secondaryNavItems.map((item) => (
+          {/* Secondary Nav (root_admin only) */}
+          {visibleSecondaryNavItems.length > 0 && visibleSecondaryNavItems.map((item) => (
             <NavLink key={item.to} item={item} collapsed={sidebarCollapsed} />
           ))}
         </nav>
@@ -356,10 +361,14 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
                 {navItems.map((item) => (
                   <NavLink key={item.to} item={item} />
                 ))}
-                <div className="my-4 border-t border-border" />
-                {secondaryNavItems.map((item) => (
-                  <NavLink key={item.to} item={item} />
-                ))}
+                {visibleSecondaryNavItems.length > 0 && (
+                  <>
+                    <div className="my-4 border-t border-border" />
+                    {visibleSecondaryNavItems.map((item) => (
+                      <NavLink key={item.to} item={item} />
+                    ))}
+                  </>
+                )}
               </nav>
 
               {/* Mobile User */}
