@@ -350,10 +350,16 @@ function getStagingApiUrl(): string {
   return 'https://stage-api.drgreennft.com/api/v1';
 }
 
-// Actions that require write-enabled API keys (client creation permissions)
-// All actions now use standard production credentials (DRGREEN_API_KEY / DRGREEN_PRIVATE_KEY)
-// Write credentials are available but only used when explicitly requested via environment parameter
-const WRITE_ACTIONS: string[] = [];
+// Actions that require write-enabled API keys (NFT-scoped write permissions)
+// These actions MUST use the same credentials that created the client (DRGREEN_WRITE_*)
+// to avoid "Client shipping address not found" errors from NFT scope mismatch
+const WRITE_ACTIONS: string[] = [
+  'create-client', 'create-client-legacy',
+  'add-to-cart', 'remove-from-cart', 'empty-cart',
+  'place-order', 'create-order',
+  'update-shipping-address',
+  'admin-reregister-client', 'bootstrap-test-client',
+];
 
 const DAPP_ADMIN_READ_ACTIONS: string[] = [];
 
@@ -2227,13 +2233,18 @@ serve(async (req) => {
           throw new Error("Invalid ID format");
         }
         
-        // Sign the JSON payload with HMAC-SHA256 (matching health check approach)
+        // Sign the JSON payload with secp256k1 using write credentials
         const signPayloadData = { cartId };
         const payloadStr = JSON.stringify(signPayloadData);
-        const signature = await generateSecp256k1Signature(payloadStr, Deno.env.get("DRGREEN_PRIVATE_KEY")!);
+        const writeEnv = adminEnvConfig || ENV_CONFIG['production-write'];
+        const { apiKey: writeApiKey, privateKey: writePrivKey } = getEnvCredentials(writeEnv);
+        if (!writeApiKey || !writePrivKey) {
+          throw new Error(`Write credentials not configured for remove-from-cart (${writeEnv.apiKeyEnv})`);
+        }
+        const signature = await generateSecp256k1Signature(payloadStr, writePrivKey);
         
-        const apiKey = Deno.env.get("DRGREEN_API_KEY")!;
-        const apiUrl = `${DRGREEN_API_URL}/dapp/carts/${cartId}?strainId=${strainId}`;
+        const apiKey = writeApiKey;
+        const apiUrl = `${writeEnv.apiUrl}/dapp/carts/${cartId}?strainId=${strainId}`;
         
         logInfo(`Removing item from cart via /dapp/carts endpoint`);
         
@@ -2261,7 +2272,7 @@ serve(async (req) => {
         if (!cartId) throw new Error("cartId is required");
         
         logInfo("API request: DELETE /dapp/carts/:cartId");
-        response = await drGreenRequestBody(`/dapp/carts/${cartId}`, "DELETE", { cartId });
+        response = await drGreenRequestBody(`/dapp/carts/${cartId}`, "DELETE", { cartId }, false, adminEnvConfig);
         break;
       }
       
@@ -2271,7 +2282,7 @@ serve(async (req) => {
         if (!orderData) throw new Error("Order data is required");
         
         logInfo("API request: POST /dapp/orders");
-        response = await drGreenRequestBody("/dapp/orders", "POST", orderData);
+        response = await drGreenRequestBody("/dapp/orders", "POST", orderData, false, adminEnvConfig);
         break;
       }
       
@@ -2792,7 +2803,7 @@ serve(async (req) => {
           payload: JSON.stringify(cartPayload),
         });
         
-        response = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
+        response = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, false, adminEnvConfig);
         
         // Log the response for debugging
         const cartResponseStatus = response.status;
@@ -2818,7 +2829,7 @@ serve(async (req) => {
           throw new Error("Invalid cart ID format");
         }
         // DELETE /dapp/carts/:clientId clears the cart
-        response = await drGreenRequest(`/dapp/carts/${cartId}`, "DELETE");
+        response = await drGreenRequest(`/dapp/carts/${cartId}`, "DELETE", undefined, adminEnvConfig);
         break;
       }
       
@@ -2834,7 +2845,7 @@ serve(async (req) => {
         // POST /dapp/orders creates an order from the cart items
         response = await drGreenRequest("/dapp/orders", "POST", {
           clientId: orderData.clientId,
-        });
+        }, adminEnvConfig);
         break;
       }
       
@@ -2941,7 +2952,7 @@ serve(async (req) => {
           });
           
           try {
-            const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload);
+            const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
             if (!shippingResponse.ok) {
               const shippingError = await shippingResponse.clone().text();
               logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
@@ -2999,7 +3010,7 @@ serve(async (req) => {
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
           try {
-            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload);
+            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, false, adminEnvConfig);
             lastCartStatus = cartResponse.status;
             if (cartResponse.ok) {
               logInfo(`[${requestId}] Step 2: Cart add success`, { attempt: cartAttempts });
@@ -3036,7 +3047,7 @@ serve(async (req) => {
           const orderPayload = { clientId: clientId };
           
           try {
-            response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload);
+            response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload, false, adminEnvConfig);
             
             if (response.ok) {
               logInfo(`[${requestId}] Step 3: Order created successfully via cart flow`);
@@ -3081,7 +3092,7 @@ serve(async (req) => {
           };
           
           try {
-            response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload);
+            response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload, false, adminEnvConfig);
             
             if (response.ok) {
               logInfo(`[${requestId}] Step 3 (Fallback): Direct order created successfully`);
