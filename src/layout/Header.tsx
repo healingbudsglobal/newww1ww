@@ -8,7 +8,7 @@
  */
 
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { LogOut, LayoutDashboard, User, Shield } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Shield, ChevronDown, Wallet } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { motion, useScroll, useSpring } from "framer-motion";
@@ -29,6 +29,14 @@ import NavigationOverlay from "@/components/NavigationOverlay";
 import AnimatedMenuButton from "@/components/AnimatedMenuButton";
 import { WalletButton } from "@/components/WalletConnectionModal";
 import { KYCStatusBadge } from "@/components/KYCStatusBadge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   onMenuStateChange?: (isOpen: boolean) => void;
@@ -239,17 +247,49 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                       </button>
                     </>
                   ) : (
-                    <Link
-                      to="/auth"
-                      className={cn(
-                        "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
-                        "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50 hover:text-[#EAB308]",
-                        "text-sm flex items-center gap-2"
-                      )}
-                    >
-                      <User className="w-4 h-4" />
-                      {t('nav.patientLogin')}
-                    </Link>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className={cn(
+                            "font-medium px-4 py-2.5 rounded-lg transition-all duration-300",
+                            "bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:border-[#EAB308]/50 hover:text-[#EAB308]",
+                            "text-sm flex items-center gap-2"
+                          )}
+                        >
+                          <User className="w-4 h-4" />
+                          {t('nav.patientLogin')}
+                          <ChevronDown className="w-3 h-3 opacity-60" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 bg-popover border-border shadow-xl z-[100]">
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Choose login type</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => navigate('/auth')}
+                          className="cursor-pointer gap-2"
+                        >
+                          <User className="w-4 h-4" />
+                          <div>
+                            <p className="font-medium">Patient Login</p>
+                            <p className="text-xs text-muted-foreground">Email &amp; password</p>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            // Trigger wallet connection for admin NFT login
+                            const walletBtn = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement;
+                            if (walletBtn) walletBtn.click();
+                          }}
+                          className="cursor-pointer gap-2"
+                        >
+                          <Wallet className="w-4 h-4" />
+                          <div>
+                            <p className="font-medium">Admin Login</p>
+                            <p className="text-xs text-muted-foreground">NFT wallet connection</p>
+                          </div>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               </div>
