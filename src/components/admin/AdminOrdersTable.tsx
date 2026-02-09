@@ -5,6 +5,7 @@
  */
 
 import { format } from "date-fns";
+import { formatPrice } from "@/lib/currency";
 import { motion } from "framer-motion";
 import {
   Table,
@@ -252,7 +253,7 @@ export function AdminOrdersTable({
                 </span>
               </TableCell>
               <TableCell className="text-right font-medium">
-                €{order.total_amount?.toFixed(2) || "0.00"}
+                {formatPrice(order.total_amount ?? 0, order.country_code || 'ZA')}
               </TableCell>
               <TableCell>{getOrderStatusBadge(order.status)}</TableCell>
               <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>

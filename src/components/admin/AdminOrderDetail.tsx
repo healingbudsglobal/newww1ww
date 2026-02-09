@@ -5,6 +5,7 @@
  */
 
 import { format } from "date-fns";
+import { formatPrice } from "@/lib/currency";
 import { motion } from "framer-motion";
 import {
   Sheet,
@@ -207,7 +208,7 @@ export function AdminOrderDetail({
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total</p>
-                  <p className="font-medium text-lg">€{order.total_amount?.toFixed(2)}</p>
+                  <p className="font-medium text-lg">{formatPrice(order.total_amount ?? 0, order.country_code || 'ZA')}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Payment</p>
@@ -299,10 +300,10 @@ export function AdminOrderDetail({
                     <div>
                       <p className="font-medium">{item.strainName}</p>
                       <p className="text-xs text-muted-foreground">
-                        Qty: {item.quantity} × €{item.unitPrice?.toFixed(2)}
+                        Qty: {item.quantity} × {formatPrice(item.unitPrice ?? 0, order.country_code || 'ZA')}
                       </p>
                     </div>
-                    <p className="font-medium">€{item.totalPrice?.toFixed(2)}</p>
+                    <p className="font-medium">{formatPrice(item.totalPrice ?? 0, order.country_code || 'ZA')}</p>
                   </motion.div>
                 ))}
               </div>

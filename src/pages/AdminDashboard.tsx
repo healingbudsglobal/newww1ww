@@ -118,7 +118,7 @@ const AdminDashboard = () => {
     try {
       const [clientsRes, ordersRes] = await Promise.all([
         supabase.from('drgreen_clients').select('id, full_name, email, created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('drgreen_orders').select('id, drgreen_order_id, customer_name, total_amount, created_at, status').order('created_at', { ascending: false }).limit(5),
+        supabase.from('drgreen_orders').select('id, drgreen_order_id, customer_name, total_amount, created_at, status, country_code').order('created_at', { ascending: false }).limit(5),
       ]);
 
       const items: RecentItem[] = [];
@@ -135,7 +135,7 @@ const AdminDashboard = () => {
         items.push({
           id: o.id,
           label: o.customer_name || o.drgreen_order_id,
-          detail: `Order ${o.status} — €${o.total_amount}`,
+          detail: `Order ${o.status} — ${formatPrice(o.total_amount ?? 0, o.country_code || 'ZA')}`,
           time: o.created_at,
           type: 'order',
         });
