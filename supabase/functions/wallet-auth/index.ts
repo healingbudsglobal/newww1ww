@@ -301,33 +301,35 @@ async function createSessionForWallet(
     console.log(`[wallet-auth] Legacy wallet user found (${legacyWalletUser.id.slice(0, 8)}...), linked account used instead`);
   }
 
-  // Ensure admin role — ONLY for whitelisted wallets
+  // Assign role based on wallet whitelist:
+  // - Whitelisted wallets (ADMIN_WALLET_ADDRESSES) → root_admin (platform owner)
+  // - Other NFT holders → admin (delegated storefront operator)
   if (userId) {
     const adminWallets = (Deno.env.get('ADMIN_WALLET_ADDRESSES') || '')
       .split(',')
       .map(a => a.trim().toLowerCase())
       .filter(Boolean);
-    const isAdminWallet = adminWallets.includes(address.toLowerCase());
+    const isRootWallet = adminWallets.includes(address.toLowerCase());
+    const targetRole = isRootWallet ? 'root_admin' : 'admin';
 
-    if (isAdminWallet) {
-      const { data: hasRole } = await adminClient.rpc('has_role', {
-        _user_id: userId,
-        _role: 'admin',
-      });
+    // Check if user already has the target role (or higher)
+    const { data: hasTargetRole } = await adminClient.rpc('has_role', {
+      _user_id: userId,
+      _role: targetRole,
+    });
 
-      if (!hasRole) {
-        const { error: roleError } = await adminClient
-          .from('user_roles')
-          .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role' });
+    if (!hasTargetRole) {
+      const { error: roleError } = await adminClient
+        .from('user_roles')
+        .upsert({ user_id: userId, role: targetRole }, { onConflict: 'user_id,role' });
 
-        if (roleError) {
-          console.error('[wallet-auth] Role assignment failed:', roleError.message);
-        } else {
-          console.log(`[wallet-auth] Admin role assigned to whitelisted wallet ${address.slice(0, 10)}...`);
-        }
+      if (roleError) {
+        console.error(`[wallet-auth] Role assignment failed (${targetRole}):`, roleError.message);
+      } else {
+        console.log(`[wallet-auth] ${targetRole} role assigned to wallet ${address.slice(0, 10)}...`);
       }
     } else {
-      console.log(`[wallet-auth] Wallet ${address.slice(0, 10)}... is not in admin whitelist — no admin role assigned`);
+      console.log(`[wallet-auth] Wallet ${address.slice(0, 10)}... already has ${targetRole} role`);
     }
   }
 
