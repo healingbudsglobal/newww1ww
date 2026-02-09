@@ -24,6 +24,7 @@ import { Product, useProducts, DataSource } from '@/hooks/useProducts';
 import { useShop } from '@/context/ShopContext';
 import { useStockUpdates, StockUpdate } from '@/hooks/useStockUpdates';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const categories = ['All', 'Sativa', 'Indica', 'Hybrid', 'CBD'];
 
@@ -34,6 +35,7 @@ const dataSourceInfo: Record<DataSource, { icon: typeof Cloud; label: string; co
 
 export function ProductGrid() {
   const { countryCode } = useShop();
+  const { isAdmin } = useUserRole();
   const { products, isLoading, error, dataSource, refetch } = useProducts(countryCode);
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,7 +147,7 @@ export function ProductGrid() {
           </SheetTrigger>
           <SheetContent side="bottom" className="h-[50vh]">
             <SheetHeader>
-              <SheetTitle>Filter Products</SheetTitle>
+              <SheetTitle>Filter Strains</SheetTitle>
             </SheetHeader>
             <div className="mt-6 space-y-4">
               <div className="space-y-2">
@@ -228,39 +230,41 @@ export function ProductGrid() {
       {/* Results count and data source indicator */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredProducts.length} of {products.length} products
+          Showing {filteredProducts.length} of {products.length} strains
         </p>
         
-        {/* Data source and debug controls */}
-        <div className="flex items-center gap-3">
-          {/* Data source badge */}
-          <div className={`flex items-center gap-1.5 text-xs ${dataSourceInfo[dataSource].color}`}>
-            <SourceIcon className="h-3.5 w-3.5" />
-            <span className="font-medium">{dataSourceInfo[dataSource].label}</span>
+        {/* Data source and debug controls - admin only */}
+        {isAdmin && (
+          <div className="flex items-center gap-3">
+            {/* Data source badge */}
+            <div className={`flex items-center gap-1.5 text-xs ${dataSourceInfo[dataSource].color}`}>
+              <SourceIcon className="h-3.5 w-3.5" />
+              <span className="font-medium">{dataSourceInfo[dataSource].label}</span>
+            </div>
+            
+            {/* Realtime indicator */}
+            <div className={`flex items-center gap-1.5 text-xs ${realtimeConnected ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+              <Radio className={`h-3.5 w-3.5 ${realtimeConnected ? 'animate-pulse' : ''}`} />
+              <span className="font-medium">
+                {realtimeConnected ? 'Live' : 'Connecting...'}
+              </span>
+              {lastStockUpdate && showDebug && (
+                <span className="text-muted-foreground ml-1">({lastStockUpdate})</span>
+              )}
+            </div>
+            
+            {/* Debug toggle */}
+            <Button
+              variant={showDebug ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+              className="h-8 text-xs"
+            >
+              <Bug className="mr-1.5 h-3 w-3" />
+              Debug
+            </Button>
           </div>
-          
-          {/* Realtime indicator */}
-          <div className={`flex items-center gap-1.5 text-xs ${realtimeConnected ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-            <Radio className={`h-3.5 w-3.5 ${realtimeConnected ? 'animate-pulse' : ''}`} />
-            <span className="font-medium">
-              {realtimeConnected ? 'Live' : 'Connecting...'}
-            </span>
-            {lastStockUpdate && showDebug && (
-              <span className="text-muted-foreground ml-1">({lastStockUpdate})</span>
-            )}
-          </div>
-          
-          {/* Debug toggle */}
-          <Button
-            variant={showDebug ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setShowDebug(!showDebug)}
-            className="h-8 text-xs"
-          >
-            <Bug className="mr-1.5 h-3 w-3" />
-            Debug
-          </Button>
-        </div>
+        )}
       </div>
 
       {/* Product grid */}
@@ -308,7 +312,7 @@ export function ProductGrid() {
           className="text-center py-12"
         >
           <AlertCircle className="mx-auto h-12 w-12 text-destructive/50 mb-4" />
-          <h3 className="text-lg font-medium mb-2">Unable to Load Products</h3>
+          <h3 className="text-lg font-medium mb-2">Unable to Load Strains</h3>
           <p className="text-muted-foreground mb-4">
             {error}
           </p>
@@ -323,9 +327,9 @@ export function ProductGrid() {
           className="text-center py-12"
         >
           <Leaf className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Products Available</h3>
+          <h3 className="text-lg font-medium mb-2">No Strains Available</h3>
           <p className="text-muted-foreground mb-4">
-            There are currently no products available in your region.
+            There are currently no strains available in your region.
           </p>
         </motion.div>
       ) : filteredProducts.length === 0 ? (
@@ -335,7 +339,7 @@ export function ProductGrid() {
           className="text-center py-12"
         >
           <Leaf className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Products Found</h3>
+          <h3 className="text-lg font-medium mb-2">No Strains Found</h3>
           <p className="text-muted-foreground mb-4">
             Try adjusting your search or filter criteria.
           </p>

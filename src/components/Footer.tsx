@@ -65,7 +65,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link to="/shop" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Dispensary
+                      Strains
                     </Link>
                   </li>
                   <li>

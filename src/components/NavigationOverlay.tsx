@@ -6,7 +6,7 @@
  */
 
 import { Link, useLocation } from "react-router-dom";
-import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, ShoppingBag, HeadphonesIcon, Home, Shield, Newspaper } from "lucide-react";
+import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, Leaf, HeadphonesIcon, Home, Shield, Newspaper } from "lucide-react";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -113,7 +113,7 @@ const NavigationOverlay = ({
     { to: "/research", label: "Research", icon: FileText, active: isActive("/research") },
     { to: "/the-wire", label: "The Wire", icon: Newspaper, active: isActive("/the-wire") || location.pathname.startsWith("/the-wire/") },
     { to: "/eligibility", label: "Eligibility", icon: ClipboardCheck, active: isActive("/eligibility") },
-    { to: "/shop", label: "Products", icon: ShoppingBag, active: isShopActive },
+    { to: "/shop", label: "Strains", icon: Leaf, active: isShopActive },
     { to: "/support", label: "Support", icon: HeadphonesIcon, active: isActive("/support") }
   ];
 

@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ArrowRight, User as UserIcon } from "lucide-react";
+import { LogOut, ArrowRight, User as UserIcon, Leaf, LayoutDashboard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { useShop } from "@/context/ShopContext";
 
 interface MobileBottomActionsProps {
   menuOpen?: boolean;
@@ -22,6 +23,7 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
   const { t } = useTranslation('common');
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const { isEligible, drGreenClient } = useShop();
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -74,64 +76,140 @@ const MobileBottomActions = ({ menuOpen = false }: MobileBottomActionsProps) => 
                 
                 <div className="px-5 py-4">
                   <div className="flex gap-3">
-                    {/* Primary CTA - Check Eligibility */}
-                    <button 
-                      type="button"
-                      onClick={() => setEligibilityDialogOpen(true)}
-                      className={cn(
-                        "flex-[1.2] group relative overflow-hidden",
-                        "font-jakarta font-semibold px-6 py-4 rounded-2xl",
-                        "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
-                        "transition-all duration-300 ease-out active:scale-[0.97]",
-                        isDark
-                          ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35),inset_0_1px_0_0_rgba(255,255,255,0.15)] active:shadow-[0_2px_16px_-2px_rgba(16,185,129,0.3)]"
-                          : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5),inset_0_1px_0_0_rgba(255,255,255,0.2)] active:shadow-[0_2px_12px_-2px_rgba(16,185,129,0.4)]"
-                      )}
-                    >
-                      {/* Shine effect */}
-                      <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-active:translate-x-full transition-transform duration-500" />
-                      <span className="relative tracking-wide text-[15px] drop-shadow-sm">
-                        {t('nav.checkEligibility')}
-                      </span>
-                      <ArrowRight className="relative w-4 h-4 transition-transform duration-300 group-active:translate-x-1" />
-                    </button>
-                    
-                    {/* Secondary Action - Refined Glass Style */}
-                    {user ? (
-                      <button 
-                        type="button"
-                        onClick={handleLogout}
-                        className={cn(
-                          "flex-1 group relative overflow-hidden",
-                          "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
-                          "transition-all duration-300 ease-out active:scale-[0.97]",
-                          "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
-                          isDark
-                            ? "bg-white/10 text-white/95 border border-white/25 hover:border-white/35 active:bg-white/15"
-                            : "bg-white/8 text-white/90 hover:text-white border border-white/15 hover:border-white/25 active:bg-white/12"
-                        )}
-                      >
-                        <LogOut className="w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
-                        <span className="tracking-wide text-[14px]">{t('nav.signOut')}</span>
-                      </button>
+                    {/* State-aware CTAs */}
+                    {user && isEligible ? (
+                      <>
+                        {/* Verified patient: Browse Strains + Dashboard */}
+                        <Link
+                          to="/shop"
+                          className={cn(
+                            "flex-[1.2] group relative overflow-hidden",
+                            "font-jakarta font-semibold px-6 py-4 rounded-2xl",
+                            "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
+                            "transition-all duration-300 ease-out active:scale-[0.97]",
+                            isDark
+                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35)]"
+                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)]"
+                          )}
+                        >
+                          <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-active:translate-x-full transition-transform duration-500" />
+                          <Leaf className="relative w-4 h-4" />
+                          <span className="relative tracking-wide text-[15px] drop-shadow-sm">
+                            Browse Strains
+                          </span>
+                        </Link>
+                        <Link
+                          to="/dashboard"
+                          className={cn(
+                            "flex-1 group relative overflow-hidden",
+                            "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
+                            "transition-all duration-300 ease-out active:scale-[0.97]",
+                            "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
+                            isDark
+                              ? "bg-white/10 text-white/95 border border-white/25 active:bg-white/15"
+                              : "bg-white/8 text-white/90 hover:text-white border border-white/15 active:bg-white/12"
+                          )}
+                        >
+                          <LayoutDashboard className="w-4 h-4 opacity-80" />
+                          <span className="tracking-wide text-[14px]">Dashboard</span>
+                        </Link>
+                      </>
+                    ) : user && drGreenClient ? (
+                      <>
+                        {/* Logged in, pending verification: Browse Strains + Sign Out */}
+                        <Link
+                          to="/shop"
+                          className={cn(
+                            "flex-[1.2] group relative overflow-hidden",
+                            "font-jakarta font-semibold px-6 py-4 rounded-2xl",
+                            "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
+                            "transition-all duration-300 ease-out active:scale-[0.97]",
+                            isDark
+                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35)]"
+                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)]"
+                          )}
+                        >
+                          <Leaf className="relative w-4 h-4" />
+                          <span className="relative tracking-wide text-[15px] drop-shadow-sm">
+                            Browse Strains
+                          </span>
+                        </Link>
+                        <button 
+                          type="button"
+                          onClick={handleLogout}
+                          className={cn(
+                            "flex-1 group relative overflow-hidden",
+                            "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
+                            "transition-all duration-300 ease-out active:scale-[0.97]",
+                            "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
+                            isDark
+                              ? "bg-white/10 text-white/95 border border-white/25 active:bg-white/15"
+                              : "bg-white/8 text-white/90 hover:text-white border border-white/15 active:bg-white/12"
+                          )}
+                        >
+                          <LogOut className="w-4 h-4 opacity-80" />
+                          <span className="tracking-wide text-[14px]">{t('nav.signOut')}</span>
+                        </button>
+                      </>
                     ) : (
-                      <Link 
-                        to="/auth"
-                        className={cn(
-                          "flex-1 group relative overflow-hidden",
-                          "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
-                          "transition-all duration-300 ease-out active:scale-[0.97]",
-                          "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
-                          isDark
-                            ? "bg-white/10 text-white/95 border border-white/25 hover:border-amber-400/40 active:bg-white/15"
-                            : "bg-white/8 text-white/90 hover:text-white border border-white/15 hover:border-amber-400/30 active:bg-white/12"
+                      <>
+                        {/* Visitor: Check Eligibility + Login */}
+                        <button 
+                          type="button"
+                          onClick={() => setEligibilityDialogOpen(true)}
+                          className={cn(
+                            "flex-[1.2] group relative overflow-hidden",
+                            "font-jakarta font-semibold px-6 py-4 rounded-2xl",
+                            "text-white min-h-[56px] flex items-center justify-center gap-2.5 touch-manipulation",
+                            "transition-all duration-300 ease-out active:scale-[0.97]",
+                            isDark
+                              ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.35),inset_0_1px_0_0_rgba(255,255,255,0.15)] active:shadow-[0_2px_16px_-2px_rgba(16,185,129,0.3)]"
+                              : "bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5),inset_0_1px_0_0_rgba(255,255,255,0.2)] active:shadow-[0_2px_12px_-2px_rgba(16,185,129,0.4)]"
+                          )}
+                        >
+                          <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-active:translate-x-full transition-transform duration-500" />
+                          <span className="relative tracking-wide text-[15px] drop-shadow-sm">
+                            {t('nav.checkEligibility')}
+                          </span>
+                          <ArrowRight className="relative w-4 h-4 transition-transform duration-300 group-active:translate-x-1" />
+                        </button>
+                        
+                        {user ? (
+                          <button 
+                            type="button"
+                            onClick={handleLogout}
+                            className={cn(
+                              "flex-1 group relative overflow-hidden",
+                              "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
+                              "transition-all duration-300 ease-out active:scale-[0.97]",
+                              "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
+                              isDark
+                                ? "bg-white/10 text-white/95 border border-white/25 hover:border-white/35 active:bg-white/15"
+                                : "bg-white/8 text-white/90 hover:text-white border border-white/15 hover:border-white/25 active:bg-white/12"
+                            )}
+                          >
+                            <LogOut className="w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
+                            <span className="tracking-wide text-[14px]">{t('nav.signOut')}</span>
+                          </button>
+                        ) : (
+                          <Link 
+                            to="/auth"
+                            className={cn(
+                              "flex-1 group relative overflow-hidden",
+                              "font-jakarta font-medium px-5 py-4 rounded-2xl backdrop-blur-sm",
+                              "transition-all duration-300 ease-out active:scale-[0.97]",
+                              "min-h-[56px] flex items-center justify-center gap-2 touch-manipulation",
+                              isDark
+                                ? "bg-white/10 text-white/95 border border-white/25 hover:border-amber-400/40 active:bg-white/15"
+                                : "bg-white/8 text-white/90 hover:text-white border border-white/15 hover:border-amber-400/30 active:bg-white/12"
+                            )}
+                          >
+                            <span className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-400/10 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            <UserIcon className="relative w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
+                            <span className="relative tracking-wide text-[14px]">{t('nav.patientLogin')}</span>
+                          </Link>
                         )}
-                      >
-                        {/* Subtle gold accent on hover */}
-                        <span className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-400/10 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <UserIcon className="relative w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
-                        <span className="relative tracking-wide text-[14px]">{t('nav.patientLogin')}</span>
-                      </Link>
+                      </>
                     )}
                   </div>
                 </div>
