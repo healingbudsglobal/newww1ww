@@ -298,8 +298,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        if (!apiError && apiResponse?.success && apiResponse?.data) {
-          const liveData = apiResponse.data;
+        // Accept response with or without "success" wrapper
+        const liveData = apiResponse?.data || apiResponse;
+        if (!apiError && liveData && (liveData.isKYCVerified !== undefined || liveData.adminApproval !== undefined)) {
           const liveKyc = liveData.isKYCVerified ?? liveData.is_kyc_verified ?? false;
           const liveApproval = liveData.adminApproval ?? liveData.admin_approval ?? 'PENDING';
           const liveKycLink = liveData.kycLink ?? liveData.kyc_link ?? null;

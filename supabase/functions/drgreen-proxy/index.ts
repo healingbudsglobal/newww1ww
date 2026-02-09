@@ -203,44 +203,7 @@ function validateStringLength(value: unknown, maxLength: number): boolean {
  * When DRGREEN_API_KEY is stored as Base64-encoded PEM (e.g., "LS0tLS1CRUdJTi..."), 
  * this extracts just the inner key content (e.g., "MFYwEAYH...") for the API header
  */
-function extractPemBody(base64EncodedPem: string): string {
-  try {
-    // Attempt to decode as Base64
-    const decoded = base64ToBytes(base64EncodedPem);
-    const pemText = new TextDecoder().decode(decoded);
-    
-    // Check if it's PEM format
-    if (pemText.includes('-----BEGIN')) {
-      // Extract just the Base64 content between headers
-      const pemBody = pemText
-        .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
-        .replace(/-----END [A-Z0-9 ]+-----/g, '')
-        .replace(/[\r\n\s]/g, '')
-        .trim();
-      
-      logInfo('extractPemBody: Extracted inner key from PEM', { 
-        originalLength: base64EncodedPem.length,
-        extractedLength: pemBody.length,
-        extractedPrefix: pemBody.slice(0, 12) + '...',
-      });
-      
-      return pemBody;
-    }
-    
-    // Not PEM format, return as-is
-    logInfo('extractPemBody: Not PEM format, using as-is', { 
-      length: base64EncodedPem.length 
-    });
-    return base64EncodedPem;
-  } catch (e) {
-    // If decoding fails, return as-is (assume it's already the correct format)
-    logWarn('extractPemBody: Decode failed, using as-is', { 
-      error: String(e),
-      length: base64EncodedPem.length 
-    });
-    return base64EncodedPem;
-  }
-}
+// extractPemBody REMOVED — dead code, known source of key corruption bugs
 
 /**
  * Convert country name to ISO 3166-1 alpha-3 code
@@ -904,12 +867,7 @@ async function signWithHmac(data: string, secretKey: string): Promise<string> {
 /**
  * Legacy fallback HMAC-SHA256 signature (kept for backwards compatibility)
  */
-async function generateHmacSignatureFallback(
-  data: string,
-  secretKey: string
-): Promise<string> {
-  return signWithHmac(data, secretKey);
-}
+// generateHmacSignatureFallback REMOVED — was just a wrapper around signWithHmac
 
 /**
  * Sign payload using secp256k1 ECDSA (primary method)
@@ -937,9 +895,7 @@ async function signQueryString(queryString: string, secretKey: string): Promise<
 /**
  * Generate signature with specific mode (for diagnostics)
  */
-async function signPayloadWithMode(payload: string, secretKey: string, _useDecoded: boolean): Promise<string> {
-  return generateSecp256k1Signature(payload, secretKey);
-}
+// signPayloadWithMode REMOVED — unused wrapper
 
 /**
  * Retry wrapper for API requests with exponential backoff
@@ -1235,20 +1191,8 @@ async function drGreenRequestGet(
   );
 }
 
-/**
- * Make authenticated request to Dr Green API with query string signing (Method B)
- * DEPRECATED: Use drGreenRequestGet instead - it correctly signs an empty object
- * Kept for backwards compatibility during migration
- */
-async function drGreenRequestQuery(
-  endpoint: string,
-  queryParams: Record<string, string | number>,
-  enableDetailedLogging = false,
-  envConfig?: EnvConfig
-): Promise<Response> {
-  // Redirect to new implementation that signs empty object correctly
-  return drGreenRequestGet(endpoint, queryParams, enableDetailedLogging, envConfig);
-}
+// drGreenRequestQuery is now just an alias for drGreenRequestGet
+const drGreenRequestQuery = drGreenRequestGet;
 
 /**
  * Legacy request handler for backwards compatibility
@@ -2152,25 +2096,9 @@ serve(async (req) => {
         break;
       }
       
-      // Empty cart (Method A - Body Sign) - uses /dapp/carts endpoint
-      case "empty-cart": {
-        const { cartId } = body || {};
-        if (!cartId) throw new Error("cartId is required");
-        
-        logInfo("API request: DELETE /dapp/carts/:cartId");
-        response = await drGreenRequestBody(`/dapp/carts/${cartId}`, "DELETE", { cartId }, false, adminEnvConfig);
-        break;
-      }
-      
-      // Place order (Method A - Body Sign) - uses /dapp/orders endpoint
-      case "place-order": {
-        const orderData = body?.data;
-        if (!orderData) throw new Error("Order data is required");
-        
-        logInfo("API request: POST /dapp/orders");
-        response = await drGreenRequestBody("/dapp/orders", "POST", orderData, false, adminEnvConfig);
-        break;
-      }
+      // NOTE: "empty-cart" and "place-order" are defined later in the switch
+      // with more complete implementations (around lines 2707-2733).
+      // Duplicate first-definitions removed to let the correct ones execute.
       
       // ==========================================
       // DAPP ADMIN ENDPOINTS
@@ -2572,19 +2500,21 @@ serve(async (req) => {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // GET request - use query string signing with write credentials (NFT-scoped)
-        const clientResponse = await drGreenRequestQuery(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
+        // GET request - use query string signing with credentials (NFT-scoped)
+        const clientResponse = await drGreenRequestGet(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
         if (clientResponse && clientResponse.ok) {
           const clientData = await clientResponse.json();
           // Normalize shippings array to shipping object - check both wrapper and inner data levels
-          const innerClientData = clientData?.data;
-          if (innerClientData && Array.isArray(innerClientData.shippings) && innerClientData.shippings.length > 0) {
+          const innerClientData = clientData?.data || clientData;
+          if (Array.isArray(innerClientData.shippings) && innerClientData.shippings.length > 0) {
             innerClientData.shipping = normalizeShippingObject(innerClientData.shippings[0]);
-          } else if (Array.isArray(clientData.shippings) && clientData.shippings.length > 0) {
-            clientData.shipping = normalizeShippingObject(clientData.shippings[0]);
           }
-          return new Response(JSON.stringify(clientData), {
-            status: clientResponse.status,
+          // Wrap in { success: true, data: ... } envelope so ShopContext can parse it
+          return new Response(JSON.stringify({
+            success: true,
+            data: innerClientData,
+          }), {
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -3400,78 +3330,8 @@ serve(async (req) => {
         }
       }
       
-      // Debug action: List ALL clients (public for debugging - no auth required)
-      case "debug-list-all-clients": {
-        logInfo("Debug: Listing all Dr. Green clients");
-        
-        try {
-          const allClients: any[] = [];
-          const MAX_PAGES = 5;
-          const PAGE_SIZE = 100;
-          
-          for (let page = 1; page <= MAX_PAGES; page++) {
-            const queryParams: Record<string, string | number> = {
-              take: PAGE_SIZE,
-              page,
-              orderBy: 'desc',
-            };
-            
-            const response = await drGreenRequestQuery("/dapp/clients", queryParams, false, adminEnvConfig);
-            
-            if (!response.ok) {
-              logWarn(`Failed to fetch page ${page}`, { status: response.status });
-              break;
-            }
-            
-            const data = await response.json();
-            let clients: any[] = [];
-            
-            if (Array.isArray(data.data)) {
-              clients = data.data;
-            } else if (data.data?.items) {
-              clients = data.data.items;
-            } else if (Array.isArray(data)) {
-              clients = data;
-            }
-            
-            if (clients.length === 0) break;
-            
-            allClients.push(...clients);
-            
-            if (clients.length < PAGE_SIZE) break;
-          }
-          
-          // Return summary for debugging
-          const results = allClients.map((c: any) => ({
-            id: c.id || c.clientId,
-            firstName: c.firstName || c.first_name || '(no first name)',
-            lastName: c.lastName || c.last_name || '(no last name)',
-            email: c.email || '(no email)',
-            isKYCVerified: c.isKYCVerified ?? c.is_kyc_verified,
-            adminApproval: c.adminApproval || c.admin_approval,
-          }));
-          
-          logInfo(`Debug: Found ${results.length} total clients`, {
-            firstNames: results.map((r: any) => r.firstName).slice(0, 10),
-            emails: results.map((r: any) => (r.email || '').slice(0, 5) + '***').slice(0, 10),
-          });
-          
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              clients: results, 
-              totalCount: results.length,
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        } catch (e) {
-          logError("Debug list clients error", { error: String(e) });
-          return new Response(
-            JSON.stringify({ success: false, error: String(e) }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      }
+      // debug-list-all-clients REMOVED — security risk (unauthenticated PII exposure)
+      // Use admin-list-all-clients instead (requires admin role)
       
       case "delete-client": {
         // DELETE /dapp/clients/:clientId - Delete a client
@@ -4192,15 +4052,14 @@ serve(async (req) => {
           results.methodA_hmac_querystring = { error: String(e) };
         }
         
-        // Method B: secp256k1 ECDSA + extractPemBody + sign "{}" (old proxy approach)
+        // Method B: secp256k1 ECDSA + raw apiKey + sign "{}" (current proxy approach)
         try {
           const ecdsaSig = await generatePrivateKeySignature("{}", envPrivateKey);
-          const extractedKey = extractPemBody(envApiKey);
           const ecdsaResp = await fetch(testUrl, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              "x-auth-apikey": extractedKey,
+              "x-auth-apikey": envApiKey,
               "x-auth-signature": ecdsaSig,
             },
           });
@@ -4210,7 +4069,7 @@ serve(async (req) => {
             ok: ecdsaResp.ok,
             bodyPreview: ecdsaBody.slice(0, 200),
             signingData: '{}',
-            apiKeyUsed: 'extractPemBody',
+            apiKeyUsed: 'raw',
           };
         } catch (e) {
           results.methodB_ecdsa_empty = { error: String(e) };
