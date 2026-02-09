@@ -1,38 +1,36 @@
 
 
-# Set Up Admin Account and Run API Test Runner
+# Fix Currency Display on Orders Page
 
 ## Problem
-This is a freshly remixed project with no users in the database. The admin tools page (including the API Test Runner) requires an authenticated user with the `admin` role, so we need to create the account and assign the role first.
 
-## Steps
+Line 125 of `src/components/shop/OrdersTable.tsx` hardcodes the Euro symbol:
+```
+€{order.total_amount.toFixed(2)}
+```
 
-### Step 1: Create the admin user account
-- Sign up `scott@healing.buds` with password `H34l1ngBuds2026!` using the authentication system
-- Auto-confirm the email so login works immediately
+Orders already store `currency` (e.g. "ZAR", "EUR", "GBP") and `country_code` (e.g. "ZA", "PT", "GB") from checkout. These fields are just not being used for display.
 
-### Step 2: Assign the admin role
-- Insert a record into the `user_roles` table granting the `admin` role to the new user
-- Also create the corresponding `profiles` entry if the trigger doesn't fire automatically
+## Fix
 
-### Step 3: Log in and navigate to Admin Tools
-- Log in with the admin credentials
-- Navigate to `/admin/tools`
-- Locate the API Test Runner component
+### `src/components/shop/OrdersTable.tsx`
 
-### Step 4: Run the API Test Runner
-- Execute the test suite which validates all Dr. Green API endpoints:
-  - GET /strains (product listing)
-  - GET /dapp/clients (client listing)
-  - GET /dapp/nfts (NFT listing)
-  - GET /dapp/orders (order listing)
-  - Health check connectivity
-- Report pass/fail results for each endpoint
+1. Import `formatPrice` from `src/lib/currency.ts`
+2. Add `currency` and `country_code` to the `Order` interface
+3. Replace the hardcoded `€{order.total_amount.toFixed(2)}` with:
+   ```
+   formatPrice(order.total_amount, order.country_code || 'ZA')
+   ```
+   This uses the existing currency utility which handles locale-aware formatting with the correct symbol (R for ZAR, GBP for pounds, EUR for euros, etc.)
 
-## Technical Details
+4. Also format the `unit_price` if shown anywhere in expanded order details
 
-- The admin role check uses the `has_role()` database function and the `user_roles` table with the `app_role` enum
-- The API Test Runner component (`ApiTestRunner.tsx`) calls the `drgreen-proxy` edge function with various actions
-- All API calls go through the proxy layer — no direct external API calls from the browser
-- The environment selector allows testing against production, staging, alt-production, railway, or production-write environments
+### Fallback behavior
+
+- If `country_code` is missing/null on older orders, defaults to `'ZA'` (South African Rand) since Dr. Green API uses ZAR as base currency
+- The `formatPrice` function already handles invalid/missing country codes gracefully
+
+## Scope
+
+One file changed: `src/components/shop/OrdersTable.tsx` -- approximately 3 lines modified.
 
