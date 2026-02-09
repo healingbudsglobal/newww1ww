@@ -247,12 +247,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [toast]);
 
   const fetchClient = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    // Use getSession first - it's synchronous from cache and avoids race conditions
+    // getUser() can fail during initial auth state recovery
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
       setDrGreenClient(null);
       setIsLoading(false);
       return;
     }
+    const user = session.user;
 
     // Step 1: Check if we have a local mapping (user_id → drgreen_client_id)
     const { data: localRecord, error } = await supabase
