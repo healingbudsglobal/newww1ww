@@ -1,62 +1,105 @@
 
-# Fix: Client Fetching — secp256k1 Private Key PEM Detection Bug
+# Fix: Live Data Sync, Admin Bypass, and GET Endpoint Signing
 
-## Problem
-The Admin Client Management page (`/admin/clients`) fails to load clients because the `generateSecp256k1Signature` function in the `drgreen-proxy` edge function cannot parse the private key. The logs show:
+## Issues Found
 
-```
-secp256k1: Using raw DER { derLength: 213 }
-secp256k1: Failed to extract private key: Error: Expected SEQUENCE
-```
+### 1. GET Endpoints Using Wrong Signing Method (Causes 401 errors)
+Several GET `/dapp/*` endpoints in `drgreen-proxy` use `drGreenRequestBody()` (body signing) instead of `drGreenRequestQuery()` (query-string signing). The Dr. Green API requires query-string signing for all GET requests. This silently fails with 401, causing empty data on the admin dashboard.
 
-The 213 bytes are actually PEM text (decoded from Base64), but the PEM detection check (`decodedAsText.includes('-----BEGIN')`) is failing, causing the code to treat PEM text as raw DER — which then fails to parse.
+**Affected endpoints:**
+- `get-clients-summary` (line 3821) -- used by Admin Client Manager summary badges
+- `get-sales-summary` (line 3850) -- used by Sales Dashboard
+- `get-user-nfts` (line 4013) -- used by NFT ownership checks
+- `get-user-me` (line 3093) -- used by user profile lookup
 
-## Root Cause
-In `generateSecp256k1Signature` (line ~576 of `drgreen-proxy/index.ts`), after Base64-decoding the stored secret, the function checks if the result contains `-----BEGIN`. This check is failing (possibly due to encoding edge cases or invisible characters in the decoded text), so it falls through to the raw DER path which cannot parse PEM text.
+### 2. Admin Not Bypassing All Verification Gates
+Admin users should never be subject to KYC or medical approval checks. Currently:
+- `ComplianceGuard` -- correctly bypasses admin (line 72)
+- `EligibilityGate` -- correctly bypasses admin (line 26)
+- `RestrictedRegionGate` -- **MISSING admin bypass** -- admins in UK/PT regions get blocked from viewing products
+- `Cart` component -- does not check admin role, blocks checkout if no `drGreenClient`
+- `DashboardStatus` -- redirects verified users to `/shop` but does not redirect admins
 
-## Fix (1 file changed)
+### 3. Live Sync Not Polling
+The current sync model fetches live data from Dr. Green API once on page load and on auth state change. There is no periodic refresh, so data can become stale during a session.
 
-### `supabase/functions/drgreen-proxy/index.ts`
+---
 
-Make the PEM detection more robust by:
+## Changes
 
-1. Adding a byte-level check for the PEM header (`2d2d2d2d2d` = `-----`) as a fallback to the string-based `includes` check
-2. Adding explicit logging when PEM is detected vs not detected, including the first 30 characters of the decoded text for debugging
-3. If both PEM detection methods fail AND the decoded length matches typical PEM text size (150-500 bytes), attempt PEM extraction anyway as a last resort
+### File 1: `supabase/functions/drgreen-proxy/index.ts`
+Switch all GET endpoints from `drGreenRequestBody` to `drGreenRequestQuery`:
 
-Specifically, in the `generateSecp256k1Signature` function around line 576:
+1. **Line 3821** (`get-clients-summary`): Change `drGreenRequestBody("/dapp/clients/summary", "GET", {}, false, adminEnvConfig)` to `drGreenRequestQuery("/dapp/clients/summary", {}, false, adminEnvConfig)`
+
+2. **Line 3850** (`get-sales-summary`): Change `drGreenRequestBody("/dapp/sales/summary", "GET", {}, false, adminEnvConfig)` to `drGreenRequestQuery("/dapp/sales/summary", {}, false, adminEnvConfig)`
+
+3. **Line 4013** (`get-user-nfts`): Change `drGreenRequestBody("/dapp/users/nfts", "GET", {})` to `drGreenRequestQuery("/dapp/users/nfts", {}, false, adminEnvConfig)`
+
+4. **Line 3093** (`get-user-me`): Change `drGreenRequestBody("/user/me", "GET", {})` to `drGreenRequestQuery("/user/me", {})`
+
+### File 2: `src/components/shop/RestrictedRegionGate.tsx`
+Add admin bypass so admin users can always browse products regardless of region:
 
 ```typescript
-// Current code (failing):
-if (decodedAsText.includes('-----BEGIN')) {
-  // PEM branch...
-} else {
-  keyDerBytes = decodedSecretBytes;  // treats PEM text as DER
-}
+import { useUserRole } from '@/hooks/useUserRole';
 
-// Fixed code:
-const isPem = decodedAsText.includes('-----BEGIN') || 
-              decodedAsText.includes('BEGIN') ||
-              // Byte-level fallback: check for "-----" (0x2D repeated)
-              (decodedSecretBytes[0] === 0x2D && decodedSecretBytes[1] === 0x2D);
+// Inside component, add:
+const { isAdmin, isLoading: roleLoading } = useUserRole();
 
-if (isPem) {
-  // Extract PEM body and decode to DER...
-} else {
-  keyDerBytes = decodedSecretBytes;
+// Update loading check to include roleLoading
+if (checkingAuth || isLoading || roleLoading) { ... }
+
+// After the "not restricted" check, add admin bypass:
+if (isAdmin) {
+  return <>{children}</>;
 }
 ```
 
-Also add a final fallback in `extractSecp256k1PrivateKey`: if DER parsing fails and the input looks like ASCII text (all bytes < 128), log a clear error indicating PEM was not detected.
+### File 3: `src/components/shop/Cart.tsx`
+Add admin bypass to checkout eligibility check so admin can test checkout flow without needing a Dr. Green client record:
+
+- Import `useUserRole`
+- If admin, set `canCheckout: true` regardless of client status
+- Admin orders would still need a valid client ID for the API, so show a note
+
+### File 4: `src/pages/DashboardStatus.tsx`
+Add admin redirect -- admins should never land on the verification status page:
+
+```typescript
+const { isAdmin } = useUserRole();
+
+useEffect(() => {
+  if (!isLoading && isAdmin) {
+    navigate('/admin', { replace: true });
+  }
+}, [isAdmin, isLoading, navigate]);
+```
+
+### File 5: `src/context/ShopContext.tsx`
+Add periodic live sync for client verification status (polling every 60 seconds while the user is on the site). This ensures that when a patient gets approved in the Dr. Green DApp, the Healing Buds UI reflects it without requiring a page refresh:
+
+```typescript
+// Add polling interval for live sync
+useEffect(() => {
+  if (!drGreenClient?.drgreen_client_id) return;
+  if (drGreenClient.drgreen_client_id.startsWith('local-')) return;
+  // Only poll if not yet verified (no need to keep checking once verified)
+  if (drGreenClient.is_kyc_verified && drGreenClient.admin_approval === 'VERIFIED') return;
+
+  const interval = setInterval(() => {
+    fetchClient();
+  }, 60000); // Every 60 seconds
+
+  return () => clearInterval(interval);
+}, [drGreenClient?.drgreen_client_id, drGreenClient?.is_kyc_verified, drGreenClient?.admin_approval, fetchClient]);
+```
+
+---
 
 ## Expected Outcome
-- Admin Client Management page will successfully fetch and display clients from the Dr. Green API
-- All `/dapp/*` endpoints (clients, orders, carts, NFTs) will work correctly
-- Strains endpoint (which may work via a different timing/caching scenario) continues to work
-
-## Testing
-After deployment, verify:
-1. Navigate to `/admin/clients` — clients should load
-2. Click "Refresh" — should show updated data
-3. Test client search by email
-4. Verify summary counts (Pending/Verified/Rejected) appear
+- Admin Client Manager loads live client data and summary counts from Dr. Green API
+- Sales Dashboard loads live sales data
+- Admin users bypass all verification gates (KYC, medical approval, regional restrictions)
+- Patient verification status auto-refreshes every 60 seconds until verified
+- Once verified, polling stops to reduce API load
