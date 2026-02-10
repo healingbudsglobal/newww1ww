@@ -1,64 +1,46 @@
 
 
-## Admin Dashboard Role-Based Access Control Review
+## Fix Dr. Green API Private Key and Confirm Regional Gating
 
-### Current State
-The admin routes work correctly but have an inconsistency worth addressing:
-- AdminLayout checks the admin role and blocks rendering for non-admins (shows "Access Denied")
-- However, admin routes in App.tsx do NOT use the `ProtectedRoute` component
-- Database-level RLS policies correctly enforce admin access on all sensitive tables using `has_role()`
+### 1. Update DRGREEN_PRIVATE_KEY Secret
 
-### What Works Well
-- All admin-only database tables are protected by RLS policies using `has_role(auth.uid(), 'admin')`
-- The `has_role()` function uses `SECURITY DEFINER` to prevent recursive RLS issues
-- AdminLayout correctly blocks UI rendering for non-admin users
-- Non-admin users see a clean "Access Denied" screen with navigation options
+The root cause of the 500 error is that the `DRGREEN_PRIVATE_KEY` secret currently contains an **EC Public Key** (SubjectPublicKeyInfo format) instead of a private key. This means the proxy cannot sign API requests.
 
-### Recommended Fix: Wrap Admin Routes with ProtectedRoute
+**Action required from you:** You need to provide the correct secp256k1 private key from the Dr. Green DApp dashboard. I will prompt you to enter it securely.
 
-Add the `ProtectedRoute` component around all admin routes in `App.tsx` for defense-in-depth. This provides:
-- Redirect to `/auth` for unauthenticated users (instead of showing "Access Denied")
-- Prevents admin page components from mounting at all for unauthorized users
-- Consistent security pattern across the application
+The expected format is a Base64-encoded private key (either raw 32-byte key, SEC1/DER, or PKCS#8 PEM format). The proxy already supports all three formats.
 
-### Changes
+---
 
-**File: `src/App.tsx`**
-Wrap each admin route with `ProtectedRoute`:
+### 2. Regional Gating - Already Correct (Confirmation)
+
+The current architecture already matches the requested behavior:
 
 ```text
-Before:
-<Route path="/admin" element={<AdminDashboard />} />
-
-After:
-<Route path="/admin" element={
-  <ProtectedRoute requiredRole="admin">
-    <AdminDashboard />
-  </ProtectedRoute>
-} />
+Region        | Browse Products | Add to Cart | Checkout/Orders
+--------------+-----------------+-------------+-----------------
+ZA (.co.za)   | Yes (open)      | Yes*        | Requires verification
+TH (.co.th)   | Yes (open)      | Yes*        | Requires verification
+GB (.co.uk)   | Requires login  | Yes*        | Requires verification
+PT (.pt)      | Requires login  | Yes*        | Requires verification
 ```
 
-Apply this pattern to all 11 admin routes:
-- `/admin`
-- `/admin/clients`
-- `/admin/orders`
-- `/admin/prescriptions`
-- `/admin/strains`
-- `/admin/strain-sync`
-- `/admin/strain-knowledge`
-- `/admin/roles`
-- `/admin/wallet-mappings`
-- `/admin/tools`
-- `/admin/settings`
+*Cart requires login; Checkout requires full KYC + admin approval.
 
-### Technical Details
-- `ProtectedRoute` uses `supabase.rpc('has_role', ...)` for server-side role verification
-- This is a double-layer check: ProtectedRoute (route level) + AdminLayout (component level)
-- No database changes needed — RLS policies are already correctly configured
-- No new dependencies required
+- `/shop` page: No `ComplianceGuard` -- uses `RestrictedRegionGate` internally, which only blocks GB/PT
+- `/checkout` and `/orders`: Wrapped in `ComplianceGuard` -- requires authentication + verification for all regions
+- South Africa (ZA) and Thailand (TH): Products display freely without login
 
-### Risk Assessment
-- **Low risk**: This is additive security, not a behavior change
-- The AdminLayout check remains as a fallback
-- Both checks use the same `has_role` database function
+No code changes needed for gating -- it is working as designed.
+
+---
+
+### Technical Summary
+
+| Item | Status |
+|------|--------|
+| Regional gate (ZA browsing) | Already correct - no changes needed |
+| Checkout/orders gating | Already correct - ComplianceGuard enforces verification |
+| DRGREEN_PRIVATE_KEY | Needs replacement - currently contains a public key |
+| Proxy signing code | Already supports multiple key formats - no changes needed |
 
