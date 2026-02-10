@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useShop } from '@/context/ShopContext';
+import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 
 interface OrderItem {
   strain_id: string;
@@ -30,7 +31,6 @@ interface LocalOrder {
   items: OrderItem[];
   created_at: string;
   updated_at: string;
-  // Order context captured at checkout
   client_id?: string | null;
   shipping_address?: ShippingAddressSnapshot | null;
   customer_email?: string | null;
@@ -45,7 +45,6 @@ export interface SaveOrderParams {
   payment_status: string;
   total_amount: number;
   items: OrderItem[];
-  // Order context
   client_id?: string;
   shipping_address?: ShippingAddressSnapshot;
   customer_email?: string;
@@ -54,18 +53,25 @@ export interface SaveOrderParams {
   currency?: string;
 }
 
+const SYNC_INTERVAL_MS = 60_000;
+
 export function useOrderTracking() {
   const [orders, setOrders] = useState<LocalOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const { toast } = useToast();
-  const { addToCart } = useShop();
+  const { addToCart, drGreenClient } = useShop();
+  const { getOrders: getLiveOrders } = useDrGreenApi();
+  const syncInProgress = useRef(false);
 
-  const fetchOrders = useCallback(async () => {
+  // Fetch local orders from Supabase
+  const fetchLocalOrders = useCallback(async (): Promise<LocalOrder[]> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setOrders([]);
       setIsLoading(false);
-      return;
+      return [];
     }
 
     const { data, error } = await supabase
@@ -76,17 +82,143 @@ export function useOrderTracking() {
 
     if (error) {
       console.error('Error fetching orders:', error);
-    } else {
-      setOrders((data || []).map(order => ({
-        ...order,
-        items: (order.items as unknown as OrderItem[]) || [],
-        shipping_address: order.shipping_address as unknown as ShippingAddressSnapshot | null,
-      })));
+      setIsLoading(false);
+      return [];
     }
+
+    const mapped = (data || []).map(order => ({
+      ...order,
+      items: (order.items as unknown as OrderItem[]) || [],
+      shipping_address: order.shipping_address as unknown as ShippingAddressSnapshot | null,
+    }));
+    setOrders(mapped);
     setIsLoading(false);
+    return mapped;
   }, []);
 
-  // Set up realtime subscription for order updates
+  // Sync live order statuses from Dr. Green DApp API
+  const syncFromDrGreen = useCallback(async () => {
+    const clientId = drGreenClient?.drgreen_client_id;
+    if (!clientId || clientId.startsWith('local-')) return;
+    if (syncInProgress.current) return;
+
+    syncInProgress.current = true;
+    setIsSyncing(true);
+
+    try {
+      const { data: liveOrders, error: apiError } = await getLiveOrders(clientId);
+
+      if (apiError || !liveOrders) {
+        console.warn('[OrderSync] Failed to fetch live orders:', apiError);
+        return;
+      }
+
+      // Unwrap: API may return { success, data: [...] } or raw array
+      const ordersList = Array.isArray(liveOrders)
+        ? liveOrders
+        : (liveOrders as any)?.data && Array.isArray((liveOrders as any).data)
+          ? (liveOrders as any).data
+          : [];
+
+      if (ordersList.length === 0) {
+        setLastSyncedAt(new Date());
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get current local orders for comparison
+      const { data: currentLocal } = await supabase
+        .from('drgreen_orders')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const localMap = new Map(
+        (currentLocal || []).map(o => [o.drgreen_order_id, o])
+      );
+
+      let changesDetected = 0;
+
+      for (const live of ordersList) {
+        const liveId = live.orderId || live.id;
+        if (!liveId) continue;
+
+        const local = localMap.get(liveId);
+        const liveStatus = live.status || 'PENDING';
+        const livePayment = live.paymentStatus || live.payment_status || 'PENDING';
+
+        if (local) {
+          // Compare and update if changed
+          if (local.status !== liveStatus || local.payment_status !== livePayment) {
+            const { error: updateErr } = await supabase
+              .from('drgreen_orders')
+              .update({
+                status: liveStatus,
+                payment_status: livePayment,
+                synced_at: new Date().toISOString(),
+                sync_status: 'synced',
+              })
+              .eq('id', local.id);
+
+            if (!updateErr) {
+              changesDetected++;
+              toast({
+                title: 'Order Status Updated',
+                description: `Order #${liveId.slice(0, 8)}… is now ${liveStatus}`,
+              });
+            }
+          }
+        } else {
+          // New order from DApp not in local DB — insert it
+          const { error: insertErr } = await supabase
+            .from('drgreen_orders')
+            .insert({
+              user_id: user.id,
+              drgreen_order_id: liveId,
+              status: liveStatus,
+              payment_status: livePayment,
+              total_amount: live.totalAmount || live.total_amount || 0,
+              items: JSON.parse(JSON.stringify(live.items || [])),
+              client_id: clientId,
+              synced_at: new Date().toISOString(),
+              sync_status: 'synced',
+            });
+
+          if (!insertErr) {
+            changesDetected++;
+          }
+        }
+      }
+
+      // Refresh local orders if anything changed
+      if (changesDetected > 0) {
+        await fetchLocalOrders();
+      }
+
+      setLastSyncedAt(new Date());
+    } catch (err) {
+      console.error('[OrderSync] Sync error:', err);
+    } finally {
+      setIsSyncing(false);
+      syncInProgress.current = false;
+    }
+  }, [drGreenClient?.drgreen_client_id, getLiveOrders, fetchLocalOrders, toast]);
+
+  // Combined fetch: local first, then live sync
+  const fetchOrders = useCallback(async () => {
+    await fetchLocalOrders();
+    // Fire live sync in background (non-blocking for initial UI)
+    syncFromDrGreen();
+  }, [fetchLocalOrders, syncFromDrGreen]);
+
+  // Manual refresh (returns promise so UI can await it)
+  const refreshOrders = useCallback(async () => {
+    await fetchLocalOrders();
+    await syncFromDrGreen();
+  }, [fetchLocalOrders, syncFromDrGreen]);
+
+  // Set up realtime subscription for local DB changes + initial fetch
   useEffect(() => {
     fetchOrders();
 
@@ -94,34 +226,28 @@ export function useOrderTracking() {
       .channel('order-status-updates')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'drgreen_orders'
-        },
+        { event: 'UPDATE', schema: 'public', table: 'drgreen_orders' },
         (payload) => {
           const updatedOrder = payload.new as LocalOrder;
           const oldOrder = payload.old as LocalOrder;
-          
-          // Show notification if status changed
+
           if (oldOrder.status !== updatedOrder.status) {
             toast({
               title: 'Order Status Updated',
-              description: `Order #${updatedOrder.drgreen_order_id.slice(0, 8)}... is now ${updatedOrder.status}`,
-            });
-          }
-          
-          if (oldOrder.payment_status !== updatedOrder.payment_status) {
-            toast({
-              title: 'Payment Status Updated',
-              description: `Payment for order #${updatedOrder.drgreen_order_id.slice(0, 8)}... is ${updatedOrder.payment_status}`,
+              description: `Order #${updatedOrder.drgreen_order_id.slice(0, 8)}… is now ${updatedOrder.status}`,
             });
           }
 
-          // Update local state
-          setOrders(prev => 
-            prev.map(order => 
-              order.id === updatedOrder.id 
+          if (oldOrder.payment_status !== updatedOrder.payment_status) {
+            toast({
+              title: 'Payment Status Updated',
+              description: `Payment for order #${updatedOrder.drgreen_order_id.slice(0, 8)}… is ${updatedOrder.payment_status}`,
+            });
+          }
+
+          setOrders(prev =>
+            prev.map(order =>
+              order.id === updatedOrder.id
                 ? { ...updatedOrder, items: (updatedOrder.items as unknown as OrderItem[]) || [] }
                 : order
             )
@@ -130,11 +256,7 @@ export function useOrderTracking() {
       )
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'drgreen_orders'
-        },
+        { event: 'INSERT', schema: 'public', table: 'drgreen_orders' },
         (payload) => {
           const newOrder = payload.new as LocalOrder;
           setOrders(prev => [{ ...newOrder, items: (newOrder.items as unknown as OrderItem[]) || [] }, ...prev]);
@@ -147,7 +269,20 @@ export function useOrderTracking() {
     };
   }, [fetchOrders, toast]);
 
-  // Reorder - add all items from a previous order to cart
+  // 60-second background polling for live sync
+  useEffect(() => {
+    const clientId = drGreenClient?.drgreen_client_id;
+    if (!clientId || clientId.startsWith('local-')) return;
+
+    const interval = setInterval(() => {
+      console.log('[OrderSync] Background polling...');
+      syncFromDrGreen();
+    }, SYNC_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [drGreenClient?.drgreen_client_id, syncFromDrGreen]);
+
+  // Reorder
   const reorder = async (order: LocalOrder) => {
     if (!order.items || order.items.length === 0) {
       toast({
@@ -182,8 +317,7 @@ export function useOrderTracking() {
     }
   };
 
-  // Save order locally (called after checkout)
-  // Now captures complete order context including shipping address snapshot
+  // Save order locally
   const saveOrder = async (orderData: SaveOrderParams) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -197,7 +331,6 @@ export function useOrderTracking() {
         payment_status: orderData.payment_status,
         total_amount: orderData.total_amount,
         items: JSON.parse(JSON.stringify(orderData.items)),
-        // Order context captured at checkout time
         client_id: orderData.client_id,
         shipping_address: orderData.shipping_address ? JSON.parse(JSON.stringify(orderData.shipping_address)) : null,
         customer_email: orderData.customer_email,
@@ -216,9 +349,9 @@ export function useOrderTracking() {
     return data;
   };
 
-  // Update order status (for webhook or polling)
+  // Update order status
   const updateOrderStatus = async (
-    orderId: string, 
+    orderId: string,
     updates: { status?: string; payment_status?: string }
   ) => {
     const { error } = await supabase
@@ -234,9 +367,11 @@ export function useOrderTracking() {
   return {
     orders,
     isLoading,
+    isSyncing,
+    lastSyncedAt,
     reorder,
     saveOrder,
     updateOrderStatus,
-    refreshOrders: fetchOrders,
+    refreshOrders,
   };
 }

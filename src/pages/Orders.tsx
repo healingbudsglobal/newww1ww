@@ -5,15 +5,26 @@ import { useOrderTracking } from '@/hooks/useOrderTracking';
 import { OrdersTable } from '@/components/shop/OrdersTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
-import { Loader2, Package, ShoppingBag } from 'lucide-react';
+import { Loader2, Package, ShoppingBag, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function Orders() {
-  const { orders, isLoading, reorder } = useOrderTracking();
+  const { orders, isLoading, isSyncing, lastSyncedAt, reorder, refreshOrders } = useOrderTracking();
   const navigate = useNavigate();
   const [isReordering, setIsReordering] = useState(false);
+  const [syncLabel, setSyncLabel] = useState('');
+
+  // Update the "X ago" label every 10 seconds
+  useEffect(() => {
+    if (!lastSyncedAt) return;
+    const update = () => setSyncLabel(formatDistanceToNow(lastSyncedAt, { addSuffix: true }));
+    update();
+    const interval = setInterval(update, 10_000);
+    return () => clearInterval(interval);
+  }, [lastSyncedAt]);
 
   const handleReorder = async (order: any) => {
     setIsReordering(true);
@@ -22,6 +33,10 @@ export default function Orders() {
     } finally {
       setIsReordering(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await refreshOrders();
   };
 
   return (
@@ -56,6 +71,25 @@ export default function Orders() {
                   Browse Shop
                 </Button>
               </div>
+
+              {/* Sync status bar */}
+              {orders.length > 0 && (
+                <div className="flex items-center gap-3 mb-4 text-sm text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isSyncing}
+                    className="h-7 px-2 gap-1.5"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Syncing…' : 'Refresh'}
+                  </Button>
+                  {lastSyncedAt && !isSyncing && (
+                    <span className="text-xs">Last synced {syncLabel}</span>
+                  )}
+                </div>
+              )}
 
               {isLoading ? (
                 <Card className="rounded-3xl border-border/50">
