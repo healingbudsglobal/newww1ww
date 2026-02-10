@@ -93,17 +93,9 @@ const AnimatedRoutes = () => {
           } />
           
           {/* Shop - Protected by ComplianceGuard */}
-          <Route path="/shop" element={
-            <ComplianceGuard>
-              <Shop />
-            </ComplianceGuard>
-          } />
+          <Route path="/shop" element={<Shop />} />
           <Route path="/shop/register" element={<ShopRegister />} />
-          <Route path="/shop/strain/:strainId" element={
-            <ComplianceGuard>
-              <StrainDetail />
-            </ComplianceGuard>
-          } />
+          <Route path="/shop/strain/:strainId" element={<StrainDetail />} />
           <Route path="/checkout" element={
             <ComplianceGuard>
               <ErrorBoundary fallback={<CheckoutErrorFallback />}>
