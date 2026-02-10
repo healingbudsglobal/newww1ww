@@ -1,105 +1,97 @@
 
-# Fix: Live Data Sync, Admin Bypass, and GET Endpoint Signing
+# Fix: Ensure Clients Are Visible and API Connections Are Healthy
 
-## Issues Found
+## Current State (Verified)
 
-### 1. GET Endpoints Using Wrong Signing Method (Causes 401 errors)
-Several GET `/dapp/*` endpoints in `drgreen-proxy` use `drGreenRequestBody()` (body signing) instead of `drGreenRequestQuery()` (query-string signing). The Dr. Green API requires query-string signing for all GET requests. This silently fails with 401, causing empty data on the admin dashboard.
+### What's Working
+- API health check returns `healthy` (credentials valid, API reachable, 491ms latency)
+- `DRGREEN_API_KEY` and `DRGREEN_PRIVATE_KEY` secrets are configured
+- Signing logic correctly uses secp256k1 ECDSA with proper PEM detection and DER extraction
+- GET endpoints (`dapp-clients`, `get-clients-summary`) correctly use `drGreenRequestQuery` (query-string signing)
+- Both `kayliegh.sm@gmail.com` and `scott.k1@outlook.com` exist as auth users in the database
 
-**Affected endpoints:**
-- `get-clients-summary` (line 3821) -- used by Admin Client Manager summary badges
-- `get-sales-summary` (line 3850) -- used by Sales Dashboard
-- `get-user-nfts` (line 4013) -- used by NFT ownership checks
-- `get-user-me` (line 3093) -- used by user profile lookup
+### What's Failing
+- **Every recent proxy request returns 401 "Authentication required"** -- the proxy logs show "Unauthenticated request to dapp-clients" and "Unauthenticated request to get-clients-summary"
+- This means the admin is **not logged into Supabase auth** when visiting the admin pages, so the JWT is missing from requests
+- The `drgreen_clients` table is **empty** -- no local client records exist at all
+- Only `scott@healingbuds.global` has the admin role; neither `kayliegh.sm@gmail.com` nor `scott.k1@outlook.com` have admin
 
-### 2. Admin Not Bypassing All Verification Gates
-Admin users should never be subject to KYC or medical approval checks. Currently:
-- `ComplianceGuard` -- correctly bypasses admin (line 72)
-- `EligibilityGate` -- correctly bypasses admin (line 26)
-- `RestrictedRegionGate` -- **MISSING admin bypass** -- admins in UK/PT regions get blocked from viewing products
-- `Cart` component -- does not check admin role, blocks checkout if no `drGreenClient`
-- `DashboardStatus` -- redirects verified users to `/shop` but does not redirect admins
+## Root Cause
 
-### 3. Live Sync Not Polling
-The current sync model fetches live data from Dr. Green API once on page load and on auth state change. There is no periodic refresh, so data can become stale during a session.
+The proxy requires a valid Supabase JWT for admin endpoints. The `supabase.functions.invoke` call in `useDrGreenApi` automatically attaches the JWT **only if the user has an active Supabase session**. If the user visits `/admin/clients` without being logged in, every admin API call fails silently with 401.
 
----
+The two client emails need to be pulled from the Dr. Green DApp API (they may already be registered there via the DApp directly). Once an admin is logged in and visits the client manager, the API call to `/dapp/clients` should return them.
 
-## Changes
+## Changes Required
 
-### File 1: `supabase/functions/drgreen-proxy/index.ts`
-Switch all GET endpoints from `drGreenRequestBody` to `drGreenRequestQuery`:
+### 1. Auto-redirect to login if not authenticated on admin pages
+**File: `src/layout/AdminLayout.tsx`**
 
-1. **Line 3821** (`get-clients-summary`): Change `drGreenRequestBody("/dapp/clients/summary", "GET", {}, false, adminEnvConfig)` to `drGreenRequestQuery("/dapp/clients/summary", {}, false, adminEnvConfig)`
+Add an auth check: if no active Supabase session exists, redirect to `/auth` with a return URL. This prevents the confusing "0 clients" state when the admin simply isn't logged in.
 
-2. **Line 3850** (`get-sales-summary`): Change `drGreenRequestBody("/dapp/sales/summary", "GET", {}, false, adminEnvConfig)` to `drGreenRequestQuery("/dapp/sales/summary", {}, false, adminEnvConfig)`
-
-3. **Line 4013** (`get-user-nfts`): Change `drGreenRequestBody("/dapp/users/nfts", "GET", {})` to `drGreenRequestQuery("/dapp/users/nfts", {}, false, adminEnvConfig)`
-
-4. **Line 3093** (`get-user-me`): Change `drGreenRequestBody("/user/me", "GET", {})` to `drGreenRequestQuery("/user/me", {})`
-
-### File 2: `src/components/shop/RestrictedRegionGate.tsx`
-Add admin bypass so admin users can always browse products regardless of region:
-
-```typescript
-import { useUserRole } from '@/hooks/useUserRole';
-
-// Inside component, add:
-const { isAdmin, isLoading: roleLoading } = useUserRole();
-
-// Update loading check to include roleLoading
-if (checkingAuth || isLoading || roleLoading) { ... }
-
-// After the "not restricted" check, add admin bypass:
-if (isAdmin) {
-  return <>{children}</>;
-}
+```text
+Flow:
+  User visits /admin/clients
+    -> AdminLayout checks session
+    -> No session? Redirect to /auth?redirect=/admin/clients
+    -> After login, redirect back to admin page
+    -> JWT is now attached to all proxy calls
+    -> Clients load from Dr. Green API
 ```
 
-### File 3: `src/components/shop/Cart.tsx`
-Add admin bypass to checkout eligibility check so admin can test checkout flow without needing a Dr. Green client record:
+### 2. Sync Dr. Green API clients to local database on admin fetch
+**File: `src/components/admin/AdminClientManager.tsx`**
 
-- Import `useUserRole`
-- If admin, set `canCheckout: true` regardless of client status
-- Admin orders would still need a valid client ID for the API, so show a note
+After successfully fetching clients from the Dr. Green API, upsert them into the local `drgreen_clients` table. This ensures the local cache stays populated for ownership checks and ShopContext lookups. Currently the local table is empty because no one has gone through the onboarding flow on Healing Buds -- all clients were registered directly on the DApp.
 
-### File 4: `src/pages/DashboardStatus.tsx`
-Add admin redirect -- admins should never land on the verification status page:
+Changes:
+- After `clientsResult` returns successfully, iterate over the client list
+- For each client, upsert into `drgreen_clients` with `drgreen_client_id`, `email`, `full_name`, `is_kyc_verified`, `admin_approval`, `country_code`
+- Match existing auth users by email to set the `user_id` foreign key
+- This is a background sync -- it should not block the UI
 
-```typescript
-const { isAdmin } = useUserRole();
+### 3. Map auth users to their Dr. Green client IDs on login
+**File: `src/context/ShopContext.tsx`**
 
-useEffect(() => {
-  if (!isLoading && isAdmin) {
-    navigate('/admin', { replace: true });
-  }
-}, [isAdmin, isLoading, navigate]);
+When a user logs in, after the auth state change, check if their email matches a `drgreen_clients` record. If not, try to find them via the Dr. Green API (search by email). If found, create the local mapping so the user can access their client data, cart, and orders.
+
+Changes:
+- In the `onAuthStateChange` handler, after successful login:
+  - Check `drgreen_clients` for a record matching the user's email
+  - If not found, call `drgreen-proxy` with action `dapp-clients` and `search` param set to the user's email
+  - If a match is found, insert a new `drgreen_clients` record linking the auth user to the Dr. Green client ID
+  - This auto-maps `kayliegh.sm@gmail.com` and `scott.k1@outlook.com` to their Dr. Green records on next login
+
+### 4. Clean up stale credential secrets
+**No code change -- informational**
+
+The secrets `DRGREEN_WRITE_API_KEY`, `DRGREEN_WRITE_PRIVATE_KEY`, `DRGREEN_ALT_API_KEY`, and `DRGREEN_ALT_PRIVATE_KEY` are legacy and unused. The architecture uses a single credential set per environment. These could be removed to reduce confusion, but are not causing any issues.
+
+## Technical Details
+
+### Key Conversion (Verified Correct)
+The current key conversion pipeline:
+1. Base64-decode the stored secret
+2. Detect PEM format (handles truncated headers like `---\n`)
+3. Extract Base64 body from PEM, decode to DER bytes
+4. Check for secp256k1 OID (`2b8104000a`) in the DER
+5. Parse PKCS#8 or SEC1 structure to extract the raw 32-byte private key
+6. Sign with `@noble/secp256k1` using SHA-256 hash
+7. Convert compact signature (r||s) to DER format
+8. Return Base64-encoded DER signature
+
+This matches the Dr. Green API's expected signing method. The health check confirms it works.
+
+### API Connection (Verified Healthy)
+```text
+Status: healthy
+Credentials: ok (API credentials configured)
+Connectivity: ok (API reachable, 491ms)
 ```
-
-### File 5: `src/context/ShopContext.tsx`
-Add periodic live sync for client verification status (polling every 60 seconds while the user is on the site). This ensures that when a patient gets approved in the Dr. Green DApp, the Healing Buds UI reflects it without requiring a page refresh:
-
-```typescript
-// Add polling interval for live sync
-useEffect(() => {
-  if (!drGreenClient?.drgreen_client_id) return;
-  if (drGreenClient.drgreen_client_id.startsWith('local-')) return;
-  // Only poll if not yet verified (no need to keep checking once verified)
-  if (drGreenClient.is_kyc_verified && drGreenClient.admin_approval === 'VERIFIED') return;
-
-  const interval = setInterval(() => {
-    fetchClient();
-  }, 60000); // Every 60 seconds
-
-  return () => clearInterval(interval);
-}, [drGreenClient?.drgreen_client_id, drGreenClient?.is_kyc_verified, drGreenClient?.admin_approval, fetchClient]);
-```
-
----
 
 ## Expected Outcome
-- Admin Client Manager loads live client data and summary counts from Dr. Green API
-- Sales Dashboard loads live sales data
-- Admin users bypass all verification gates (KYC, medical approval, regional restrictions)
-- Patient verification status auto-refreshes every 60 seconds until verified
-- Once verified, polling stops to reduce API load
+- Admin pages redirect to login if session is missing
+- After admin login, `/admin/clients` loads both `kayliegh.sm@gmail.com` and `scott.k1@outlook.com` from the Dr. Green API
+- Client records are synced to local `drgreen_clients` table for future lookups
+- When `kayliegh.sm@gmail.com` or `scott.k1@outlook.com` log in, they are auto-mapped to their Dr. Green client ID
+- All verification status, KYC, and admin approval reflect live DApp data
