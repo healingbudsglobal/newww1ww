@@ -20,10 +20,13 @@ import { getProductionPath } from "@/lib/urls";
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isSettingNewPassword, setIsSettingNewPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -59,6 +62,13 @@ const Auth = () => {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Detect password recovery flow
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsSettingNewPassword(true);
+          setIsForgotPassword(false);
+          setIsLogin(false);
+        }
       }
     );
 
@@ -70,25 +80,59 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Role-based redirect after login
+  // Role-based redirect after login (skip if setting new password)
   useEffect(() => {
+    if (isSettingNewPassword) return;
     if (user && !roleLoading && !clientLoading) {
-      // Priority 1: Admins go to admin portal
       if (isAdmin) {
         navigate("/admin", { replace: true });
         return;
       }
-      
-      // Priority 2: Verified patients go to patient dashboard
       if (isEligible) {
         navigate("/dashboard", { replace: true });
         return;
       }
-      
-      // Priority 3: Unverified patients go to status page
       navigate("/dashboard/status", { replace: true });
     }
-  }, [user, isAdmin, roleLoading, isEligible, clientLoading, navigate]);
+  }, [user, isAdmin, roleLoading, isEligible, clientLoading, navigate, isSettingNewPassword]);
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    if (newPassword.length < 6) {
+      setErrors({ newPassword: t('validationErrors.passwordMin') });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrors({ confirmNewPassword: t('validationErrors.passwordMatch') });
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+    setLoading(false);
+
+    if (error) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: t('passwordUpdated') || 'Password Updated',
+      description: t('passwordUpdatedDesc') || 'Your password has been successfully changed.',
+    });
+    setIsSettingNewPassword(false);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setIsLogin(true);
+  };
 
   const validateForm = () => {
     setErrors({});
@@ -282,19 +326,74 @@ const Auth = () => {
                   />
                 </div>
                 <h1 className="font-display text-2xl font-bold text-white mb-2">
-                  {isForgotPassword ? t('resetPassword') : isLogin ? t('welcomeBack') : t('createAccount')}
+                  {isSettingNewPassword ? (t('setNewPassword') || 'Set New Password') : isForgotPassword ? t('resetPassword') : isLogin ? t('welcomeBack') : t('createAccount')}
                 </h1>
                 <p className="text-white/80 text-sm">
-                  {isForgotPassword 
-                    ? t('resetDescription')
-                    : isLogin 
-                      ? t('loginDescription')
-                      : t('signupDescription')}
+                  {isSettingNewPassword
+                    ? (t('setNewPasswordDesc') || 'Enter your new password below.')
+                    : isForgotPassword 
+                      ? t('resetDescription')
+                      : isLogin 
+                        ? t('loginDescription')
+                        : t('signupDescription')}
                 </p>
               </div>
 
-              {/* Forgot Password Form */}
-              {isForgotPassword ? (
+              {/* Set New Password Form */}
+              {isSettingNewPassword ? (
+                <form onSubmit={handleSetNewPassword} className="p-8 space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword" className="text-foreground">{t('newPassword') || 'New Password'}</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="pl-10"
+                        disabled={loading}
+                      />
+                    </div>
+                    {errors.newPassword && (
+                      <p className="text-destructive text-xs">{errors.newPassword}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmNewPassword" className="text-foreground">{t('confirmNewPassword') || 'Confirm New Password'}</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="confirmNewPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="pl-10"
+                        disabled={loading}
+                      />
+                    </div>
+                    {errors.confirmNewPassword && (
+                      <p className="text-destructive text-xs">{errors.confirmNewPassword}</p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : null}
+                    {t('updatePassword') || 'Update Password'}
+                    {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                  </Button>
+                </form>
+              ) : /* Forgot Password Form */
+              isForgotPassword ? (
                 <div className="p-8 space-y-5">
                   {resetEmailSent ? (
                     <div className="text-center space-y-4">
