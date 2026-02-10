@@ -1,46 +1,62 @@
 
+# Fix: Client Fetching — secp256k1 Private Key PEM Detection Bug
 
-## Fix Dr. Green API Private Key and Confirm Regional Gating
+## Problem
+The Admin Client Management page (`/admin/clients`) fails to load clients because the `generateSecp256k1Signature` function in the `drgreen-proxy` edge function cannot parse the private key. The logs show:
 
-### 1. Update DRGREEN_PRIVATE_KEY Secret
-
-The root cause of the 500 error is that the `DRGREEN_PRIVATE_KEY` secret currently contains an **EC Public Key** (SubjectPublicKeyInfo format) instead of a private key. This means the proxy cannot sign API requests.
-
-**Action required from you:** You need to provide the correct secp256k1 private key from the Dr. Green DApp dashboard. I will prompt you to enter it securely.
-
-The expected format is a Base64-encoded private key (either raw 32-byte key, SEC1/DER, or PKCS#8 PEM format). The proxy already supports all three formats.
-
----
-
-### 2. Regional Gating - Already Correct (Confirmation)
-
-The current architecture already matches the requested behavior:
-
-```text
-Region        | Browse Products | Add to Cart | Checkout/Orders
---------------+-----------------+-------------+-----------------
-ZA (.co.za)   | Yes (open)      | Yes*        | Requires verification
-TH (.co.th)   | Yes (open)      | Yes*        | Requires verification
-GB (.co.uk)   | Requires login  | Yes*        | Requires verification
-PT (.pt)      | Requires login  | Yes*        | Requires verification
+```
+secp256k1: Using raw DER { derLength: 213 }
+secp256k1: Failed to extract private key: Error: Expected SEQUENCE
 ```
 
-*Cart requires login; Checkout requires full KYC + admin approval.
+The 213 bytes are actually PEM text (decoded from Base64), but the PEM detection check (`decodedAsText.includes('-----BEGIN')`) is failing, causing the code to treat PEM text as raw DER — which then fails to parse.
 
-- `/shop` page: No `ComplianceGuard` -- uses `RestrictedRegionGate` internally, which only blocks GB/PT
-- `/checkout` and `/orders`: Wrapped in `ComplianceGuard` -- requires authentication + verification for all regions
-- South Africa (ZA) and Thailand (TH): Products display freely without login
+## Root Cause
+In `generateSecp256k1Signature` (line ~576 of `drgreen-proxy/index.ts`), after Base64-decoding the stored secret, the function checks if the result contains `-----BEGIN`. This check is failing (possibly due to encoding edge cases or invisible characters in the decoded text), so it falls through to the raw DER path which cannot parse PEM text.
 
-No code changes needed for gating -- it is working as designed.
+## Fix (1 file changed)
 
----
+### `supabase/functions/drgreen-proxy/index.ts`
 
-### Technical Summary
+Make the PEM detection more robust by:
 
-| Item | Status |
-|------|--------|
-| Regional gate (ZA browsing) | Already correct - no changes needed |
-| Checkout/orders gating | Already correct - ComplianceGuard enforces verification |
-| DRGREEN_PRIVATE_KEY | Needs replacement - currently contains a public key |
-| Proxy signing code | Already supports multiple key formats - no changes needed |
+1. Adding a byte-level check for the PEM header (`2d2d2d2d2d` = `-----`) as a fallback to the string-based `includes` check
+2. Adding explicit logging when PEM is detected vs not detected, including the first 30 characters of the decoded text for debugging
+3. If both PEM detection methods fail AND the decoded length matches typical PEM text size (150-500 bytes), attempt PEM extraction anyway as a last resort
 
+Specifically, in the `generateSecp256k1Signature` function around line 576:
+
+```typescript
+// Current code (failing):
+if (decodedAsText.includes('-----BEGIN')) {
+  // PEM branch...
+} else {
+  keyDerBytes = decodedSecretBytes;  // treats PEM text as DER
+}
+
+// Fixed code:
+const isPem = decodedAsText.includes('-----BEGIN') || 
+              decodedAsText.includes('BEGIN') ||
+              // Byte-level fallback: check for "-----" (0x2D repeated)
+              (decodedSecretBytes[0] === 0x2D && decodedSecretBytes[1] === 0x2D);
+
+if (isPem) {
+  // Extract PEM body and decode to DER...
+} else {
+  keyDerBytes = decodedSecretBytes;
+}
+```
+
+Also add a final fallback in `extractSecp256k1PrivateKey`: if DER parsing fails and the input looks like ASCII text (all bytes < 128), log a clear error indicating PEM was not detected.
+
+## Expected Outcome
+- Admin Client Management page will successfully fetch and display clients from the Dr. Green API
+- All `/dapp/*` endpoints (clients, orders, carts, NFTs) will work correctly
+- Strains endpoint (which may work via a different timing/caching scenario) continues to work
+
+## Testing
+After deployment, verify:
+1. Navigate to `/admin/clients` — clients should load
+2. Click "Refresh" — should show updated data
+3. Test client search by email
+4. Verify summary counts (Pending/Verified/Rejected) appear
