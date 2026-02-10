@@ -443,83 +443,110 @@ function bytesToBase64(bytes: Uint8Array): string {
  *       }
  *   }
  */
-function extractSecp256k1PrivateKey(pkcs8Der: Uint8Array): Uint8Array {
-  // The 32-byte private key is embedded in the PKCS#8 structure
-  // For secp256k1 PKCS#8 keys, the structure is predictable:
-  // The raw key starts at a known offset in the DER structure
-  
-  // Look for the inner OCTET STRING that contains the 32-byte key
-  // In PKCS#8 EC keys, we need to find the SEC1 structure inside
-  
-  // The key user provided has this structure (decoded from Base64):
-  // SEQUENCE (PKCS#8 wrapper)
-  //   INTEGER 0
-  //   SEQUENCE (algorithm identifier)
-  //     OID 1.2.840.10045.2.1 (ecPublicKey)
-  //     OID 1.3.132.0.10 (secp256k1)
-  //   OCTET STRING containing SEC1 ECPrivateKey:
-  //     SEQUENCE
-  //       INTEGER 1
-  //       OCTET STRING (32 bytes) <- THIS IS WHAT WE WANT
-  //       [0] OID (optional)
-  //       [1] BIT STRING public key (optional)
-  
-  // For a typical secp256k1 PKCS#8 key, the private key bytes are at offset 36
-  // But let's parse properly to be safe
+function extractSecp256k1PrivateKey(derBytes: Uint8Array): Uint8Array {
+  // Supports both PKCS#8 and SEC1 EC private key formats
+  // PKCS#8 (~138 bytes): SEQUENCE { INTEGER 0, SEQUENCE {OIDs}, OCTET STRING {SEC1} }
+  // SEC1 (~88 bytes):    SEQUENCE { INTEGER 1, OCTET STRING (32 bytes), ... }
   
   let offset = 0;
   
-  // Helper to read ASN.1 length
   function readLength(): number {
-    const firstByte = pkcs8Der[offset++];
+    const firstByte = derBytes[offset++];
     if (firstByte < 0x80) return firstByte;
     const numBytes = firstByte & 0x7f;
     let length = 0;
     for (let i = 0; i < numBytes; i++) {
-      length = (length << 8) | pkcs8Der[offset++];
+      length = (length << 8) | derBytes[offset++];
     }
     return length;
   }
   
-  // Skip outer SEQUENCE
-  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE');
-  readLength();
-  
-  // Skip version INTEGER
-  if (pkcs8Der[offset++] !== 0x02) throw new Error('Expected INTEGER (version)');
-  const versionLen = readLength();
-  offset += versionLen;
-  
-  // Skip algorithm identifier SEQUENCE
-  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE (algorithm)');
-  const algLen = readLength();
-  offset += algLen;
-  
-  // Now we should be at the OCTET STRING containing the SEC1 private key
-  if (pkcs8Der[offset++] !== 0x04) throw new Error('Expected OCTET STRING');
-  const octetLen = readLength();
-  
-  // Inside this OCTET STRING is the SEC1 ECPrivateKey structure
-  const sec1Start = offset;
-  
-  // Parse SEC1 ECPrivateKey
-  if (pkcs8Der[offset++] !== 0x30) throw new Error('Expected SEQUENCE (SEC1)');
-  readLength();
-  
-  // Version INTEGER (should be 1)
-  if (pkcs8Der[offset++] !== 0x02) throw new Error('Expected INTEGER (SEC1 version)');
-  const sec1VersionLen = readLength();
-  offset += sec1VersionLen;
-  
-  // Private key OCTET STRING (32 bytes for secp256k1)
-  if (pkcs8Der[offset++] !== 0x04) throw new Error('Expected OCTET STRING (private key)');
-  const keyLen = readLength();
-  
-  if (keyLen !== 32) {
-    throw new Error(`Expected 32-byte private key, got ${keyLen}`);
+  function readInteger(): { value: number; rawBytes: Uint8Array } {
+    if (derBytes[offset++] !== 0x02) throw new Error('Expected INTEGER');
+    const len = readLength();
+    const raw = derBytes.slice(offset, offset + len);
+    let value = 0;
+    for (let i = 0; i < len; i++) value = (value << 8) | derBytes[offset + i];
+    offset += len;
+    return { value, rawBytes: raw };
   }
   
-  return pkcs8Der.slice(offset, offset + 32);
+  // Outer SEQUENCE
+  if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE');
+  readLength();
+  
+  // Log first bytes after SEQUENCE header for debugging
+  logInfo('secp256k1: DER structure', {
+    totalLength: derBytes.length,
+    nextByte: `0x${derBytes[offset].toString(16).padStart(2, '0')}`,
+    first16Hex: Array.from(derBytes.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '),
+  });
+  
+  // If the key is exactly 32 bytes after decoding, it might be a raw key
+  if (derBytes.length === 32) {
+    logInfo('secp256k1: Using as raw 32-byte key');
+    return derBytes;
+  }
+  
+  // Check the tag at current position to determine format
+  const nextTag = derBytes[offset];
+  
+  // If next byte is INTEGER (0x02), it's a structured key (PKCS#8 or SEC1)
+  if (nextTag === 0x02) {
+    const version = readInteger();
+  
+    if (version.value === 1) {
+      // SEC1 ECPrivateKey format: SEQUENCE { INTEGER 1, OCTET STRING (32 bytes), ... }
+      logInfo('secp256k1: Detected SEC1 format');
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING (private key)');
+      const keyLen = readLength();
+      if (keyLen !== 32) throw new Error(`Expected 32-byte private key, got ${keyLen}`);
+      return derBytes.slice(offset, offset + 32);
+      
+    } else if (version.value === 0) {
+      // PKCS#8 format: SEQUENCE { INTEGER 0, SEQUENCE {OIDs}, OCTET STRING {SEC1} }
+      logInfo('secp256k1: Detected PKCS#8 format');
+      
+      // Skip algorithm identifier SEQUENCE
+      if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE (algorithm)');
+      const algLen = readLength();
+      offset += algLen;
+      
+      // OCTET STRING containing SEC1 ECPrivateKey
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING');
+      readLength();
+      
+      // Parse inner SEC1 structure
+      if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE (SEC1)');
+      readLength();
+      
+      // SEC1 version INTEGER (should be 1)
+      if (derBytes[offset++] !== 0x02) throw new Error('Expected INTEGER (SEC1 version)');
+      const sec1VersionLen = readLength();
+      offset += sec1VersionLen;
+      
+      // Private key OCTET STRING (32 bytes)
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING (private key)');
+      const keyLen = readLength();
+      if (keyLen !== 32) throw new Error(`Expected 32-byte private key, got ${keyLen}`);
+      return derBytes.slice(offset, offset + 32);
+      
+    } else {
+      throw new Error(`Unexpected key version: ${version.value}. Expected 0 (PKCS#8) or 1 (SEC1)`);
+    }
+  }
+  
+  // If next byte is OCTET STRING (0x04), try to read 32 bytes directly
+  if (nextTag === 0x04) {
+    offset++; // skip tag
+    const keyLen = readLength();
+    if (keyLen === 32) {
+      logInfo('secp256k1: Found raw OCTET STRING key');
+      return derBytes.slice(offset, offset + 32);
+    }
+  }
+  
+  throw new Error(`Unsupported key format. Tag at offset: 0x${nextTag.toString(16)}, DER length: ${derBytes.length}`);
 }
 
 /**
