@@ -125,8 +125,8 @@ const Auth = () => {
     }
 
     toast({
-      title: t('passwordUpdated') || 'Password Updated',
-      description: t('passwordUpdatedDesc') || 'Your password has been successfully changed.',
+      title: t('passwordUpdated'),
+      description: t('passwordUpdatedDesc'),
     });
     setIsSettingNewPassword(false);
     setNewPassword("");
@@ -326,11 +326,11 @@ const Auth = () => {
                   />
                 </div>
                 <h1 className="font-display text-2xl font-bold text-white mb-2">
-                  {isSettingNewPassword ? (t('setNewPassword') || 'Set New Password') : isForgotPassword ? t('resetPassword') : isLogin ? t('welcomeBack') : t('createAccount')}
+                  {isSettingNewPassword ? t('setNewPassword') : isForgotPassword ? t('resetPassword') : isLogin ? t('welcomeBack') : t('createAccount')}
                 </h1>
                 <p className="text-white/80 text-sm">
                   {isSettingNewPassword
-                    ? (t('setNewPasswordDesc') || 'Enter your new password below.')
+                    ? t('setNewPasswordDesc')
                     : isForgotPassword 
                       ? t('resetDescription')
                       : isLogin 
@@ -343,7 +343,7 @@ const Auth = () => {
               {isSettingNewPassword ? (
                 <form onSubmit={handleSetNewPassword} className="p-8 space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword" className="text-foreground">{t('newPassword') || 'New Password'}</Label>
+                    <Label htmlFor="newPassword" className="text-foreground">{t('newPassword')}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -362,7 +362,7 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmNewPassword" className="text-foreground">{t('confirmNewPassword') || 'Confirm New Password'}</Label>
+                    <Label htmlFor="confirmNewPassword" className="text-foreground">{t('confirmNewPassword')}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -388,7 +388,7 @@ const Auth = () => {
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     ) : null}
-                    {t('updatePassword') || 'Update Password'}
+                    {t('updatePassword')}
                     {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                   </Button>
                 </form>
