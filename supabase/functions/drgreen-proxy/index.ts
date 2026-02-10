@@ -573,13 +573,33 @@ async function generateSecp256k1Signature(
   const decodedAsText = new TextDecoder().decode(decodedSecretBytes);
   let keyDerBytes: Uint8Array;
 
-  if (decodedAsText.includes('-----BEGIN')) {
-    // Extract PEM body
-    const pemBody = decodedAsText
+  // Robust PEM detection: string check + byte-level fallback for dashes (0x2D)
+  const isPem = decodedAsText.includes('-----BEGIN') ||
+    decodedAsText.includes('BEGIN') ||
+    (decodedSecretBytes.length >= 2 &&
+      decodedSecretBytes[0] === 0x2D && decodedSecretBytes[1] === 0x2D);
+
+  logInfo('secp256k1: PEM detection', {
+    isPem,
+    decodedLength: decodedSecretBytes.length,
+    first30Chars: decodedAsText.substring(0, 30).replace(/[^\x20-\x7E]/g, '?'),
+    firstBytes: Array.from(decodedSecretBytes.slice(0, 6)).map(b => b.toString(16).padStart(2, '0')).join(' '),
+  });
+
+  // Helper: extract Base64 body from PEM text (handles truncated/malformed headers)
+  function extractPemBase64Body(text: string): string {
+    return text
+      // Strip standard PEM headers
       .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
       .replace(/-----END [A-Z0-9 ]+-----/g, '')
+      // Strip truncated/malformed dash headers (e.g. "---\n" or "--\n")
+      .replace(/-{2,}[^\n]*\n?/g, '')
       .replace(/[\r\n\s]/g, '')
       .trim();
+  }
+
+  if (isPem) {
+    const pemBody = extractPemBase64Body(decodedAsText);
 
     if (!pemBody || !isBase64(pemBody)) {
       throw new Error('Invalid private key PEM format');
@@ -587,6 +607,20 @@ async function generateSecp256k1Signature(
 
     keyDerBytes = base64ToBytes(pemBody);
     logInfo('secp256k1: Decoded PEM to DER', { derLength: keyDerBytes.length });
+  } else if (decodedSecretBytes.length >= 150 && decodedSecretBytes.length <= 500) {
+    // Fallback: size looks like PEM text, try PEM extraction anyway
+    logInfo('secp256k1: Size suggests PEM text, attempting PEM extraction as fallback', { 
+      decodedLength: decodedSecretBytes.length 
+    });
+    const pemBody = extractPemBase64Body(decodedAsText);
+
+    if (pemBody && isBase64(pemBody)) {
+      keyDerBytes = base64ToBytes(pemBody);
+      logInfo('secp256k1: Fallback PEM extraction succeeded', { derLength: keyDerBytes.length });
+    } else {
+      keyDerBytes = decodedSecretBytes;
+      logInfo('secp256k1: Fallback PEM extraction failed, using raw bytes', { derLength: keyDerBytes.length });
+    }
   } else {
     keyDerBytes = decodedSecretBytes;
     logInfo('secp256k1: Using raw DER', { derLength: keyDerBytes.length });
@@ -602,7 +636,17 @@ async function generateSecp256k1Signature(
       prefix: Array.from(privateKeyBytes.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(''),
     });
   } catch (e) {
-    logError('secp256k1: Failed to extract private key', { error: String(e) });
+    // Check if the input was actually ASCII text (PEM) that wasn't detected
+    const isAsciiText = keyDerBytes.every(b => b < 128);
+    if (isAsciiText) {
+      logError('secp256k1: DER parse failed on ASCII text — key is likely PEM that was not detected', {
+        error: String(e),
+        keyLength: keyDerBytes.length,
+        firstChars: new TextDecoder().decode(keyDerBytes.slice(0, 40)).replace(/[^\x20-\x7E]/g, '?'),
+      });
+    } else {
+      logError('secp256k1: Failed to extract private key', { error: String(e) });
+    }
     throw new Error(`Failed to parse secp256k1 private key: ${e}`);
   }
 
