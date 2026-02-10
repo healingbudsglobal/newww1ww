@@ -5,7 +5,7 @@
  * CRM-style high-density layout for management UX.
  */
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -82,6 +82,14 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   const { tenant } = useTenant();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+
+  // Redirect to auth if not logged in (prevents 401s on admin API calls)
+  useEffect(() => {
+    if (!isLoading && !user) {
+      const returnUrl = encodeURIComponent(location.pathname + location.search);
+      navigate(`/auth?redirect=${returnUrl}`, { replace: true });
+    }
+  }, [isLoading, user, location.pathname, location.search, navigate]);
 
   const isActive = (path: string) => {
     if (path === "/admin") {

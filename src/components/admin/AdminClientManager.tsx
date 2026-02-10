@@ -94,6 +94,63 @@ export function AdminClientManager() {
     searchQueryRef.current = searchQuery;
   }, [searchQuery]);
 
+  // Background sync: upsert API clients into local drgreen_clients table
+  const syncClientsToLocalDb = useCallback(async (clientsList: DrGreenClient[]) => {
+    try {
+      console.log('[AdminClientManager] Syncing', clientsList.length, 'clients to local DB...');
+      
+      // Look up auth users by email to link user_id
+      const emails = clientsList.map(c => c.email).filter(Boolean);
+      const { data: authProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name');
+      
+      // Also check existing drgreen_clients to avoid unnecessary writes
+      const { data: existingClients } = await supabase
+        .from('drgreen_clients')
+        .select('drgreen_client_id, user_id');
+      
+      const existingMap = new Map(
+        (existingClients || []).map(c => [c.drgreen_client_id, c.user_id])
+      );
+
+      for (const client of clientsList) {
+        if (!client.id || !client.email) continue;
+        
+        // Skip if already synced with same ID
+        if (existingMap.has(client.id)) continue;
+        
+        // Try to find matching auth user by email
+        // We need to query auth users - use a simple approach via supabase admin
+        // For now, upsert with a placeholder user_id if no match found
+        const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ');
+        
+        const { error: upsertErr } = await supabase
+          .from('drgreen_clients')
+          .upsert({
+            drgreen_client_id: client.id,
+            email: client.email,
+            full_name: fullName || null,
+            is_kyc_verified: client.isKYCVerified ?? false,
+            admin_approval: client.adminApproval || 'PENDING',
+            country_code: 'PT', // Default, updated when details fetched
+            user_id: existingMap.get(client.id) || crypto.randomUUID(), // Preserve existing user_id
+          }, {
+            onConflict: 'drgreen_client_id',
+            ignoreDuplicates: false,
+          });
+        
+        if (upsertErr) {
+          console.warn('[AdminClientManager] Upsert failed for', client.email, upsertErr.message);
+        }
+      }
+      
+      console.log('[AdminClientManager] Local DB sync complete');
+    } catch (err) {
+      console.warn('[AdminClientManager] Background sync failed:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async (options?: { showToast?: boolean; isInitialLoad?: boolean }) => {
     const { showToast = false, isInitialLoad = false } = options || {};
     
@@ -134,6 +191,9 @@ export function AdminClientManager() {
         const clientsList = responseData?.data?.clients || (clientsResult.data as { clients?: DrGreenClient[] })?.clients;
         if (clientsList) {
           setClients(clientsList);
+          
+          // Background sync: upsert fetched clients into local drgreen_clients table
+          syncClientsToLocalDb(clientsList);
         }
       }
 
