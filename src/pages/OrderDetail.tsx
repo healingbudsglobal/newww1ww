@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, Package, CreditCard, MapPin, RefreshCw } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, MapPin, RefreshCw, Printer } from "lucide-react";
 import { motion } from "framer-motion";
 
 import Header from "@/layout/Header";
@@ -158,13 +158,22 @@ export default function OrderDetail() {
                       </span>
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
                     <Badge className={cn("border", getStatusColor(order.status))}>
                       {getDisplayStatus(order.status)}
                     </Badge>
                     <Badge className={cn("border", getStatusColor(order.payment_status))}>
                       {getDisplayStatus(order.payment_status)}
                     </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="w-4 h-4 mr-1.5" />
+                      Print Invoice
+                    </Button>
                   </div>
                 </div>
 

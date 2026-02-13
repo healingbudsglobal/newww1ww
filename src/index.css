@@ -813,3 +813,29 @@ All colors MUST be HSL.
 #main-content:focus {
   outline: none;
 }
+
+/* Print styles for order invoice */
+@media print {
+  header, footer, nav,
+  .mobile-bottom-actions,
+  [data-sonner-toaster],
+  button:not(.print-visible) {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  main {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .container {
+    max-width: 100% !important;
+  }
+}
