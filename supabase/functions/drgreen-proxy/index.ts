@@ -2027,6 +2027,54 @@ serve(async (req) => {
           console.log("[create-client-legacy] Error status:", response.status);
           console.log("[create-client-legacy] Full error body:", respBody);
           
+          // Handle 409 Conflict: client email already exists
+          // Instead of failing, fetch the existing client and return their details
+          if (response.status === 409) {
+            console.log("[create-client-legacy] DIAGNOSIS: Client email already exists - attempting to fetch existing client");
+            
+            try {
+              const parsedError = JSON.parse(respBody);
+              const clientEmail = String(dappPayload.email).toLowerCase().trim();
+              
+              // Try to find existing client in local DB by email
+              const { data: existingClient } = await supabaseClient
+                .from('drgreen_clients')
+                .select('*')
+                .eq('email', clientEmail)
+                .maybeSingle();
+              
+              if (existingClient) {
+                console.log("[create-client-legacy] Found existing local client record:", existingClient.drgreen_client_id?.slice(0, 8) + '***');
+                return new Response(JSON.stringify({
+                  success: true,
+                  clientId: existingClient.drgreen_client_id,
+                  kycLink: existingClient.kyc_link,
+                  isKYCVerified: existingClient.is_kyc_verified || false,
+                  adminApproval: existingClient.admin_approval || 'PENDING',
+                  alreadyExists: true,
+                  message: 'Client already registered. Returning existing record.',
+                }), {
+                  status: 200,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+              }
+              
+              // No local record but API says email exists - return helpful message
+              console.log("[create-client-legacy] No local record found for existing API client");
+              return new Response(JSON.stringify({
+                success: false,
+                alreadyExists: true,
+                message: 'This email is already registered with Dr. Green. Please contact support if you need to recover your account.',
+                errorCode: 409,
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            } catch (conflictErr) {
+              console.log("[create-client-legacy] Error handling 409 conflict:", conflictErr);
+            }
+          }
+          
           if (response.status === 401) {
             console.log("[create-client-legacy] DIAGNOSIS: Authentication failed - signature mismatch or invalid API key");
           } else if (response.status === 422) {
