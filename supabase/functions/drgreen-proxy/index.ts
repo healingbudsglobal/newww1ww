@@ -3064,9 +3064,13 @@ serve(async (req) => {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // Method A - Body Sign: signs {"clientId": "..."}
-        const signBody = { clientId: body.clientId };
-        response = await drGreenRequestBody(`/client/${body.clientId}/orders`, "GET", signBody);
+        // Use query string signing for GET endpoints (fixes 401 / empty responses)
+        response = await drGreenRequestGet(
+          `/dapp/clients/${body.clientId}/orders`,
+          { orderBy: 'desc', take: 50, page: 1 },
+          false,
+          adminEnvConfig
+        );
         break;
       }
       

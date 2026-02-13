@@ -113,12 +113,20 @@ export function useOrderTracking() {
         return;
       }
 
-      // Unwrap: API may return { success, data: [...] } or raw array
-      const ordersList = Array.isArray(liveOrders)
-        ? liveOrders
-        : (liveOrders as any)?.data && Array.isArray((liveOrders as any).data)
-          ? (liveOrders as any).data
-          : [];
+      // Unwrap: API may return { success, data: [...] } or raw array or nested data.data
+      let ordersList: any[] = [];
+      if (Array.isArray(liveOrders)) {
+        ordersList = liveOrders;
+      } else if (typeof liveOrders === 'object' && liveOrders !== null) {
+        const obj = liveOrders as any;
+        if (Array.isArray(obj.data?.data)) {
+          ordersList = obj.data.data;
+        } else if (Array.isArray(obj.data)) {
+          ordersList = obj.data;
+        } else {
+          console.warn('[OrderSync] Unexpected response shape:', JSON.stringify(liveOrders).slice(0, 300));
+        }
+      }
 
       if (ordersList.length === 0) {
         setLastSyncedAt(new Date());
