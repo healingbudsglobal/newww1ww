@@ -343,8 +343,9 @@ const Checkout = () => {
         description: `Your order ${createdOrderId} has been ${finalPaymentStatus === 'PAID' ? 'confirmed' : 'submitted for processing'}.`,
       });
     } catch (error) {
-      console.error('Checkout error — attempting local fallback:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Checkout error — attempting local fallback:', errorMessage);
+      console.error('[Checkout] Full error details:', JSON.stringify(error, null, 2));
 
       // --- LOCAL-FIRST FALLBACK ---
       try {
@@ -380,6 +381,8 @@ const Checkout = () => {
           customer_name: drGreenClient.full_name || undefined,
           country_code: clientCountryCode,
           currency: getCurrencyForCountry(clientCountryCode),
+          sync_error: errorMessage,
+          sync_status: 'failed',
         });
 
         setOrderId(localOrderId);

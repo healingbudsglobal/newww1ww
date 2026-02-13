@@ -2873,7 +2873,8 @@ serve(async (req) => {
         }
         
         // Step 2: Add items to server-side cart
-        const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number }) => ({
+        // API: POST /dapp/carts with { clientCartId, items: [{ strainId, quantity }] }
+        const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
           strainId: item.strainId || item.productId,
           quantity: item.quantity,
         }));
@@ -2883,7 +2884,10 @@ serve(async (req) => {
           items: cartItems,
         };
         
-        logInfo(`[${requestId}] Step 2: Adding items to cart`, { itemCount: cartItems.length });
+        logInfo(`[${requestId}] Step 2: Adding items to cart`, { 
+          itemCount: cartItems.length,
+          clientCartId: clientId.slice(0, 8) + '***',
+        });
         
         // Retry cart add with exponential backoff
         let cartSuccess = false;
@@ -2905,15 +2909,22 @@ serve(async (req) => {
               logWarn(`[${requestId}] Step 2: Cart add failed`, { 
                 attempt: cartAttempts,
                 status: cartResponse.status,
-                error: lastCartError.slice(0, 150),
+                error: lastCartError.slice(0, 200),
               });
               
+              // Non-retryable 400 errors (except shipping propagation delay)
               if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1000;
+                const delay = cartAttempts * 1500;
                 logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
                 await sleep(delay);
+              } else if (lastCartStatus === 400 && !lastCartError.includes("shipping")) {
+                // Other 400 errors are non-retryable
+                logWarn(`[${requestId}] Step 2: Non-retryable 400 error, stopping retries`);
+                break;
               } else if (cartAttempts >= maxCartAttempts) {
                 break;
+              } else {
+                await sleep(1000);
               }
             }
           } catch (cartErr) {
@@ -2961,20 +2972,48 @@ serve(async (req) => {
           lastStepStatus = lastCartStatus;
         }
         
-        // FALLBACK: Try direct order creation with items
+        // FALLBACK: Try direct order creation with items + shippingAddress + price
+        // The POST /dapp/orders endpoint accepts items directly with shippingAddress
+        // This bypasses the cart flow entirely which requires shipping to be saved on the client
         if (!cartSuccess || stepFailed) {
-          logInfo(`[${requestId}] Step 3 (Fallback): Attempting direct order creation`, { 
+          logInfo(`[${requestId}] Step 3 (Fallback): Attempting direct order creation with full payload`, { 
             cartFailed: !cartSuccess,
             previousStep: stepFailed,
+            hasShippingAddress: !!orderData.shippingAddress,
           });
           
-          const directOrderPayload = {
+          // Build items with price from the original order data
+          const originalItems = orderData.items || [];
+          const directItems = originalItems.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
+            strainId: item.strainId || item.productId,
+            quantity: item.quantity,
+            ...(item.price !== undefined ? { price: item.price } : {}),
+          }));
+          
+          // Build full direct order payload per API spec
+          const directOrderPayload: Record<string, unknown> = {
             clientId: clientId,
-            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
-              strainId: item.strainId,
-              quantity: item.quantity,
-            })),
+            items: directItems,
           };
+          
+          // Include shipping address in direct order payload
+          if (orderData.shippingAddress) {
+            const addr = orderData.shippingAddress;
+            directOrderPayload.shippingAddress = {
+              address1: addr.street || addr.address1 || '',
+              address2: addr.address2 || '',
+              city: addr.city || '',
+              state: addr.state || addr.city || '',
+              country: addr.country || '',
+              countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+              postalCode: addr.zipCode || addr.postalCode || '',
+            };
+          }
+          
+          logInfo(`[${requestId}] Step 3 (Fallback): Direct order payload`, {
+            itemCount: directItems.length,
+            hasShipping: !!directOrderPayload.shippingAddress,
+          });
           
           try {
             response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload, false, adminEnvConfig);
@@ -2989,7 +3028,7 @@ serve(async (req) => {
               stepFailed = 'direct-order';
               logError(`[${requestId}] Step 3 (Fallback): Direct order failed`, { 
                 status: response.status,
-                error: directError.slice(0, 150),
+                error: directError.slice(0, 200),
               });
             }
           } catch (directErr) {

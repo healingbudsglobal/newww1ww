@@ -51,6 +51,8 @@ export interface SaveOrderParams {
   customer_name?: string;
   country_code?: string;
   currency?: string;
+  sync_error?: string;
+  sync_status?: string;
 }
 
 const SYNC_INTERVAL_MS = 60_000;
@@ -345,6 +347,8 @@ export function useOrderTracking() {
         customer_name: orderData.customer_name,
         country_code: orderData.country_code,
         currency: orderData.currency,
+        sync_error: orderData.sync_error || null,
+        sync_status: orderData.sync_status || 'pending',
       }])
       .select()
       .single();
