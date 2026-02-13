@@ -208,10 +208,36 @@ const Checkout = () => {
     }
 
     setIsProcessing(true);
-    setPaymentStatus('Creating order...');
+    setPaymentStatus('Verifying your profile...');
 
     try {
-      const clientId = drGreenClient.drgreen_client_id;
+      let clientId = drGreenClient.drgreen_client_id;
+
+      // --- PRE-FLIGHT: Auto-rehome guard ---
+      // Check if the current client ID is valid on the Dr. Green API
+      // If it's broken (scope mismatch), auto-rehome before proceeding
+      try {
+        const { data: rehomeResult, error: rehomeError } = await supabase.functions.invoke('drgreen-proxy', {
+          body: { action: 'auto-rehome-client', clientId },
+        });
+
+        if (rehomeError) {
+          console.warn('[Checkout] Auto-rehome check failed:', rehomeError.message);
+          // Continue with existing clientId — may fall through to local order
+        } else if (rehomeResult?.rehomed && rehomeResult?.clientId) {
+          console.log('[Checkout] Client auto-rehomed:', clientId, '->', rehomeResult.clientId);
+          clientId = rehomeResult.clientId;
+          toast({
+            title: 'Profile Updated',
+            description: 'Your profile has been refreshed. Continuing with your order...',
+          });
+        }
+      } catch (rehomeErr) {
+        console.warn('[Checkout] Auto-rehome guard error:', rehomeErr);
+        // Non-blocking — continue with original clientId
+      }
+
+      setPaymentStatus('Creating order...');
 
       // Use the atomic createOrder which handles:
       // 1. PATCH client shipping address

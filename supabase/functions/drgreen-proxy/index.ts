@@ -101,6 +101,7 @@ const OWNERSHIP_ACTIONS = [
   'get-my-details',           // Users can fetch their own client details
   'update-shipping-address',  // Users can update their own shipping address
   'create-order',             // Users can only create orders for their own clientId
+  'auto-rehome-client',       // Users can trigger re-homing for their own client
 ];
 
 // Public actions that don't require authentication (minimal - only webhooks/health)
@@ -3674,14 +3675,28 @@ serve(async (req) => {
               .maybeSingle();
             
             if (existingClient?.user_id) {
-              // Update existing record with new Dr. Green IDs
+              // Preserve old client ID for audit trail
+              const { data: currentRecord } = await supabaseClient
+                .from('drgreen_clients')
+                .select('drgreen_client_id')
+                .eq('user_id', existingClient.user_id)
+                .maybeSingle();
+
+              const apiKey = Deno.env.get(envConfig.apiKeyEnv) || '';
+
+              // Update existing record with new Dr. Green IDs + rehome tracking
               const { error: updateError } = await supabaseClient
                 .from('drgreen_clients')
                 .update({
+                  old_drgreen_client_id: currentRecord?.drgreen_client_id || null,
                   drgreen_client_id: newClientId,
                   kyc_link: newKycLink,
                   is_kyc_verified: false, // Reset - they need to re-verify
                   admin_approval: 'PENDING',
+                  rehome_status: 'success',
+                  rehome_error: null,
+                  rehomed_at: new Date().toISOString(),
+                  api_key_scope: apiKey.slice(0, 8),
                   updated_at: new Date().toISOString(),
                   shipping_address: reregisterPayload.shipping,
                 })
@@ -3709,6 +3724,143 @@ serve(async (req) => {
         }
         
         break;
+      }
+
+      // Auto re-home: ownership-verified action for checkout flow
+      // Detects if the current client ID is broken (404/401) and re-registers automatically
+      case "auto-rehome-client": {
+        const { clientId } = body || {};
+        if (!clientId) {
+          throw new Error("clientId is required");
+        }
+
+        // Verify user owns this client record
+        const { data: clientRecord, error: lookupErr } = await supabaseClient
+          .from('drgreen_clients')
+          .select('*')
+          .eq('drgreen_client_id', clientId)
+          .maybeSingle();
+
+        if (lookupErr || !clientRecord) {
+          throw new Error("Client record not found");
+        }
+
+        // Verify the client ID is actually broken by calling the Dr. Green API
+        let isBroken = false;
+        try {
+          const checkResp = await drGreenRequest(`/dapp/clients/${clientId}`, "GET", envConfig);
+          if (!checkResp.ok) {
+            const status = checkResp.status;
+            if (status === 404 || status === 401 || status === 403) {
+              isBroken = true;
+            }
+          }
+        } catch {
+          isBroken = true; // Network error = assume broken
+        }
+
+        if (!isBroken) {
+          return new Response(JSON.stringify({
+            success: true,
+            clientId,
+            message: 'Client ID is valid, no re-homing needed',
+            rehomed: false,
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Client is broken — re-register
+        const nameParts = (clientRecord.full_name || '').split(' ');
+        const autoFirstName = nameParts[0] || 'Unknown';
+        const autoLastName = nameParts.slice(1).join(' ') || 'Patient';
+        const autoShipping = clientRecord.shipping_address as Record<string, string> | null;
+
+        const autoCountryCodeMap: Record<string, string> = {
+          PT: 'PRT', GB: 'GBR', ZA: 'ZAF', TH: 'THA', US: 'USA',
+        };
+        const autoShippingCC = autoShipping?.countryCode || clientRecord.country_code || 'ZAF';
+        const autoAlpha3 = autoCountryCodeMap[autoShippingCC] || autoShippingCC;
+
+        const autoPayload: Record<string, unknown> = {
+          firstName: autoFirstName,
+          lastName: autoLastName,
+          email: (clientRecord.email || '').toLowerCase().trim(),
+          phoneCode: '+27',
+          phoneCountryCode: 'ZA',
+          contactNumber: '000000000',
+          shipping: {
+            address1: autoShipping?.address1 || 'Address Pending',
+            address2: autoShipping?.address2 || '',
+            city: autoShipping?.city || 'City',
+            state: autoShipping?.state || autoShipping?.city || 'State',
+            country: autoShipping?.country || 'South Africa',
+            countryCode: autoAlpha3,
+            postalCode: autoShipping?.postalCode || '0000',
+            landmark: autoShipping?.landmark || '',
+          },
+          medicalRecord: {
+            dob: '1990-01-01',
+            gender: 'prefer_not_to_say',
+            medicalHistory0: false, medicalHistory1: false, medicalHistory2: false,
+            medicalHistory3: false, medicalHistory4: false,
+            medicalHistory5: ['none'],
+            medicalHistory8: false, medicalHistory9: false, medicalHistory10: false,
+            medicalHistory12: false, medicalHistory13: 'never', medicalHistory14: ['never'],
+          },
+        };
+
+        const autoResp = await drGreenRequestBody("/dapp/clients", "POST", autoPayload, true, envConfig);
+        const autoRespBody = await autoResp.clone().text();
+
+        if (autoResp.ok) {
+          const rawData = JSON.parse(autoRespBody);
+          const newAutoClientId = rawData.client?.id || rawData.data?.id || rawData.clientId || rawData.id;
+          const newAutoKycLink = rawData.client?.kycLink || rawData.data?.kycLink || rawData.kycLink;
+          const apiKey = Deno.env.get(envConfig.apiKeyEnv) || '';
+
+          // Update local record
+          await supabaseClient
+            .from('drgreen_clients')
+            .update({
+              old_drgreen_client_id: clientId,
+              drgreen_client_id: newAutoClientId,
+              kyc_link: newAutoKycLink,
+              is_kyc_verified: false,
+              admin_approval: 'PENDING',
+              rehome_status: 'success',
+              rehome_error: null,
+              rehomed_at: new Date().toISOString(),
+              api_key_scope: apiKey.slice(0, 8),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', clientRecord.id);
+
+          return new Response(JSON.stringify({
+            success: true,
+            clientId: newAutoClientId,
+            kycLink: newAutoKycLink,
+            oldClientId: clientId,
+            message: 'Client auto-rehomed successfully',
+            rehomed: true,
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } else {
+          const errMsg = `Auto-rehome failed: API returned ${autoResp.status}`;
+          await supabaseClient
+            .from('drgreen_clients')
+            .update({
+              rehome_status: 'failed',
+              rehome_error: errMsg,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', clientRecord.id);
+
+          throw new Error(errMsg);
+        }
       }
       
       // TEMPORARY: Public bootstrap endpoint for test client creation

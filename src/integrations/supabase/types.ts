@@ -143,6 +143,7 @@ export type Database = {
       drgreen_clients: {
         Row: {
           admin_approval: string | null
+          api_key_scope: string | null
           country_code: string
           created_at: string
           drgreen_client_id: string
@@ -151,12 +152,17 @@ export type Database = {
           id: string
           is_kyc_verified: boolean | null
           kyc_link: string | null
+          old_drgreen_client_id: string | null
+          rehome_error: string | null
+          rehome_status: string | null
+          rehomed_at: string | null
           shipping_address: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
           admin_approval?: string | null
+          api_key_scope?: string | null
           country_code?: string
           created_at?: string
           drgreen_client_id: string
@@ -165,12 +171,17 @@ export type Database = {
           id?: string
           is_kyc_verified?: boolean | null
           kyc_link?: string | null
+          old_drgreen_client_id?: string | null
+          rehome_error?: string | null
+          rehome_status?: string | null
+          rehomed_at?: string | null
           shipping_address?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
           admin_approval?: string | null
+          api_key_scope?: string | null
           country_code?: string
           created_at?: string
           drgreen_client_id?: string
@@ -179,6 +190,10 @@ export type Database = {
           id?: string
           is_kyc_verified?: boolean | null
           kyc_link?: string | null
+          old_drgreen_client_id?: string | null
+          rehome_error?: string | null
+          rehome_status?: string | null
+          rehomed_at?: string | null
           shipping_address?: Json | null
           updated_at?: string
           user_id?: string

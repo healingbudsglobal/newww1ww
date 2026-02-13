@@ -1,1 +1,4 @@
 project_id = "fvpmzwnqbtxpjjvcsxun"
+
+[functions.drgreen-rehome]
+verify_jwt = false
