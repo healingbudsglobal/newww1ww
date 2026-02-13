@@ -3156,13 +3156,13 @@ serve(async (req) => {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // Use query string signing for GET endpoints (fixes 401 / empty responses)
-        response = await drGreenRequestGet(
-          `/dapp/clients/${body.clientId}/orders`,
-          { orderBy: 'desc', take: 50, page: 1 },
-          false,
-          adminEnvConfig
-        );
+        // Use /dapp/orders with clientId as query param (fixes 404 from old /dapp/clients/{id}/orders path)
+        response = await drGreenRequestQuery("/dapp/orders", {
+          clientId: body.clientId,
+          orderBy: 'desc',
+          take: 50,
+          page: 1,
+        }, false, adminEnvConfig);
         break;
       }
       
@@ -4235,7 +4235,7 @@ serve(async (req) => {
       }
       
       case "get-client-orders": {
-        // GET /dapp/client/:clientId/orders - Get orders for specific client
+        // GET /dapp/orders with clientId query param (fixes 404 from old path-based endpoint)
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
@@ -4246,12 +4246,13 @@ serve(async (req) => {
         }
         
         const queryParams: Record<string, string | number> = {
+          clientId: body.clientId,
           orderBy: orderBy || 'desc',
           take: take || 10,
           page: page || 1,
         };
         
-        response = await drGreenRequestQuery(`/dapp/client/${body.clientId}/orders`, queryParams);
+        response = await drGreenRequestQuery("/dapp/orders", queryParams, false, adminEnvConfig);
         break;
       }
       
