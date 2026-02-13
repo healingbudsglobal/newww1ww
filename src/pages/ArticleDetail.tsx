@@ -35,6 +35,7 @@ interface Article {
   author: string;
   is_featured: boolean;
   published_at: string;
+  source_url: string | null;
 }
 
 const categoryColors: Record<string, string> = {
@@ -319,6 +320,21 @@ const ArticleDetail = () => {
                   <div className="prose-custom">
                     {renderContent(article.content)}
                   </div>
+
+                  {/* Read Original Article Link */}
+                  {article.source_url && (
+                    <div className="mt-10 pt-6 border-t border-border">
+                      <a
+                        href={article.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {t('readOriginal')}
+                      </a>
+                    </div>
+                  )}
                 </motion.div>
               </div>
             </article>
