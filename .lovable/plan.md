@@ -1,89 +1,48 @@
 
 
-# Fix Auth Page Flickering and Race Condition
+# Fix AdminOrders Infinite Render Loop (Flickering)
 
 ## Problem
 
-The auth page flickers because `ShopContext.onAuthStateChange` directly calls `fetchClient()`, which invokes edge functions. During auth state transitions (login, token refresh), this creates a race condition where API calls fire before the session is fully established, causing 401 errors and rapid state toggling.
+The `/admin/orders` page flickers with the console error: **"Maximum update depth exceeded"**. This is caused by an infinite re-render loop.
 
-## Root Cause (Technical)
+## Root Cause
 
-In `src/context/ShopContext.tsx` (lines 391-401):
-
-```text
-onAuthStateChange(() => {
-  fetchCart();      // <- async DB call inside listener
-  fetchClient();   // <- async edge function call inside listener
-});
-```
-
-Per Supabase best practices, awaiting or invoking async Supabase calls directly inside `onAuthStateChange` can cause deadlocks and flickering. The listener fires before the token is fully refreshed, leading to 401s from the proxy.
-
-## Solution
-
-### 1. Fix ShopContext auth pattern (`src/context/ShopContext.tsx`)
-
-- Separate **initial load** (controls `isLoading`) from **ongoing auth changes** (updates state but defers API calls)
-- Use `setTimeout(fn, 0)` to dispatch `fetchClient` and `fetchCart` from within `onAuthStateChange`, preventing deadlocks
-- Only set `isLoading = false` after the initial load completes (not on every auth event)
+In `useAdminOrderSync.ts` (line 610-613), `fetchOrders` is defined as an inline arrow function:
 
 ```text
-useEffect(() => {
-  let isMounted = true;
-
-  // Listener for ONGOING changes - defer with setTimeout
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      if (!isMounted) return;
-      if (event === 'SIGNED_OUT') {
-        setDrGreenClient(null);
-        setCart([]);
-        return;
-      }
-      // Defer to avoid deadlock
-      setTimeout(() => {
-        if (isMounted) {
-          fetchCart();
-          fetchClient();
-        }
-      }, 0);
-    }
-  );
-
-  // INITIAL load - controls isLoading
-  const initializeShop = async () => {
-    await fetchCart();
-    await fetchClient();
-    // isLoading is set to false inside fetchClient
-  };
-  initializeShop();
-
-  return () => {
-    isMounted = false;
-    subscription.unsubscribe();
-  };
-}, [fetchCart, fetchClient]);
+fetchOrders: async (filters) => {
+  const result = await fetchAllOrders(filters);
+  return result;
+},
 ```
 
-### 2. Fix Auth.tsx redirect logic (`src/pages/Auth.tsx`)
+This creates a **new function reference on every render**. In `AdminOrders.tsx`, `handleFilterChange` is a `useCallback` that lists `fetchOrders` as a dependency. Since `fetchOrders` changes every render, `handleFilterChange` also changes every render, which triggers the `useEffect` hooks that depend on it, causing state updates (`setOrders`, `setIsFiltering`), which trigger another render -- creating an infinite loop.
 
-- Respect the `?redirect=` query parameter instead of always sending users to `/admin` or `/dashboard`
-- This is important since the user arrived at `/auth?redirect=%2Fcheckout`
+## Fix
 
-### 3. Guard against stale token in fetchClient (`src/context/ShopContext.tsx`)
+### 1. Stabilize `fetchOrders` in `useAdminOrderSync.ts`
 
-- In `fetchClient`, add a small guard: if `getSession()` returns no session, bail immediately and set loading false -- already present, but ensure no edge function call fires without a valid session
+Replace the inline arrow function with a proper `useCallback`-wrapped reference:
+
+```text
+// Before (line 610-613): recreated every render
+fetchOrders: async (filters: OrderFilters) => {
+  const result = await fetchAllOrders(filters);
+  return result;
+},
+
+// After: stable reference
+fetchOrders: fetchAllOrders,  // fetchAllOrders is already useCallback with [] deps
+```
+
+Since `fetchAllOrders` is already wrapped in `useCallback` with `[]` dependencies, simply returning it directly gives `fetchOrders` a stable identity across renders.
+
+### 2. No changes needed in `AdminOrders.tsx`
+
+Once `fetchOrders` is stable, the existing `handleFilterChange` and its dependent `useEffect` hooks will stop re-firing unnecessarily. The flickering stops.
 
 ## Files Modified
 
-- `src/context/ShopContext.tsx` -- fix auth listener pattern, prevent race condition
-- `src/pages/Auth.tsx` -- respect redirect query param
-
-## Client Summary
-
-Only 1 client exists in the database:
-
-| Name | Email | Dr Green ID | KYC | Approval | Country | Rehome |
-|------|-------|-------------|-----|----------|---------|--------|
-| Scott Hickling | scott.k1@outlook.com | dfd81e64-... | Yes | VERIFIED | PT | none |
+- `src/hooks/useAdminOrderSync.ts` -- replace inline `fetchOrders` wrapper with stable `fetchAllOrders` reference (1 line change)
 
