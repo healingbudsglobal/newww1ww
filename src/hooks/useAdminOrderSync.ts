@@ -607,10 +607,7 @@ export function useAdminOrderSync() {
     error: ordersQuery.error,
 
     // Actions
-    fetchOrders: async (filters: OrderFilters) => {
-      const result = await fetchAllOrders(filters);
-      return result;
-    },
+    fetchOrders: fetchAllOrders,
     syncOrder: syncOrderMutation.mutateAsync,
     batchSyncOrders: batchSyncMutation.mutateAsync,
     updateOrderStatus: updateOrderStatusMutation.mutateAsync,
