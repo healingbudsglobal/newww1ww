@@ -110,6 +110,15 @@ export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProp
                 <code className="text-xs bg-muted px-2 py-1 rounded">
                   {order.drgreen_order_id.slice(0, 8)}...
                 </code>
+                {/* Mobile-only summary */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 md:hidden">
+                  <Badge className={`${getStatusColor(order.status)} border text-[10px] px-1.5 py-0`}>
+                    {getDisplayStatus(order.status)}
+                  </Badge>
+                  <span className="text-xs font-semibold text-foreground">
+                    {formatPrice(order.total_amount, order.country_code || 'ZA')}
+                  </span>
+                </div>
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Button

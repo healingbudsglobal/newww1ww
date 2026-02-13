@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, Package, CreditCard, MapPin, RefreshCw, Printer } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, MapPin, RefreshCw, Printer, Clock, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 import Header from "@/layout/Header";
@@ -176,6 +176,28 @@ export default function OrderDetail() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Status Banner */}
+                {(order.status === "PENDING_SYNC" || order.payment_status === "AWAITING_PROCESSING" || order.status.toLowerCase() === "pending") ? (
+                  <Card className="rounded-2xl border-amber-500/30 bg-amber-500/10">
+                    <CardContent className="py-4 px-5 flex items-start gap-3">
+                      <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold text-amber-700 dark:text-amber-300">Order Queued for Processing</p>
+                        <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1">
+                          Your order has been received and saved securely. Our team will process it and confirm via email.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (order.payment_status.toLowerCase() === "paid" || order.status.toLowerCase() === "confirmed" || order.status.toLowerCase() === "completed") ? (
+                  <Card className="rounded-2xl border-emerald-500/30 bg-emerald-500/10">
+                    <CardContent className="py-4 px-5 flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-300">Order Confirmed</p>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 {/* Timeline */}
                 <Card className="rounded-2xl border-border/50">

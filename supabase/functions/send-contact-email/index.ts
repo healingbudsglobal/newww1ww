@@ -18,6 +18,17 @@ interface ContactFormRequest {
   email: string;
   subject: string;
   message: string;
+  region?: string;
+}
+
+const SEND_DOMAIN_MAP: Record<string, string> = {
+  ZA: 'send.healingbuds.co.za',
+  PT: 'send.healingbuds.pt',
+  GB: 'send.healingbuds.co.uk',
+};
+
+function getSendDomain(region?: string): string {
+  return SEND_DOMAIN_MAP[region?.toUpperCase() || ''] || 'send.healingbuds.co.za';
 }
 
 // Simple validation function (mirrors frontend Zod schema)
@@ -190,7 +201,7 @@ const handler = async (req: Request): Promise<Response> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: "Healing Buds <noreply@send.healingbuds.co.za>",
+        from: `Healing Buds <noreply@${getSendDomain(body.region)}>`,
         to: [email.trim()],
         subject: "Thank you for contacting Healing Buds",
         html: emailHtml,
