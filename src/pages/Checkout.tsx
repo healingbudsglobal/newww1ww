@@ -292,7 +292,7 @@ const Checkout = () => {
       }
 
       // Save order locally with complete context snapshot for reliable admin sync
-      const clientCountryCode = drGreenClient.country_code || countryCode || 'PT';
+      const clientCountryCode = drGreenClient.country_code || countryCode || 'ZA';
       await saveOrder({
         drgreen_order_id: createdOrderId,
         status: finalStatus,
@@ -354,7 +354,7 @@ const Checkout = () => {
         const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
         const localOrderId = `LOCAL-${datePart}-${rand}`;
 
-        const clientCountryCode = drGreenClient.country_code || countryCode || 'PT';
+        const clientCountryCode = drGreenClient.country_code || countryCode || 'ZA';
 
         await saveOrder({
           drgreen_order_id: localOrderId,

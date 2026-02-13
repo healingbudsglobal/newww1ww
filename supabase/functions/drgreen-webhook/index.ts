@@ -54,11 +54,11 @@ function sanitizeForLogging(data: Record<string, unknown>): Record<string, unkno
 const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000;
 
 // Multi-domain configuration for Healing Buds regions
-const DOMAIN_CONFIG: Record<string, { domain: string; brandName: string }> = {
-  'ZA': { domain: 'healingbuds.co.za', brandName: 'Healing Buds South Africa' },
-  'PT': { domain: 'healingbuds.pt', brandName: 'Healing Buds Portugal' },
-  'GB': { domain: 'healingbuds.co.uk', brandName: 'Healing Buds UK' },
-  'global': { domain: 'healingbuds.global', brandName: 'Healing Buds' },
+const DOMAIN_CONFIG: Record<string, { domain: string; brandName: string; sendDomain: string }> = {
+  'ZA': { domain: 'healingbuds.co.za', brandName: 'Healing Buds South Africa', sendDomain: 'send.healingbuds.co.za' },
+  'PT': { domain: 'healingbuds.pt', brandName: 'Healing Buds Portugal', sendDomain: 'send.healingbuds.pt' },
+  'GB': { domain: 'healingbuds.co.uk', brandName: 'Healing Buds UK', sendDomain: 'send.healingbuds.co.uk' },
+  'global': { domain: 'healingbuds.global', brandName: 'Healing Buds', sendDomain: 'send.healingbuds.co.za' },
 };
 
 function getDomainConfig(region?: string) {
@@ -248,7 +248,7 @@ async function sendEmail(to: string, subject: string, html: string, config: type
 
   try {
     // Use verified domain or fallback to resend.dev
-    const fromAddress = `${config.brandName} <noreply@send.healingbuds.co.za>`;
+    const fromAddress = `${config.brandName} <noreply@${config.sendDomain}>`;
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
