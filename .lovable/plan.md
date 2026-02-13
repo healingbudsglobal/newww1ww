@@ -1,61 +1,73 @@
 
 
-# Fix Email Region Detection + Enhance Order Detail View
+# Implement Plan: Fix Email Region + Enhance Order Views
 
-## Problem 1: Email Says "Healing Buds Portugal" for South Africa Orders
-
-The order confirmation email shows "Healing Buds Portugal" because the country code fallback in `Checkout.tsx` (lines 295 and 357) defaults to `'PT'`:
-
-```text
-const clientCountryCode = drGreenClient.country_code || countryCode || 'PT';
-```
-
-Since `ricardo.drgreennft.com` is the South Africa site, but the client's `country_code` in the DB is likely null or not set, it falls through to the hardcoded `'PT'` fallback. This then gets passed as `region: 'PT'` to the email function, which looks up "Healing Buds Portugal" in `DOMAIN_CONFIG`.
-
-### Fix
-- **`src/pages/Checkout.tsx`** (lines 295 and 357): Change fallback from `'PT'` to `'ZA'` since this is the South Africa store. Better yet, derive a smarter default from the tenant context or shipping address country.
-
-## Problem 2: Email "from" Domain Always Uses .co.za
-
-The `send-order-confirmation` edge function hardcodes the "from" address to `noreply@send.healingbuds.co.za` for all regions. Each region's emails should come from their own domain.
-
-### Fix
-- **`supabase/functions/send-order-confirmation/index.ts`**: Add `sendDomain` to `DOMAIN_CONFIG` and use it in the `from:` field:
-  - ZA: `send.healingbuds.co.za`
-  - PT: `send.healingbuds.pt`
-  - GB: `send.healingbuds.co.uk`
-  - Global fallback: `send.healingbuds.co.za`
-- Fix PT support email from `suporte@healingbuds.pt` to `support@healingbuds.pt`
-
-## Problem 3: Order Detail Page Should Show Email-Level Information
-
-When clicking "Recent Orders", the detail page should mirror the information shown in the confirmation email: status banner (e.g., "Order Queued for Processing"), product table with quantities and subtotals, shipping address, and total -- similar to the email layout.
-
-### Fix
-- **`src/pages/OrderDetail.tsx`**: Add a status banner card (amber for pending/local orders, green for confirmed) matching the email's visual treatment. The existing page already shows items, shipping, and total -- just needs the prominent status message banner added above the timeline.
-
-## Problem 4: OrdersTable Shows Limited Info on Mobile
-
-On mobile, most columns are hidden (`hidden md:table-cell`). When a user taps an order, they only see the date, a truncated ref, and the action button.
-
-### Fix
-- **`src/components/shop/OrdersTable.tsx`**: Show total amount and a single combined status badge on mobile (remove `hidden md:table-cell` from key columns or add a mobile-specific summary row).
+## API Health Check Result
+The Dr. Green API credentials are verified and working -- health check returned "healthy" with 510ms response time.
 
 ---
 
-## Technical Changes Summary
+## Step 1: Fix Country Code Fallback in Checkout
 
-| File | Change |
-|------|--------|
-| `src/pages/Checkout.tsx` (2 lines) | Change `'PT'` fallback to `'ZA'` on lines 295 and 357 |
-| `supabase/functions/send-order-confirmation/index.ts` | Add `sendDomain` to DOMAIN_CONFIG, use region-aware `from:`, fix PT `suporte` to `support` |
-| `src/pages/OrderDetail.tsx` | Add status banner card (amber for pending/local, green for confirmed) above the timeline |
-| `src/components/shop/OrdersTable.tsx` | Show total and status on mobile view |
+**File:** `src/pages/Checkout.tsx`
+
+Two lines (295 and 357) hardcode `'PT'` as the fallback country code. This causes South Africa orders to be tagged as Portugal, which cascades into wrong email branding.
+
+**Change:** Replace `'PT'` with `'ZA'` on both lines so the South Africa store defaults correctly.
+
+---
+
+## Step 2: Region-Aware Email Domains Across 6 Edge Functions
+
+All 6 email-sending functions hardcode `noreply@send.healingbuds.co.za` as the "from" address. Each must use the store's country domain.
+
+**Domain mapping to add:**
+- ZA: `send.healingbuds.co.za`
+- PT: `send.healingbuds.pt`
+- GB: `send.healingbuds.co.uk`
+- Global fallback: `send.healingbuds.co.za`
+
+**Files to update:**
+
+| File | Current | Fix |
+|------|---------|-----|
+| `send-order-confirmation/index.ts` | Hardcoded `.co.za`, PT uses `suporte@` | Add `sendDomain` to DOMAIN_CONFIG, fix PT to `support@` |
+| `send-dispatch-email/index.ts` | Hardcoded `.co.za` | Same pattern |
+| `send-client-email/index.ts` | Hardcoded `.co.za` | Same pattern |
+| `drgreen-webhook/index.ts` | Hardcoded `.co.za` | Same pattern |
+| `send-onboarding-email/index.ts` | Hardcoded `.co.za`, no region awareness | Add region param + domain config |
+| `send-contact-email/index.ts` | Hardcoded `.co.za`, no region awareness | Add region param + domain config |
+
+Note: Non-ZA domains must be verified in Resend for emails to actually deliver from those domains.
+
+---
+
+## Step 3: Add Status Banner to Order Detail Page
+
+**File:** `src/pages/OrderDetail.tsx`
+
+Currently shows badges and a timeline but lacks the prominent status message banner that the email has. Add a status card between the header and timeline:
+
+- **Amber banner** for pending/local orders: "Order Queued for Processing" with explanation text ("Your order has been received and saved securely. Our team will process it and confirm via email.")
+- **Green banner** for confirmed/paid orders: "Order Confirmed"
+- Uses the same visual treatment as the email notification
+
+---
+
+## Step 4: Improve Mobile Visibility in Orders Table
+
+**File:** `src/components/shop/OrdersTable.tsx`
+
+On mobile, columns for Payment, Status, Qty, and Total are hidden (`hidden md:table-cell`). Users only see date, truncated ref, and a reorder button.
+
+**Fix:** Show total amount and a combined status badge on mobile by removing `hidden md:table-cell` from the Total and Status columns (or adding a compact mobile summary below the ref).
+
+---
 
 ## Implementation Order
 
-1. Fix the country code fallback in Checkout.tsx (root cause of wrong region)
-2. Update send-order-confirmation edge function with region-aware domains
-3. Enhance OrderDetail.tsx with status banner
-4. Improve OrdersTable mobile visibility
+1. Checkout.tsx -- 2-line fix (root cause)
+2. 6 edge functions -- region-aware from addresses
+3. OrderDetail.tsx -- status banner
+4. OrdersTable.tsx -- mobile columns
 
