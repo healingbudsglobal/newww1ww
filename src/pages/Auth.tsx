@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ const Auth = () => {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { t } = useTranslation('auth');
   
@@ -84,6 +85,11 @@ const Auth = () => {
   useEffect(() => {
     if (isSettingNewPassword) return;
     if (user && !roleLoading && !clientLoading) {
+      const redirectTo = searchParams.get('redirect');
+      if (redirectTo) {
+        navigate(redirectTo, { replace: true });
+        return;
+      }
       if (isAdmin) {
         navigate("/admin", { replace: true });
         return;
@@ -94,7 +100,7 @@ const Auth = () => {
       }
       navigate("/dashboard/status", { replace: true });
     }
-  }, [user, isAdmin, roleLoading, isEligible, clientLoading, navigate, isSettingNewPassword]);
+  }, [user, isAdmin, roleLoading, isEligible, clientLoading, navigate, isSettingNewPassword, searchParams]);
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();

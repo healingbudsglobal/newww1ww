@@ -389,15 +389,39 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [drGreenClient?.drgreen_client_id, fetchClient]);
 
   useEffect(() => {
-    fetchCart();
-    fetchClient();
+    let isMounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      fetchCart();
-      fetchClient();
-    });
+    // Listener for ONGOING auth changes - defer with setTimeout to avoid deadlock
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (!isMounted) return;
+        if (event === 'SIGNED_OUT') {
+          setDrGreenClient(null);
+          setCart([]);
+          return;
+        }
+        // Defer async calls to avoid Supabase auth deadlock
+        setTimeout(() => {
+          if (isMounted) {
+            fetchCart();
+            fetchClient();
+          }
+        }, 0);
+      }
+    );
 
-    return () => subscription.unsubscribe();
+    // INITIAL load - controls isLoading
+    const initializeShop = async () => {
+      await fetchCart();
+      await fetchClient();
+      // isLoading is set to false inside fetchClient
+    };
+    initializeShop();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchCart, fetchClient]);
 
   // Live sync: poll for verification status updates every 60 seconds
