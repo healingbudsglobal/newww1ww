@@ -44,6 +44,8 @@ import { cn } from "@/lib/utils";
 const AdminOrders = () => {
   const [activeTab, setActiveTab] = useState<SyncStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<LocalOrder | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [orders, setOrders] = useState<LocalOrder[]>([]);
@@ -77,13 +79,15 @@ const AdminOrders = () => {
     setOrders(initialOrders);
   }, [initialOrders]);
 
-  // Filter orders when tab or search changes
+  // Filter orders when tab, search, or date range changes
   const handleFilterChange = useCallback(async () => {
     setIsFiltering(true);
     try {
       const filters: OrderFilters = {
         syncStatus: activeTab,
         search: searchQuery || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
       };
       const result = await fetchOrders(filters);
       setOrders(result.orders);
@@ -92,19 +96,19 @@ const AdminOrders = () => {
     } finally {
       setIsFiltering(false);
     }
-  }, [activeTab, searchQuery, fetchOrders]);
+  }, [activeTab, searchQuery, dateFrom, dateTo, fetchOrders]);
 
   useEffect(() => {
     handleFilterChange();
   }, [activeTab, handleFilterChange]);
 
-  // Debounced search
+  // Debounced search and date filter
   useEffect(() => {
     const timer = setTimeout(() => {
       handleFilterChange();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, handleFilterChange]);
+  }, [searchQuery, dateFrom, dateTo, handleFilterChange]);
 
   // Set up realtime subscription
   useEffect(() => {
@@ -337,7 +341,7 @@ const AdminOrders = () => {
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SyncStatus | "all")}>
             <div className="border-b border-border px-4 py-3">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <TabsList className="bg-muted/50">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="pending">Pending</TabsTrigger>
@@ -346,8 +350,8 @@ const AdminOrders = () => {
                   <TabsTrigger value="manual_review">Review</TabsTrigger>
                 </TabsList>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-56">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       placeholder="Search orders..."
@@ -355,6 +359,33 @@ const AdminOrders = () => {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
                     />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="h-9 w-[130px] text-xs"
+                      placeholder="From"
+                    />
+                    <span className="text-xs text-muted-foreground">–</span>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="h-9 w-[130px] text-xs"
+                      placeholder="To"
+                    />
+                    {(dateFrom || dateTo) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 px-2 text-xs text-muted-foreground"
+                        onClick={() => { setDateFrom(""); setDateTo(""); }}
+                      >
+                        Clear
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
