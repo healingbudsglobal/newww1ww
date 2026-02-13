@@ -1698,6 +1698,10 @@ serve(async (req) => {
     // Check if action only requires authentication (no ownership check)
     const isAuthOnlyAction = AUTH_ONLY_ACTIONS.includes(action);
     
+    // Hoisted auth variables - accessible in route handlers below
+    let authenticatedUser: any = null;
+    let supabaseClient: any = null;
+    
     // Handle country-gated actions (strains)
     // IMPORTANT: For open countries (ZAF, THA), skip ALL auth checks completely.
     // Even if client sends an invalid/expired JWT, we ignore it for open country browsing.
@@ -1735,69 +1739,69 @@ serve(async (req) => {
         logInfo(`Authenticated user accessing ${action}`);
       }
     } else if (!isPublicAction) {
-      {
-        // All non-country-gated, non-public actions require authentication
-        const authResult = await verifyAuthentication(req);
+      // All non-country-gated, non-public actions require authentication
+      const authResult = await verifyAuthentication(req);
+      
+      if (!authResult) {
+        logWarn(`Unauthenticated request to ${action}`);
+        return new Response(
+          JSON.stringify({ error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Hoist user and supabaseClient so they're accessible in route handlers below
+      authenticatedUser = authResult.user;
+      supabaseClient = authResult.supabaseClient;
+
+      // Check admin role for admin-only endpoints
+      if (ADMIN_ACTIONS.includes(action)) {
+        const hasAdminRole = await isAdmin(supabaseClient, authenticatedUser.id);
         
-        if (!authResult) {
-          logWarn(`Unauthenticated request to ${action}`);
+        if (!hasAdminRole) {
+          logWarn(`Non-admin attempted to access ${action}`);
           return new Response(
-            JSON.stringify({ error: 'Authentication required' }),
-            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: 'Admin access required' }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        logInfo(`Admin accessed ${action}`);
+      }
 
-        const { user, supabaseClient } = authResult;
-
-        // Check admin role for admin-only endpoints
-        if (ADMIN_ACTIONS.includes(action)) {
-          const hasAdminRole = await isAdmin(supabaseClient, user.id);
-          
-          if (!hasAdminRole) {
-            logWarn(`Non-admin attempted to access ${action}`);
+      // Verify resource ownership for client-specific operations
+      if (OWNERSHIP_ACTIONS.includes(action)) {
+        const clientId = body?.clientId || body?.data?.clientId;
+        
+        if (clientId) {
+          // Validate clientId input
+          if (!validateClientId(clientId)) {
             return new Response(
-              JSON.stringify({ error: 'Admin access required' }),
-              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              JSON.stringify({ error: 'Invalid client ID format' }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
-          logInfo(`Admin accessed ${action}`);
-        }
-
-        // Verify resource ownership for client-specific operations
-        if (OWNERSHIP_ACTIONS.includes(action)) {
-          const clientId = body?.clientId || body?.data?.clientId;
           
-          if (clientId) {
-            // Validate clientId input
-            if (!validateClientId(clientId)) {
+          // Check ownership or admin status
+          const ownsResource = await verifyClientOwnership(supabaseClient, authenticatedUser.id, clientId);
+          
+          if (!ownsResource) {
+            const hasAdminRole = await isAdmin(supabaseClient, authenticatedUser.id);
+            
+            if (!hasAdminRole) {
+              logWarn(`User attempted unauthorized access`);
               return new Response(
-                JSON.stringify({ error: 'Invalid client ID format' }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                JSON.stringify({ error: 'Access denied' }),
+                { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
-            }
-            
-            // Check ownership or admin status
-            const ownsResource = await verifyClientOwnership(supabaseClient, user.id, clientId);
-            
-            if (!ownsResource) {
-              const hasAdminRole = await isAdmin(supabaseClient, user.id);
-              
-              if (!hasAdminRole) {
-                logWarn(`User attempted unauthorized access`);
-                return new Response(
-                  JSON.stringify({ error: 'Access denied' }),
-                  { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
-              }
             }
           }
         }
+      }
 
-        // Special case: create-client-legacy and create-client don't require ownership 
-        // (new client creation) but do require authentication
-        if (action === 'create-client-legacy' || action === 'create-client') {
-          logInfo(`User creating new client`);
-        }
+      // Special case: create-client-legacy and create-client don't require ownership 
+      // (new client creation) but do require authentication
+      if (action === 'create-client-legacy' || action === 'create-client') {
+        logInfo(`User creating new client`);
       }
     }
 
