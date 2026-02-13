@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { updateCachedRates } from '@/lib/currency';
+import { useStrainSync } from '@/hooks/useStrainSync';
 
 interface CartItem {
   id: string;
@@ -103,6 +104,8 @@ function getCountryFromDomain(): string {
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const { rates, lastUpdated, convertPrice } = useExchangeRates();
+  // Auto-sync strains on app initialization and periodically
+  useStrainSync();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);

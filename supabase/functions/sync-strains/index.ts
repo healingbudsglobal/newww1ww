@@ -123,184 +123,204 @@ serve(async (req) => {
     console.log("Starting strain sync from Dr Green API...");
     
     // Parse request body for optional parameters
-    let countryCode = 'PRT';
+    let countryCodes = ['PRT'];
     let take = 100;
     let page = 1;
+    let multiCountry = false;
+    let skipIfFreshHours = 0;
     
     try {
       const body = await req.json();
-      if (body.countryCode) countryCode = body.countryCode;
+      if (body.multiCountry) {
+        multiCountry = true;
+        countryCodes = ['ZAF', 'PRT', 'GBR', 'THA'];
+      } else if (body.countryCode) {
+        countryCodes = [body.countryCode];
+      }
       if (body.take) take = body.take;
       if (body.page) page = body.page;
+      if (body.skipIfFreshHours) skipIfFreshHours = body.skipIfFreshHours;
     } catch {
       // No body or invalid JSON, use defaults
     }
     
-    // Fetch strains from Dr Green API using query string signing (Method B)
-    const queryParams: Record<string, string | number> = {
-      orderBy: 'desc',
-      take: take,
-      page: page,
-    };
-    
-    // Try with country code first
-    console.log(`Fetching strains for country: ${countryCode}`);
-    let response = await drGreenRequestQuery("/strains", { ...queryParams, countryCode });
-    
-    if (!response.ok) {
-      // Try without country code (global catalog)
-      console.log('Country-specific request failed, trying global catalog...');
-      response = await drGreenRequestQuery("/strains", queryParams);
-    }
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Dr Green API error:", response.status, errorText);
-      throw new Error(`Dr Green API error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log(`Received ${data?.data?.strains?.length || 0} strains from Dr Green API`);
-    console.log('Sample strain data:', JSON.stringify(data?.data?.strains?.[0], null, 2));
-    
-    if (!data?.success || !data?.data?.strains?.length) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "No strains returned from API", 
-          synced: 0,
-          raw: data 
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    const strains = data.data.strains;
-    let syncedCount = 0;
-    let errorCount = 0;
-    
-    for (const strain of strains) {
-      try {
-        // Build full image URL
-        let imageUrl = null;
-        if (strain.imageUrl) {
-          imageUrl = strain.imageUrl.startsWith('http') 
-            ? strain.imageUrl 
-            : `${S3_BASE}${strain.imageUrl}`;
-        } else if (strain.image) {
-          imageUrl = strain.image.startsWith('http')
-            ? strain.image
-            : `${S3_BASE}${strain.image}`;
-        }
-        
-        // Parse effects/feelings - handle arrays and strings
-        let feelings: string[] = [];
-        if (Array.isArray(strain.feelings)) {
-          feelings = strain.feelings;
-        } else if (typeof strain.feelings === 'string') {
-          feelings = strain.feelings.split(',').map((s: string) => s.trim());
-        } else if (Array.isArray(strain.effects)) {
-          feelings = strain.effects;
-        }
-        
-        // Parse flavors - handle arrays and strings
-        let flavors: string[] = [];
-        if (Array.isArray(strain.flavour)) {
-          flavors = strain.flavour;
-        } else if (typeof strain.flavour === 'string') {
-          flavors = strain.flavour.split(',').map((s: string) => s.trim());
-        } else if (Array.isArray(strain.flavors)) {
-          flavors = strain.flavors;
-        }
-        
-        // Parse helps_with
-        let helpsWith: string[] = [];
-        if (Array.isArray(strain.helpsWith)) {
-          helpsWith = strain.helpsWith;
-        } else if (typeof strain.helpsWith === 'string') {
-          helpsWith = strain.helpsWith.split(',').map((s: string) => s.trim());
-        }
-        
-        // Get availability from strainLocations if present
-        const location = strain.strainLocations?.[0];
-        const isAvailable = location?.isAvailable ?? strain.isAvailable ?? strain.availability ?? true;
-        const stock = location?.stockQuantity ?? strain.stock ?? strain.stockQuantity ?? 100;
-        
-        // Get price - try multiple possible fields
-        const retailPrice = 
-          parseFloat(strain.retailPrice) || 
-          parseFloat(strain.pricePerGram) || 
-          parseFloat(strain.price) || 
-          parseFloat(location?.retailPrice) ||
-          0;
-        
-        // Get THC/CBD - try multiple field names
-        const thcContent = 
-          parseFloat(strain.thc) || 
-          parseFloat(strain.thcContent) || 
-          parseFloat(strain.THC) ||
-          0;
-        const cbdContent = 
-          parseFloat(strain.cbd) || 
-          parseFloat(strain.cbdContent) || 
-          parseFloat(strain.CBD) ||
-          0;
-        const cbgContent =
-          parseFloat(strain.cbg) ||
-          parseFloat(strain.cbgContent) ||
-          0;
-        
-        // Upsert strain into local database
-        const strainData = {
-          id: strain.id,
-          sku: strain.batchNumber || strain.sku || strain.id,
-          name: strain.name,
-          description: strain.description || '',
-          type: strain.category || strain.type || 'Hybrid',
-          thc_content: thcContent,
-          cbd_content: cbdContent,
-          cbg_content: cbgContent,
-          retail_price: retailPrice,
-          availability: isAvailable,
-          stock: stock,
-          image_url: imageUrl,
-          feelings: feelings,
-          flavors: flavors,
-          helps_with: helpsWith,
-          brand_name: strain.brandName || 'Dr. Green',
-          is_archived: false,
-          updated_at: new Date().toISOString(),
-        };
-        
-        console.log(`Upserting strain: ${strain.name}`, strainData);
-        
-        const { error: upsertError } = await supabase
-          .from('strains')
-          .upsert(strainData, { onConflict: 'id' });
-        
-        if (upsertError) {
-          console.error(`Error upserting strain ${strain.name}:`, upsertError);
-          errorCount++;
-        } else {
-          console.log(`Synced strain: ${strain.name}`);
-          syncedCount++;
-        }
-      } catch (strainError) {
-        console.error(`Error processing strain ${strain.name}:`, strainError);
-        errorCount++;
+    // Freshness check: skip sync if data is recent enough
+    if (skipIfFreshHours > 0) {
+      const cutoff = new Date(Date.now() - skipIfFreshHours * 60 * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from('strains')
+        .select('*', { count: 'exact', head: true })
+        .gte('updated_at', cutoff);
+      
+      if ((count ?? 0) > 0) {
+        console.log(`[Sync] ${count} strains updated within ${skipIfFreshHours}h, skipping sync`);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Strains are fresh, sync skipped', skipped: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
     
-    console.log(`Sync complete: ${syncedCount} synced, ${errorCount} errors`);
+    let totalSynced = 0;
+    let totalErrors = 0;
+    let totalStrains = 0;
+    
+    for (const countryCode of countryCodes) {
+      console.log(`\n--- Syncing strains for ${countryCode} ---`);
+      
+      // Fetch strains from Dr Green API using query string signing
+      const queryParams: Record<string, string | number> = {
+        orderBy: 'desc',
+        take: take,
+        page: page,
+      };
+      
+      let response = await drGreenRequestQuery("/strains", { ...queryParams, countryCode });
+      
+      if (!response.ok) {
+        console.log(`Country-specific request failed for ${countryCode}, trying global catalog...`);
+        response = await drGreenRequestQuery("/strains", queryParams);
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Dr Green API error for ${countryCode}:`, response.status, errorText);
+        totalErrors++;
+        continue;
+      }
+      
+      const data = await response.json();
+      const strains = data?.data?.strains || [];
+      console.log(`Received ${strains.length} strains for ${countryCode}`);
+      if (strains.length === 0) {
+        console.log(`No strains returned for ${countryCode}`);
+        continue;
+      }
+      
+      let syncedCount = 0;
+      let errorCount = 0;
+      
+      for (const strain of strains) {
+        try {
+          // Build full image URL
+          let imageUrl = null;
+          if (strain.imageUrl) {
+            imageUrl = strain.imageUrl.startsWith('http') 
+              ? strain.imageUrl 
+              : `${S3_BASE}${strain.imageUrl}`;
+          } else if (strain.image) {
+            imageUrl = strain.image.startsWith('http')
+              ? strain.image
+              : `${S3_BASE}${strain.image}`;
+          }
+          
+          // Parse effects/feelings
+          let feelings: string[] = [];
+          if (Array.isArray(strain.feelings)) {
+            feelings = strain.feelings;
+          } else if (typeof strain.feelings === 'string') {
+            feelings = strain.feelings.split(',').map((s: string) => s.trim());
+          } else if (Array.isArray(strain.effects)) {
+            feelings = strain.effects;
+          }
+          
+          // Parse flavors
+          let flavors: string[] = [];
+          if (Array.isArray(strain.flavour)) {
+            flavors = strain.flavour;
+          } else if (typeof strain.flavour === 'string') {
+            flavors = strain.flavour.split(',').map((s: string) => s.trim());
+          } else if (Array.isArray(strain.flavors)) {
+            flavors = strain.flavors;
+          }
+          
+          // Parse helps_with
+          let helpsWith: string[] = [];
+          if (Array.isArray(strain.helpsWith)) {
+            helpsWith = strain.helpsWith;
+          } else if (typeof strain.helpsWith === 'string') {
+            helpsWith = strain.helpsWith.split(',').map((s: string) => s.trim());
+          }
+          
+          const location = strain.strainLocations?.[0];
+          const isAvailable = location?.isAvailable ?? strain.isAvailable ?? strain.availability ?? true;
+          const stock = location?.stockQuantity ?? strain.stock ?? strain.stockQuantity ?? 100;
+          
+          const retailPrice = 
+            parseFloat(strain.retailPrice) || 
+            parseFloat(strain.pricePerGram) || 
+            parseFloat(strain.price) || 
+            parseFloat(location?.retailPrice) ||
+            0;
+          
+          const thcContent = 
+            parseFloat(strain.thc) || 
+            parseFloat(strain.thcContent) || 
+            parseFloat(strain.THC) ||
+            0;
+          const cbdContent = 
+            parseFloat(strain.cbd) || 
+            parseFloat(strain.cbdContent) || 
+            parseFloat(strain.CBD) ||
+            0;
+          const cbgContent =
+            parseFloat(strain.cbg) ||
+            parseFloat(strain.cbgContent) ||
+            0;
+          
+          const strainData = {
+            id: strain.id,
+            sku: strain.batchNumber || strain.sku || strain.id,
+            name: strain.name,
+            description: strain.description || '',
+            type: strain.category || strain.type || 'Hybrid',
+            thc_content: thcContent,
+            cbd_content: cbdContent,
+            cbg_content: cbgContent,
+            retail_price: retailPrice,
+            availability: isAvailable,
+            stock: stock,
+            image_url: imageUrl,
+            feelings: feelings,
+            flavors: flavors,
+            helps_with: helpsWith,
+            brand_name: strain.brandName || 'Dr. Green',
+            is_archived: false,
+            updated_at: new Date().toISOString(),
+          };
+          
+          const { error: upsertError } = await supabase
+            .from('strains')
+            .upsert(strainData, { onConflict: 'id' });
+          
+          if (upsertError) {
+            console.error(`Error upserting strain ${strain.name}:`, upsertError);
+            errorCount++;
+          } else {
+            syncedCount++;
+          }
+        } catch (strainError) {
+          console.error(`Error processing strain ${strain.name}:`, strainError);
+          errorCount++;
+        }
+      }
+      
+      console.log(`[${countryCode}] Synced ${syncedCount}, errors ${errorCount}`);
+      totalSynced += syncedCount;
+      totalErrors += errorCount;
+      totalStrains += strains.length;
+    }
+    
+    console.log(`\nSync complete: ${totalSynced} synced, ${totalErrors} errors across ${countryCodes.length} countries`);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Synced ${syncedCount} strains from Dr Green API`,
-        synced: syncedCount,
-        errors: errorCount,
-        total: strains.length,
-        pageInfo: data?.data?.pageMetaDto
+        message: `Synced ${totalSynced} strains from Dr Green API`,
+        synced: totalSynced,
+        errors: totalErrors,
+        total: totalStrains,
+        countries: countryCodes,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

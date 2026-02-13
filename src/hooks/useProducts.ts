@@ -78,6 +78,29 @@ const getBrandedImage = (name: string): string => {
   return FALLBACK_JAR;
 };
 
+// Background sync throttle key
+const BG_SYNC_KEY = 'hb_products_bg_sync';
+const BG_SYNC_THROTTLE_MS = 60 * 60 * 1000; // 1 hour
+
+// Trigger a non-blocking background sync to keep local DB current
+const triggerBackgroundSync = (alpha3Code: string) => {
+  try {
+    const lastSync = parseInt(localStorage.getItem(BG_SYNC_KEY) || '0', 10);
+    if (Date.now() - lastSync < BG_SYNC_THROTTLE_MS) return;
+    localStorage.setItem(BG_SYNC_KEY, String(Date.now()));
+    
+    console.log('[Products] Triggering background strain sync...');
+    supabase.functions.invoke('sync-strains', {
+      body: { countryCode: alpha3Code },
+    }).then(({ error }) => {
+      if (error) console.warn('[Products] Background sync error:', error);
+      else console.log('[Products] Background sync complete');
+    });
+  } catch {
+    // non-critical
+  }
+};
+
 // Map Alpha-2 to Alpha-3 country codes for Dr Green API
 const countryCodeMap: Record<string, string> = {
   PT: 'PRT',
@@ -214,9 +237,12 @@ export function useProducts(countryCode: string = 'PT') {
           };
         });
         
-        setProducts(transformedProducts);
+      setProducts(transformedProducts);
         setDataSource('api');
         setIsLoading(false);
+        
+        // Background sync: keep local DB current (non-blocking, throttled to max once/hour)
+        triggerBackgroundSync(alpha3Code);
         return;
       }
       
