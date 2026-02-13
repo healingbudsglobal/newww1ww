@@ -201,18 +201,30 @@ export function AdminOrdersTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders.map((order, index) => (
+          {orders.map((order, index) => {
+            const items = Array.isArray(order.items) ? order.items : [];
+            const itemNames = items
+              .map((item: any) => item.strain_name || item.name || item.strainName || 'Unknown')
+              .filter(Boolean);
+            const displayNames = itemNames.slice(0, 2).join(", ");
+            const moreCount = itemNames.length - 2;
+            const itemSummary = itemNames.length > 0
+              ? (moreCount > 0 ? `${displayNames} +${moreCount} more` : displayNames)
+              : `${items.length} items`;
+
+            return (
             <motion.tr
               key={order.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.02 }}
               className={cn(
-                "border-b transition-colors hover:bg-muted/50",
+                "border-b transition-colors hover:bg-muted/50 cursor-pointer",
                 selectedOrders.includes(order.id) && "bg-primary/5"
               )}
+              onClick={() => onViewOrder(order)}
             >
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={selectedOrders.includes(order.id)}
                   onCheckedChange={() => onToggleSelect(order.id)}
@@ -248,9 +260,22 @@ export function AdminOrdersTable({
                 </div>
               </TableCell>
               <TableCell>
-                <span className="text-sm">
-                  {order.items?.length || 0} items
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-sm">
+                      {itemSummary}
+                    </span>
+                  </TooltipTrigger>
+                  {itemNames.length > 0 && (
+                    <TooltipContent>
+                      <ul className="text-xs space-y-0.5">
+                        {itemNames.map((name: string, i: number) => (
+                          <li key={i}>{name}</li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </TableCell>
               <TableCell className="text-right font-medium">
                 {formatPrice(order.total_amount ?? 0, order.country_code || 'ZA')}
@@ -271,7 +296,7 @@ export function AdminOrdersTable({
                   getSyncStatusBadge(order.sync_status)
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1">
                   {/* Quick Process button for pending orders */}
                   {order.sync_status === "pending" && order.status === "PENDING" && onProcessOrder && (
@@ -334,7 +359,8 @@ export function AdminOrdersTable({
                 </div>
               </TableCell>
             </motion.tr>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
