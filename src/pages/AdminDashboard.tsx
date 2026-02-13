@@ -392,7 +392,7 @@ const AdminDashboard = () => {
               <Key className="w-4 h-4 mr-2" /> Re-Home All Clients
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <a href="https://app.drgreennft.com" target="_blank" rel="noopener noreferrer">
+              <a href="https://dapp.drgreennft.com/" target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4 mr-2" /> Dr. Green Portal
               </a>
             </Button>
