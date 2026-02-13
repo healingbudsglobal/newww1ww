@@ -25,6 +25,7 @@ export type Database = {
           is_featured: boolean | null
           published_at: string | null
           slug: string
+          source_url: string | null
           summary: string
           title: string
           updated_at: string | null
@@ -39,6 +40,7 @@ export type Database = {
           is_featured?: boolean | null
           published_at?: string | null
           slug: string
+          source_url?: string | null
           summary: string
           title: string
           updated_at?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           is_featured?: boolean | null
           published_at?: string | null
           slug?: string
+          source_url?: string | null
           summary?: string
           title?: string
           updated_at?: string | null
