@@ -443,7 +443,11 @@ const AdminDashboard = () => {
               ) : (
                 <div className="space-y-3">
                   {recentActivity.map(item => (
-                    <div key={item.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                      onClick={() => navigate(item.type === 'order' ? '/admin/orders' : '/admin/clients')}
+                    >
                       <div className={`p-1.5 rounded-full mt-0.5 ${item.type === 'client' ? 'bg-primary/10' : 'bg-secondary/10'}`}>
                         {item.type === 'client' ? (
                           <UserPlus className="w-3.5 h-3.5 text-primary" />
@@ -455,9 +459,12 @@ const AdminDashboard = () => {
                         <p className="text-sm font-medium text-foreground truncate">{item.label}</p>
                         <p className="text-xs text-muted-foreground">{item.detail}</p>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDistanceToNow(new Date(item.time), { addSuffix: true })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDistanceToNow(new Date(item.time), { addSuffix: true })}
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
                     </div>
                   ))}
                 </div>
