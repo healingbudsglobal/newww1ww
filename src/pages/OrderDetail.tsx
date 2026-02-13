@@ -38,6 +38,9 @@ interface Order {
   customer_name: string | null;
   customer_email: string | null;
   shipping_address: Record<string, string> | null;
+  sync_status: string | null;
+  sync_error: string | null;
+  synced_at: string | null;
 }
 
 function getStatusColor(status: string): string {
@@ -292,6 +295,29 @@ export default function OrderDetail() {
                       )}
                       {order.shipping_address.postalCode && <p>{order.shipping_address.postalCode}</p>}
                       {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Sync Status (for admin/debug visibility) */}
+                {order.sync_status && order.sync_status !== 'synced' && (
+                  <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" /> Sync Status
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge className={cn("border", order.sync_status === 'failed' ? 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30')}>
+                          {order.sync_status === 'failed' ? 'Sync Failed' : 'Pending Sync'}
+                        </Badge>
+                      </div>
+                      {order.sync_error && (
+                        <p className="text-muted-foreground text-xs bg-muted p-2 rounded">
+                          {order.sync_error}
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 )}

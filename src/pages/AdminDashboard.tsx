@@ -371,6 +371,26 @@ const AdminDashboard = () => {
               <RefreshCw className={`w-4 h-4 mr-2 ${syncingClients ? 'animate-spin' : ''}`} />
               Sync Client Data
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                toast({ title: 'Re-Homing', description: 'Starting batch re-homing of all clients...' });
+                try {
+                  const { data, error } = await supabase.functions.invoke('drgreen-rehome');
+                  if (error) throw error;
+                  toast({
+                    title: 'Re-Homing Complete',
+                    description: `${data?.summary?.succeeded || 0} succeeded, ${data?.summary?.failed || 0} failed, ${data?.summary?.skipped || 0} skipped`,
+                  });
+                  fetchStats(true);
+                } catch (err: any) {
+                  toast({ title: 'Re-Homing Failed', description: err?.message || 'Unknown error', variant: 'destructive' });
+                }
+              }}
+            >
+              <Key className="w-4 h-4 mr-2" /> Re-Home All Clients
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <a href="https://app.drgreennft.com" target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4 mr-2" /> Dr. Green Portal
