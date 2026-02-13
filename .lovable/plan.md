@@ -1,55 +1,108 @@
 
 
-# Populate The Wire with Real Cannabis Industry News
+# Auto-Updating The Wire with Real Cannabis News
 
-## What We Found
+## Overview
 
-We discovered several high-quality, real news sources directly relevant to Healing Buds:
+Create a backend function that automatically fetches real cannabis industry news from RSS feeds and web sources, enriches titles/summaries with Healing Buds branding keywords, and inserts them into the `articles` table. The function can be called on-demand from admin or scheduled via a cron trigger.
 
-### Real Articles to Seed (from verified sources)
+## Data Flow
 
-1. **"Medical Cannabis Reduces Opioid Prescriptions, Study Shows"** (Marijuana Moment, Dec 2025) - Category: research
-2. **"Portugal: INFARMED Tightens Import/Export of Medical Cannabis"** (Cannabis Regulations, Sep 2025) - Category: industry  
-3. **"Trump Signs Order to Expand Medical Cannabis Research"** (Drugs.com, 2025) - Category: news
-4. **"The Blockchain Bud: Tracking Cannabis from Seed to Sale"** (Tenn Canna, Oct 2025) - Category: blockchain
-5. **"Is Portugal Losing Its Role as Europe's Cannabis Gateway?"** (Business of Cannabis, Nov 2025) - Category: industry
-6. **"Medicare's First-Ever CBD Pilot Program"** (Marijuana Herald, Nov 2025) - Category: research
-7. **"Portugal Medical Cannabis Market Overview 2025"** (Prohibition Partners, Sep 2025) - Category: industry
-8. **"Blockchain-Based Cannabis Traceability in Supply Chain Management"** (IJACSA, 2024) - Category: blockchain
+```text
+RSS Feeds (Marijuana Moment, Leafly, etc.)
+        |
+        v
+[fetch-wire-articles] Edge Function
+        |
+        +--> Parse RSS/Atom XML feeds
+        +--> Extract title, summary, link, date, category
+        +--> Enrich with Healing Buds keywords
+        +--> Deduplicate by source_url
+        +--> Insert into articles table
+        |
+        v
+  articles table (auto-visible on The Wire page)
+```
 
-## Implementation Plan
+## Implementation Steps
 
-### Step 1: Seed the articles table with real news
-Insert 8 real articles into the `articles` table with:
-- Real titles and summaries from verified sources
-- Proper categories (news, research, blockchain, industry)
-- Source attribution in the content
-- Links to original articles
-- One article marked as featured
+### Step 1: Add `source_url` column to articles table
+Add a nullable `source_url` text column so we can track original article links and deduplicate on re-fetch.
 
-### Step 2: Add a `source_url` column to articles table
-Add a column to store the original article URL so users can "Read Original Article" (this translation key already exists in the i18n files).
+### Step 2: Create `fetch-wire-articles` Edge Function
+A new backend function that:
 
-### Step 3: Update ArticleDetail page
-Ensure the article detail page shows a "Read Original Article" link when `source_url` is present, linking to the real source.
+1. **Fetches RSS feeds** from curated cannabis news sources:
+   - Marijuana Moment (`https://www.marijuanamoment.net/feed/`)
+   - Leafly News (`https://www.leafly.com/news/feed`)
+   - Cannabis Health News (`https://cannabishealthnews.co.uk/feed/`)
+   - MJBizDaily (`https://mjbizdaily.com/feed/`)
+
+2. **Parses XML** using DOMParser (available in Deno) to extract articles
+
+3. **Auto-categorises** each article based on keywords:
+   - "study", "research", "clinical" --> `research`
+   - "blockchain", "NFT", "traceability" --> `blockchain`
+   - "market", "regulation", "license", "export" --> `industry`
+   - Default --> `news`
+
+4. **Enriches titles** with Healing Buds context where relevant:
+   - Appends category tags like "[Research]", "[Industry Update]"
+   - Keeps original title intact for authenticity
+
+5. **Deduplicates** by checking if `source_url` already exists in the articles table
+
+6. **Inserts new articles** with:
+   - `title`: Original title
+   - `slug`: Generated from title
+   - `summary`: RSS description (stripped of HTML)
+   - `content`: Full summary with source attribution
+   - `source_url`: Link to original article
+   - `category`: Auto-detected
+   - `author`: Source name (e.g., "Marijuana Moment")
+   - `published_at`: Original publish date from RSS
+
+### Step 3: Seed initial articles
+Insert 8 hand-curated real articles as initial content so The Wire has content immediately.
+
+### Step 4: Update ArticleDetail page
+Add a "Read Original Article" link when `source_url` is present, using the existing `readOriginal` i18n translation key.
+
+### Step 5: Add admin trigger (optional)
+Add a "Refresh News" button on the admin tools page that calls the edge function to pull latest articles on demand.
+
+## RSS Sources and Keywords
+
+| Source | Feed URL | Focus |
+|--------|----------|-------|
+| Marijuana Moment | marijuanamoment.net/feed/ | Policy, legislation, research |
+| Leafly | leafly.com/news/feed | Strains, patient guides, industry |
+| Cannabis Health News | cannabishealthnews.co.uk/feed/ | UK medical cannabis |
+| MJBizDaily | mjbizdaily.com/feed/ | Business, market data |
+
+## Keyword Enrichment Strategy
+
+Articles are tagged with Healing Buds-relevant keywords for SEO:
+- Medical cannabis, EU-GMP, patient access, cannabis research
+- Portugal, regulated cannabis, seed-to-sale traceability
+- Dr. Green, NFT, blockchain cannabis
+
+These appear as metadata/tags, not injected into article text (keeps content authentic).
 
 ## Technical Details
 
+### New Files
+- `supabase/functions/fetch-wire-articles/index.ts` - RSS fetcher and article importer
+
+### Modified Files
+- `src/pages/ArticleDetail.tsx` - Add "Read Original Article" link with `source_url`
+
 ### Database Changes
-- Add `source_url` (text, nullable) column to `articles` table
-- Insert 8 curated real articles with proper slugs, summaries, categories, and content
+- Add `source_url` (text, nullable) to `articles` table
+- Insert 8 initial seed articles
 
-### Files to Modify
-- **ArticleDetail page** (if exists): Add "Read Original" link using existing i18n key `readOriginal`
-
-### Content Categories Used
-- `news` - General cannabis policy and legislation
-- `research` - Clinical studies and medical findings  
-- `industry` - Market analysis and business news
-- `blockchain` - Traceability and Web3 cannabis tech
-
-### No Risk
-- Only adds new data and an optional column
-- Does not change any existing functionality
-- All articles are from real, verifiable public sources
+### Security
+- Edge function uses service role key to insert articles (bypasses RLS)
+- No external API keys required (RSS feeds are public)
+- Admin-only invocation via authorization header check
 
