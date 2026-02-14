@@ -4313,6 +4313,7 @@ serve(async (req) => {
             .maybeSingle();
           
           let upsertError: any = null;
+          let synced = true;
           if (existing) {
             // Update existing record — don't change user_id to avoid unique constraint violations
             const { error } = await supabaseAdmin
@@ -4321,20 +4322,20 @@ serve(async (req) => {
               .eq('drgreen_client_id', clientId);
             upsertError = error;
           } else {
-            // Check if this user_id already has a record (unique constraint)
+            // Check if this user_id already has a different client record (unique constraint on user_id)
             const { data: existingByUser } = await supabaseAdmin
               .from('drgreen_clients')
-              .select('id')
+              .select('id, drgreen_client_id')
               .eq('user_id', localUserId)
               .maybeSingle();
             
             if (existingByUser) {
-              // User already has a different client linked — just update that record's drgreen_client_id
-              const { error } = await supabaseAdmin
-                .from('drgreen_clients')
-                .update({ ...syncFields, drgreen_client_id: clientId })
-                .eq('user_id', localUserId);
-              upsertError = error;
+              // Admin already has a client linked — skip DB insert, just return API data
+              // This happens during admin bulk-link where one admin verifies multiple clients
+              logInfo("User already has a client record, skipping DB insert for this client", { 
+                existingClientId: existingByUser.drgreen_client_id, newClientId: clientId 
+              });
+              synced = false;
             } else {
               // Insert new record
               const { error } = await supabaseAdmin
@@ -4357,15 +4358,28 @@ serve(async (req) => {
             );
           }
           
-          logInfo("Client synced to local database", { clientId, localUserId });
+          if (synced) {
+            logInfo("Client synced to local database", { clientId, localUserId });
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: synced ? "Client found and synced to local database" : "Client found on Dr Green (DB sync skipped — admin already has a linked client)",
+              client: matchedClient,
+              synced
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
         }
         
+        // No localUserId provided — just return API data
         return new Response(
           JSON.stringify({
             success: true,
-            message: localUserId ? "Client found and synced to local database" : "Client found on Dr Green",
+            message: "Client found on Dr Green",
             client: matchedClient,
-            synced: !!localUserId
+            synced: false
           }),
           { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
         );
