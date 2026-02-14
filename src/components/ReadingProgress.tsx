@@ -77,6 +77,11 @@ const ReadingProgress = ({
           scaleX,
           zIndex,
         }}
+        role="progressbar"
+        aria-valuenow={percentage}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Reading progress"
       />
       
       {/* Percentage indicator */}

@@ -95,6 +95,14 @@ const PatientDashboard = () => {
     fetchUserData();
   }, []);
 
+  // Country code to name mapping
+  const countryNames: Record<string, string> = {
+    PT: 'Portugal', GB: 'United Kingdom', UK: 'United Kingdom',
+    ZA: 'South Africa', TH: 'Thailand', DE: 'Germany',
+    FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands',
+    BE: 'Belgium', US: 'United States',
+  };
+
   // Fetch shipping address
   useEffect(() => {
     const fetchShippingAddress = async () => {
@@ -104,12 +112,26 @@ const PatientDashboard = () => {
       }
 
       try {
+        // Try Dr Green API first
         const result = await getClientDetails(drGreenClient.drgreen_client_id);
         if (result.data?.shipping && result.data.shipping.address1) {
           setShippingAddress(result.data.shipping);
+        } else if (drGreenClient.shipping_address && typeof drGreenClient.shipping_address === 'object') {
+          // Fallback: load from local DB
+          const dbAddr = drGreenClient.shipping_address as Record<string, string>;
+          if (dbAddr.address1) {
+            setShippingAddress(dbAddr as unknown as ShippingAddress);
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch shipping address:', error);
+        console.error('Failed to fetch shipping address from API, trying DB fallback:', error);
+        // Fallback: load from local DB
+        if (drGreenClient.shipping_address && typeof drGreenClient.shipping_address === 'object') {
+          const dbAddr = drGreenClient.shipping_address as Record<string, string>;
+          if (dbAddr.address1) {
+            setShippingAddress(dbAddr as unknown as ShippingAddress);
+          }
+        }
       } finally {
         setIsLoadingAddress(false);
       }
@@ -479,7 +501,7 @@ const PatientDashboard = () => {
                     {drGreenClient && (
                       <div>
                         <p className="text-sm text-muted-foreground">Country</p>
-                        <p className="font-medium">{drGreenClient.country_code}</p>
+                        <p className="font-medium">{countryNames[drGreenClient.country_code] || drGreenClient.country_code}</p>
                       </div>
                     )}
                     
