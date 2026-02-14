@@ -650,6 +650,45 @@ export type Database = {
         }
         Relationships: []
       }
+      team_commissions: {
+        Row: {
+          commission_percentage: number | null
+          created_at: string | null
+          display_name: string
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          role_type: string
+          updated_at: string | null
+          user_id: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          commission_percentage?: number | null
+          created_at?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          role_type: string
+          updated_at?: string | null
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          commission_percentage?: number | null
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          role_type?: string
+          updated_at?: string | null
+          user_id?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

@@ -142,6 +142,30 @@
   --header-offset: 0.5rem;
 }
 
+/* ===== ADMIN EARTHY GREEN PALETTE ===== */
+:root {
+  --admin-forest: 144 22% 26%;        /* #344E41 */
+  --admin-forest-deep: 140 21% 30%;   /* #3A5A40 */
+  --admin-fir: 130 22% 42%;           /* #588157 */
+  --admin-sage: 90 16% 63%;           /* #A3B18A */
+  --admin-parchment: 40 14% 83%;      /* #DAD7CD */
+  --admin-cool-sage: 192 7% 81%;      /* #C8D1D3 */
+  --admin-soft-green: 148 13% 60%;    /* #8AA894 */
+  --admin-gold: 48 72% 49%;           /* #D4B925 */
+  --admin-sidebar-gradient: linear-gradient(180deg, hsl(144 22% 26%), hsl(140 21% 30%));
+}
+
+.dark {
+  --admin-forest: 144 20% 18%;
+  --admin-forest-deep: 140 18% 22%;
+  --admin-fir: 130 18% 32%;
+  --admin-sage: 90 10% 45%;
+  --admin-parchment: 40 6% 14%;
+  --admin-cool-sage: 192 5% 20%;
+  --admin-soft-green: 148 10% 38%;
+  --admin-gold: 48 65% 45%;
+}
+
 /* ===== DARK MODE ===== */
 .dark {
   /* Base: warm charcoal with sage undertone */
