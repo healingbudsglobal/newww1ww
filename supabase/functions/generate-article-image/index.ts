@@ -11,6 +11,7 @@ const categoryPrompts: Record<string, string> = {
   research: "Professional editorial photograph of a cannabis research laboratory. Show microscopes, glass vials with terpene extracts, scientific equipment, and researchers in white coats examining cannabis samples. Clinical, modern, and professional. No text overlays. 16:9 aspect ratio. Ultra high resolution.",
   blockchain: "Professional editorial photograph representing cannabis supply chain technology. Show a modern warehouse with digital tracking screens, QR codes on cannabis packaging, and supply chain logistics. Tech-forward and professional. No text overlays. 16:9 aspect ratio. Ultra high resolution.",
   regulation: "Professional editorial photograph of a government regulatory office setting related to cannabis policy. Show official documents, stamps, and a professional meeting environment. Clean, institutional, and authoritative. No text overlays. 16:9 aspect ratio. Ultra high resolution.",
+  medical: "Professional editorial photograph of a compassionate medical cannabis consultation. Show a caring clinician in a modern clinic speaking with a patient, medical charts, cannabis-based medicine packaging, and a warm, reassuring clinical environment. Professional healthcare setting with soft natural lighting. No text overlays. 16:9 aspect ratio. Ultra high resolution.",
 };
 
 function buildPrompt(title: string, category: string): string {

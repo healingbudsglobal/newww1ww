@@ -33,7 +33,8 @@ import {
   Users,
   ShoppingCart,
   Bug,
-  Wallet
+  Wallet,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -256,17 +257,39 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
           sidebarCollapsed && "flex flex-col items-center gap-2"
         )}>
           {!sidebarCollapsed && (
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 mb-3">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="w-4 h-4 text-primary" />
+            <>
+              <Link
+                to="/"
+                className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-3"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span className="text-sm font-medium">Back to Website</span>
+              </Link>
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 mb-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {user?.email?.split('@')[0] || 'Admin'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Administrator</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {user?.email?.split('@')[0] || 'Admin'}
-                </p>
-                <p className="text-xs text-muted-foreground">Administrator</p>
-              </div>
-            </div>
+            </>
+          )}
+          {sidebarCollapsed && (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Link
+                  to="/"
+                  className="flex items-center justify-center p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Back to Website</TooltipContent>
+            </Tooltip>
           )}
 
           <div className={cn(
@@ -372,6 +395,14 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
 
               {/* Mobile User */}
               <div className="border-t border-border p-4">
+                <Link
+                  to="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-3"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span className="text-sm font-medium">Back to Website</span>
+                </Link>
                 <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 mb-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="w-4 h-4 text-primary" />
