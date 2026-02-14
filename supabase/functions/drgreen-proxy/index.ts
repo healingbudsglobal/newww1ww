@@ -1291,6 +1291,80 @@ async function drGreenRequestGet(
 // drGreenRequestQuery is now just an alias for drGreenRequestGet
 const drGreenRequestQuery = drGreenRequestGet;
 
+// ============================================================
+// findClientById: List-and-filter workaround for GET /dapp/clients/{id}
+// The API key lacks permission for the individual client endpoint (401),
+// but GET /dapp/clients (list all) works. This helper fetches the full
+// list and filters for the requested client ID.
+// ============================================================
+let _cachedClientList: any[] | null = null;
+let _cacheExpiry = 0;
+const CLIENT_LIST_CACHE_TTL = 5000; // 5 seconds
+
+async function findClientById(clientId: string, envConfig?: EnvConfig): Promise<Response> {
+  const now = Date.now();
+  const env = envConfig || ENV_CONFIG.production;
+
+  // Use cache if still valid
+  if (_cachedClientList && now < _cacheExpiry) {
+    logDebug('findClientById: using cached client list', { cacheSize: _cachedClientList.length });
+    const client = _cachedClientList.find((c: any) => c.id === clientId);
+    if (client) {
+      return new Response(JSON.stringify({ success: true, data: client }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ success: false, message: 'Client not found', clientId }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Fetch full client list
+  logInfo('findClientById: fetching client list from /dapp/clients', { clientId, env: env.name });
+  const listResponse = await drGreenRequestQuery('/dapp/clients', { take: 200, page: 1, orderBy: 'desc' }, false, env);
+
+  if (!listResponse.ok) {
+    logError('findClientById: client list fetch failed', { status: listResponse.status });
+    return new Response(JSON.stringify({ success: false, message: 'Failed to fetch client list', apiStatus: listResponse.status }), {
+      status: listResponse.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const listData = await listResponse.json();
+
+  // The API returns { data: [...] } or { data: { data: [...] } } depending on version
+  let clients: any[] = [];
+  if (Array.isArray(listData)) {
+    clients = listData;
+  } else if (Array.isArray(listData?.data)) {
+    clients = listData.data;
+  } else if (Array.isArray(listData?.data?.data)) {
+    clients = listData.data.data;
+  }
+
+  // Update cache
+  _cachedClientList = clients;
+  _cacheExpiry = now + CLIENT_LIST_CACHE_TTL;
+  logInfo('findClientById: cached client list', { count: clients.length });
+
+  const client = clients.find((c: any) => c.id === clientId);
+  if (client) {
+    return new Response(JSON.stringify({ success: true, data: client }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  logWarn('findClientById: client not found in list', { clientId, totalClients: clients.length });
+  return new Response(JSON.stringify({ success: false, message: 'Client not found', clientId }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 /**
  * Legacy request handler for backwards compatibility
  * Uses body signing for all requests
@@ -2306,8 +2380,8 @@ serve(async (req) => {
         const { clientId } = body || {};
         if (!clientId) throw new Error("clientId is required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
-        // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
+        // Use list-and-filter helper (GET /dapp/clients/{id} returns 401)
+        response = await findClientById(clientId, adminEnvConfig);
         break;
       }
       
@@ -2341,7 +2415,7 @@ serve(async (req) => {
         let apiData: Record<string, unknown> | null = null;
         
         try {
-          apiResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, { orderBy: 'desc', take: 1, page: 1 });
+          apiResponse = await findClientById(clientId);
           
           if (apiResponse.ok) {
             apiData = await apiResponse.json() as Record<string, unknown>;
@@ -2443,9 +2517,8 @@ serve(async (req) => {
         if (!clientId) throw new Error("clientId is required");
         if (!validateClientId(clientId)) throw new Error("Invalid client ID format");
         
-        // GET /dapp/clients/{clientId} returns current adminApproval status
-        // Use query string signing for GET endpoints (fixes 401)
-        response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
+        // Use list-and-filter helper (GET /dapp/clients/{id} returns 401)
+        response = await findClientById(clientId, adminEnvConfig);
         break;
       }
       
@@ -2649,8 +2722,8 @@ serve(async (req) => {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // GET request - use query string signing with credentials (NFT-scoped)
-        const clientResponse = await drGreenRequestGet(`/dapp/clients/${body.clientId}`, { orderBy: 'desc', take: 1, page: 1 }, false, adminEnvConfig);
+        // Use list-and-filter helper (GET /dapp/clients/{id} returns 401)
+        const clientResponse = await findClientById(body.clientId, adminEnvConfig);
         if (clientResponse && clientResponse.ok) {
           const clientData = await clientResponse.json();
           // Normalize shippings array to shipping object - check both wrapper and inner data levels
