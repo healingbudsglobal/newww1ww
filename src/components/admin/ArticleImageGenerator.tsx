@@ -3,8 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Image, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Image, Loader2, CheckCircle2, XCircle, Eye, Upload, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface Article {
@@ -15,12 +14,13 @@ interface Article {
   featured_image: string | null;
 }
 
-type GenStatus = "idle" | "generating" | "done" | "error";
+type GenStatus = "idle" | "generating" | "previewing" | "publishing" | "done" | "error";
 
 export const ArticleImageGenerator = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [statuses, setStatuses] = useState<Record<string, GenStatus>>({});
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
 
   const fetchMissing = async () => {
@@ -36,7 +36,7 @@ export const ArticleImageGenerator = () => {
 
   useEffect(() => { fetchMissing(); }, []);
 
-  const generateOne = async (article: Article) => {
+  const generatePreview = async (article: Article) => {
     setStatuses(s => ({ ...s, [article.id]: "generating" }));
     try {
       const { data, error } = await supabase.functions.invoke("generate-article-image", {
@@ -45,35 +45,76 @@ export const ArticleImageGenerator = () => {
           title: article.title,
           category: article.category || "industry",
           slug: article.slug,
+          previewOnly: true,
         },
       });
       if (error || data?.error) throw new Error(data?.error || error?.message);
-      setStatuses(s => ({ ...s, [article.id]: "done" }));
+      setPreviews(p => ({ ...p, [article.id]: data.imageBase64 }));
+      setStatuses(s => ({ ...s, [article.id]: "previewing" }));
       return true;
     } catch (err: any) {
       console.error(err);
       setStatuses(s => ({ ...s, [article.id]: "error" }));
+      toast.error(`Failed to generate preview for "${article.title}"`);
       return false;
     }
   };
 
-  const generateAll = async () => {
+  const publishImage = async (article: Article) => {
+    const base64 = previews[article.id];
+    if (!base64) return;
+    setStatuses(s => ({ ...s, [article.id]: "publishing" }));
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-article-image", {
+        body: {
+          articleId: article.id,
+          title: article.title,
+          category: article.category || "industry",
+          slug: article.slug,
+          imageBase64: base64,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      setStatuses(s => ({ ...s, [article.id]: "done" }));
+      setPreviews(p => { const n = { ...p }; delete n[article.id]; return n; });
+      toast.success(`Published image for "${article.title}"`);
+    } catch (err: any) {
+      console.error(err);
+      setStatuses(s => ({ ...s, [article.id]: "error" }));
+      toast.error(`Failed to publish image for "${article.title}"`);
+    }
+  };
+
+  const previewAll = async () => {
     setGenerating(true);
     let success = 0;
     for (const article of articles) {
-      if (statuses[article.id] === "done") continue;
-      const ok = await generateOne(article);
+      if (statuses[article.id] === "done" || statuses[article.id] === "previewing") continue;
+      const ok = await generatePreview(article);
       if (ok) success++;
-      // Small delay to avoid rate limits
       await new Promise(r => setTimeout(r, 2000));
     }
-    toast.success(`Generated ${success}/${articles.length} article images`);
+    toast.success(`Generated ${success} preview${success !== 1 ? "s" : ""}`);
+    setGenerating(false);
+  };
+
+  const publishAll = async () => {
+    setGenerating(true);
+    let success = 0;
+    for (const article of articles) {
+      if (statuses[article.id] !== "previewing") continue;
+      await publishImage(article);
+      success++;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    toast.success(`Published ${success} image${success !== 1 ? "s" : ""}`);
     setGenerating(false);
     fetchMissing();
   };
 
+  const previewCount = Object.values(statuses).filter(s => s === "previewing").length;
   const doneCount = Object.values(statuses).filter(s => s === "done").length;
-  const progress = articles.length > 0 ? (doneCount / articles.length) * 100 : 0;
+  const progress = articles.length > 0 ? ((previewCount + doneCount) / articles.length) * 100 : 0;
 
   return (
     <Card>
@@ -83,7 +124,7 @@ export const ArticleImageGenerator = () => {
           Article Image Generator
         </CardTitle>
         <CardDescription>
-          Generate AI editorial images for Wire articles missing featured images
+          Generate AI editorial images with preview before publishing
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -95,48 +136,71 @@ export const ArticleImageGenerator = () => {
           <p className="text-muted-foreground">All articles have featured images ✓</p>
         ) : (
           <>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-sm text-muted-foreground">
                 {articles.length} article{articles.length !== 1 ? "s" : ""} missing images
               </span>
-              <Button onClick={generateAll} disabled={generating}>
-                {generating ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
-                ) : (
-                  "Generate All"
+              <div className="flex gap-2">
+                <Button onClick={previewAll} disabled={generating} variant="outline" size="sm">
+                  {generating ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
+                  ) : (
+                    <><Eye className="w-4 h-4 mr-2" /> Preview All</>
+                  )}
+                </Button>
+                {previewCount > 0 && (
+                  <Button onClick={publishAll} disabled={generating} size="sm">
+                    <Upload className="w-4 h-4 mr-2" /> Publish All ({previewCount})
+                  </Button>
                 )}
-              </Button>
+              </div>
             </div>
 
             {generating && <Progress value={progress} className="h-2" />}
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {articles.map(a => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium text-sm">{a.title}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{a.category || "—"}</TableCell>
-                    <TableCell>
-                      {statuses[a.id] === "generating" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {articles.map(a => (
+                <div key={a.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{a.title}</p>
+                      <p className="text-xs text-muted-foreground">{a.category || "industry"}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
                       {statuses[a.id] === "done" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                       {statuses[a.id] === "error" && <XCircle className="w-4 h-4 text-destructive" />}
-                      {(!statuses[a.id] || statuses[a.id] === "idle") && (
-                        <Button variant="ghost" size="sm" onClick={() => generateOne(a)} disabled={generating}>
-                          Generate
+                      {(statuses[a.id] === "generating" || statuses[a.id] === "publishing") && (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      )}
+                      {(!statuses[a.id] || statuses[a.id] === "idle" || statuses[a.id] === "error") && (
+                        <Button variant="ghost" size="sm" onClick={() => generatePreview(a)} disabled={generating}>
+                          <Eye className="w-4 h-4 mr-1" /> Preview
                         </Button>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      {statuses[a.id] === "previewing" && (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => generatePreview(a)} disabled={generating}>
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" onClick={() => publishImage(a)} disabled={generating}>
+                            <Upload className="w-4 h-4 mr-1" /> Publish
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {previews[a.id] && statuses[a.id] === "previewing" && (
+                    <div className="rounded-md overflow-hidden border bg-muted/30">
+                      <img
+                        src={previews[a.id]}
+                        alt={`Preview for ${a.title}`}
+                        className="w-full h-40 object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </>
         )}
       </CardContent>
