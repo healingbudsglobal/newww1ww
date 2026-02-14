@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
+import { supabase } from '@/integrations/supabase/client';
 
 // Predefined clients - using REAL Dr. Green emails for Find & Link
 const PREDEFINED_CLIENTS = [
@@ -98,7 +99,10 @@ export function AdminClientCreator() {
     setFinding(client.id);
     
     try {
-      const result = await syncClientByEmail(client.email);
+      // Get current user ID for DB persistence
+      const { data: { user } } = await supabase.auth.getUser();
+      const localUserId = user?.id;
+      const result = await syncClientByEmail(client.email, localUserId);
 
       if (result.error) {
         const errorResult: ClientResult = {
