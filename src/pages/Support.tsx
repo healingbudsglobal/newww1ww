@@ -202,6 +202,11 @@ const Support = () => {
   useEffect(() => {
     if (location.hash) {
       const id = location.hash.replace('#', '');
+      // If hash matches a FAQ category, switch to that tab
+      const faqCategoryIds = faqCategories.map(c => c.id);
+      if (faqCategoryIds.includes(id)) {
+        setActiveCategory(id);
+      }
       // Small delay to allow page render
       const timer = setTimeout(() => {
         const element = document.getElementById(id);
