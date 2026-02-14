@@ -15,7 +15,7 @@ secp256k1.etc.hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]) => {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Log level configuration - defaults to INFO in production
@@ -231,14 +231,16 @@ function getCountryCodeFromName(countryName: string | undefined): string {
 
 /**
  * Verify user authentication and return user data
+ * Uses getClaims() for Lovable Cloud ES256 signing-keys compatibility,
+ * with getUser() fallback for full user data when needed.
  */
 async function verifyAuthentication(req: Request): Promise<{ user: any; supabaseClient: any } | null> {
   const authHeader = req.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logDebug('Auth: No authorization header found');
     return null;
   }
 
-  // Extract the token from the Bearer header
   const token = authHeader.replace('Bearer ', '');
 
   const supabaseClient = createClient(
@@ -247,14 +249,36 @@ async function verifyAuthentication(req: Request): Promise<{ user: any; supabase
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  // CRITICAL: Must pass token explicitly when verify_jwt=false (Lovable Cloud uses ES256)
-  const { data: { user }, error } = await supabaseClient.auth.getUser(token);
-  if (error || !user) {
-    logDebug('Auth verification failed', { error: error?.message });
-    return null;
+  // Primary: Use getClaims() which works with Lovable Cloud ES256 signing-keys
+  try {
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (!claimsError && claimsData?.claims) {
+      const user = {
+        id: claimsData.claims.sub,
+        email: claimsData.claims.email,
+        role: claimsData.claims.role,
+      };
+      logDebug('Auth: Verified via getClaims', { userId: user.id });
+      return { user, supabaseClient };
+    }
+    logDebug('Auth: getClaims failed, trying getUser fallback', { error: claimsError?.message });
+  } catch (e) {
+    logDebug('Auth: getClaims threw, trying getUser fallback', { error: String(e) });
   }
 
-  return { user, supabaseClient };
+  // Fallback: Use getUser() for older SDK compatibility
+  try {
+    const { data: { user }, error } = await supabaseClient.auth.getUser(token);
+    if (!error && user) {
+      logDebug('Auth: Verified via getUser fallback', { userId: user.id });
+      return { user, supabaseClient };
+    }
+    logDebug('Auth: getUser also failed', { error: error?.message });
+  } catch (e) {
+    logDebug('Auth: getUser threw', { error: String(e) });
+  }
+
+  return null;
 }
 
 /**
@@ -4428,7 +4452,10 @@ serve(async (req) => {
 
     logInfo(`Response status: ${response.status}`);
 
-    if (response.status === 401 && ADMIN_ACTIONS.includes(action)) {
+    if (response.status === 401) {
+      // Wrap upstream Dr. Green API 401s in a 200 response so the Supabase JS
+      // client doesn't treat it as an edge function error. The UI can inspect
+      // apiStatus to show a meaningful message.
       const usedEnv = envConfig;
       return new Response(
         JSON.stringify({
@@ -4436,7 +4463,7 @@ serve(async (req) => {
           apiStatus: 401,
           error: 'drgreen_unauthorized',
           message:
-            `Dr. Green API credentials (${usedEnv.name}: ${usedEnv.apiKeyEnv}) are not authorized for this dApp endpoint. The API key may lack admin dashboard permissions.`,
+            `Dr. Green API credentials (${usedEnv.name}: ${usedEnv.apiKeyEnv}) are not authorized for this endpoint. The API key may lack permissions for this operation.`,
           upstream: data,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
