@@ -50,7 +50,7 @@ const PREDEFINED_CLIENTS = [
     id: 'kayleigh',
     firstName: 'Kayleigh',
     lastName: 'SM',
-    email: 'kayleigh.sm@gmail.com',  // Real Dr. Green email
+    email: 'kayliegh.sm@gmail.com',  // Real Dr. Green email (note spelling)
     countryCode: 'ZAF',
     phoneCode: '+27',
     phoneCountryCode: 'ZA',
