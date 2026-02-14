@@ -1321,44 +1321,71 @@ async function findClientById(clientId: string, envConfig?: EnvConfig): Promise<
     });
   }
 
-  // Fetch full client list
-  logInfo('findClientById: fetching client list from /dapp/clients', { clientId, env: env.name });
-  const listResponse = await drGreenRequestQuery('/dapp/clients', { take: 200, page: 1, orderBy: 'desc' }, false, env);
+  // Paginated fetch — up to 3 pages (matching sync-client-by-email logic)
+  const PAGE_SIZE = 200;
+  const MAX_PAGES = 3;
+  let allClients: any[] = [];
 
-  if (!listResponse.ok) {
-    logError('findClientById: client list fetch failed', { status: listResponse.status });
-    return new Response(JSON.stringify({ success: false, message: 'Failed to fetch client list', apiStatus: listResponse.status }), {
-      status: listResponse.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    logInfo(`findClientById: fetching page ${page}/${MAX_PAGES}`, { clientId, env: env.name });
+    const listResponse = await drGreenRequestQuery('/dapp/clients', { take: PAGE_SIZE, page, orderBy: 'desc' }, false, env);
+
+    if (!listResponse.ok) {
+      logError('findClientById: client list fetch failed', { status: listResponse.status, page });
+      break; // Stop pagination on error
+    }
+
+    const listData = await listResponse.json();
+
+    // Handle all known response shapes
+    let clients: any[] = [];
+    if (Array.isArray(listData)) {
+      clients = listData;
+    } else if (Array.isArray(listData?.data)) {
+      clients = listData.data;
+    } else if (listData?.data?.items && Array.isArray(listData.data.items)) {
+      clients = listData.data.items;
+    } else if (Array.isArray(listData?.data?.data)) {
+      clients = listData.data.data;
+    } else if (Array.isArray(listData?.clients)) {
+      clients = listData.clients;
+    } else if (listData?.data?.clients && Array.isArray(listData.data.clients)) {
+      clients = listData.data.clients;
+    }
+
+    if (!clients || clients.length === 0) {
+      logInfo(`findClientById: no more clients on page ${page}`);
+      break;
+    }
+
+    allClients.push(...clients);
+
+    // Early exit if found on this page
+    const match = clients.find((c: any) => c.id === clientId);
+    if (match) {
+      logInfo(`findClientById: found client on page ${page}`, { totalFetched: allClients.length });
+      // Cache the full list we have so far
+      _cachedClientList = allClients;
+      _cacheExpiry = now + CLIENT_LIST_CACHE_TTL;
+      return new Response(JSON.stringify({ success: true, data: match }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Stop if last page
+    if (clients.length < PAGE_SIZE) {
+      logInfo(`findClientById: last page reached (page ${page}, ${clients.length} clients)`);
+      break;
+    }
   }
 
-  const listData = await listResponse.json();
-
-  // The API returns { data: [...] } or { data: { data: [...] } } depending on version
-  let clients: any[] = [];
-  if (Array.isArray(listData)) {
-    clients = listData;
-  } else if (Array.isArray(listData?.data)) {
-    clients = listData.data;
-  } else if (Array.isArray(listData?.data?.data)) {
-    clients = listData.data.data;
-  }
-
-  // Update cache
-  _cachedClientList = clients;
+  // Update cache with everything we fetched
+  _cachedClientList = allClients;
   _cacheExpiry = now + CLIENT_LIST_CACHE_TTL;
-  logInfo('findClientById: cached client list', { count: clients.length });
+  logInfo('findClientById: cached client list', { count: allClients.length });
 
-  const client = clients.find((c: any) => c.id === clientId);
-  if (client) {
-    return new Response(JSON.stringify({ success: true, data: client }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  logWarn('findClientById: client not found in list', { clientId, totalClients: clients.length });
+  logWarn('findClientById: client not found after paginated search', { clientId, totalClients: allClients.length, pagesSearched: MAX_PAGES });
   return new Response(JSON.stringify({ success: false, message: 'Client not found', clientId }), {
     status: 404,
     headers: { 'Content-Type': 'application/json' },
@@ -2415,14 +2442,14 @@ serve(async (req) => {
         let apiData: Record<string, unknown> | null = null;
         
         try {
-          apiResponse = await findClientById(clientId);
+          apiResponse = await findClientById(clientId, adminEnvConfig);
           
           if (apiResponse.ok) {
             apiData = await apiResponse.json() as Record<string, unknown>;
             logInfo("Got client details from Dr. Green API", { clientId });
-          } else if (apiResponse.status === 401) {
-            logInfo("Dr. Green API returned 401 for client details, using local fallback", { clientId });
-            // API credentials don't have access - this is expected for non-admin keys
+          } else if (apiResponse.status === 401 || apiResponse.status === 404) {
+            logInfo("Dr. Green API returned 401/404 for client details, using local fallback", { clientId, status: apiResponse.status });
+            // API credentials don't have access or client not found in paginated search - use local data
           } else {
             logWarn("Dr. Green API error for client details", { 
               status: apiResponse.status, 
@@ -3018,6 +3045,24 @@ serve(async (req) => {
             });
           }
           
+          // Always save shipping locally as fallback (even if PATCH succeeded)
+          try {
+            const supabaseAdmin = createClient(
+              Deno.env.get('SUPABASE_URL')!,
+              Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+            );
+            await supabaseAdmin
+              .from('drgreen_clients')
+              .update({ 
+                shipping_address: shippingPayload.shipping,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('drgreen_client_id', clientId);
+            logInfo(`[${requestId}] Step 1: Shipping saved locally as fallback`);
+          } catch (localSaveErr) {
+            logWarn(`[${requestId}] Step 1: Local shipping save failed`, { error: String(localSaveErr).slice(0, 100) });
+          }
+
           // Always add a delay after PATCH to allow API propagation
           logInfo(`[${requestId}] Step 1: Waiting 1500ms for propagation`);
           await sleep(1500);
