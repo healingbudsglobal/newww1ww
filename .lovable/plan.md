@@ -1,49 +1,64 @@
 
-## Add AI-Generated Featured Images to The Wire Articles
+
+## Add Image Preview Before Publish to Both Generators
 
 ### Overview
-Create a new edge function specifically for generating professional cannabis industry article images, then use it to populate the 3 articles currently missing featured images. The existing `generate-product-image` function is designed for product jar photography -- we need article-specific imagery instead.
+Currently, both image generators (Article and Strain/Product) immediately save generated images to storage and update the database. This change adds a preview step so admins can see the AI-generated image first and choose to approve or regenerate before publishing.
 
-### Articles Needing Images
+### How It Works
 
-| Article | Category | Slug |
-|---------|----------|------|
-| South Africa's Cannabis Industry Hits R2 Billion Market Milestone | industry | `south-africa-cannabis-market-milestone` |
-| New Terpene Research Reveals Key Role in Cannabis Therapeutic Effects | research | `terpene-research-therapeutic-effects` |
-| Thailand Updates Medical Cannabis Framework with Stricter Quality Controls | industry | `thailand-medical-cannabis-quality-update` |
+The flow changes from:
+```text
+Generate --> Save to Storage + Update DB (automatic)
+```
+to:
+```text
+Generate --> Preview Image --> [Approve] --> Save to Storage + Update DB
+                           --> [Regenerate] --> Generate again
+                           --> [Reject/Skip] --> Discard
+```
 
-### Implementation Steps
+### Changes Required
 
-**Step 1 -- Create `generate-article-image` Edge Function**
+**1. Update `generate-article-image` Edge Function**
+- Add a `previewOnly` boolean parameter
+- When `previewOnly: true`: generate the image via AI but return the raw base64 data instead of uploading to storage or updating the database
+- When `previewOnly: false` (or absent): keep existing behavior (upload + save)
+- This allows the frontend to call it twice: once for preview, once for publish
 
-A new backend function at `supabase/functions/generate-article-image/index.ts` that:
-- Accepts `articleId`, `title`, `category`, and `slug` as inputs
-- Uses the Lovable AI image generation API (`google/gemini-2.5-flash-image`) with article-specific prompts
-- Generates professional, editorial-style cannabis industry photography (not product jars)
-- Uploads the result to the `product-images` storage bucket under `articles/` prefix
-- Updates the `articles` table `featured_image` column directly with the public URL
-- Includes per-category prompt templates for appropriate imagery:
-  - **industry**: business/market imagery -- facilities, dispensaries, professional settings
-  - **research**: lab/science imagery -- microscopes, terpene molecules, clinical environments
-  - **blockchain**: tech/supply-chain imagery -- digital overlays, traceability visuals
+**2. Update `generate-product-image` Edge Function**
+- Same pattern: add `previewOnly` parameter
+- When true, skip storage upload and DB insert, just return the base64 image data
+- When false, proceed as normal
 
-**Step 2 -- Add a "Generate Missing Images" button to Admin Tools**
+**3. Redesign `ArticleImageGenerator.tsx` Component**
+- Change the generate flow to a two-step process:
+  - "Generate" calls the edge function with `previewOnly: true`
+  - Store the returned base64 image URL in component state per article
+  - Show a preview thumbnail next to each article row
+  - Add "Publish" and "Regenerate" buttons per article
+  - "Publish" calls the edge function again with `previewOnly: false` (full save)
+  - "Regenerate" calls preview again to get a new image
+- Add an image preview column to the table
+- "Generate All" becomes "Preview All" which generates previews for all, then a "Publish All" button saves them
 
-Add a small UI section (or extend existing admin tooling) that:
-- Lists articles missing featured images
-- Provides a "Generate All" button that calls the edge function for each
-- Shows progress and results
-
-**Step 3 -- Generate images for the 3 missing articles**
-
-Call the new edge function for each article, which will:
-1. Generate an AI image with an editorial prompt tailored to the article title and category
-2. Upload to storage at `articles/{slug}.jpg`
-3. Update the database row with the public URL
+**4. Redesign `BatchImageGenerator.tsx` Component**
+- After generation completes, show a grid of preview thumbnails for each strain
+- Each result card shows the generated image with "Publish" and "Regenerate" buttons
+- Add a "Publish All" button to save all approved images at once
+- Results grid uses image cards instead of simple text rows
 
 ### Technical Details
 
-- **AI Model**: `google/gemini-2.5-flash-image` (available via `LOVABLE_API_KEY`, already configured)
-- **Storage**: Reuses existing `product-images` bucket with `articles/` prefix
-- **Image style**: Professional editorial photography, 16:9 aspect ratio suggestion in prompt, clean and modern
-- **No new database tables needed** -- just updates `featured_image` on existing `articles` rows
+- Base64 image data is stored temporarily in React state (not in the database) during preview
+- The base64 data URI (`data:image/png;base64,...`) is used directly as `<img src>` for previews
+- On "Publish", the same base64 data is sent back to the edge function along with metadata, which then uploads to storage and updates the DB
+- To avoid re-generating on publish, the edge function will accept an optional `imageBase64` parameter -- if provided, it skips AI generation and just uploads the provided image
+- Preview images are discarded if the user navigates away without publishing (no persistence needed)
+
+### Files Modified
+- `supabase/functions/generate-article-image/index.ts` -- add `previewOnly` and `imageBase64` params
+- `supabase/functions/generate-product-image/index.ts` -- add `previewOnly` and `imageBase64` params
+- `src/components/admin/ArticleImageGenerator.tsx` -- preview UI with thumbnails, approve/regenerate
+- `src/components/admin/BatchImageGenerator.tsx` -- preview grid with thumbnails, approve/regenerate
+
