@@ -271,7 +271,7 @@ const Support = () => {
           </section>
 
           {/* FAQ Section - Tabbed Interface */}
-          <section className="py-12">
+          <section id="faq" className="py-12">
             <div className="container mx-auto px-4">
               <div className="max-w-5xl mx-auto">
                 <motion.div
@@ -370,7 +370,7 @@ const Support = () => {
           </section>
 
           {/* Contact Section - Clean Cards */}
-          <section className="py-12">
+          <section id="contact" className="py-12">
             <div className="container mx-auto px-4">
               <div className="max-w-4xl mx-auto">
                 <motion.div
