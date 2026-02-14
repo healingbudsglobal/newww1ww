@@ -4295,21 +4295,54 @@ serve(async (req) => {
             `${matchedClient.firstName || ''} ${matchedClient.lastName || ''}`.trim();
           
           // Upsert to local drgreen_clients table
-          const { error: upsertError } = await supabaseAdmin
+          const syncFields = {
+            email: matchedClient.email,
+            full_name: fullName || null,
+            country_code: matchedClient.countryCode || matchedClient.country || 'PT',
+            is_kyc_verified: matchedClient.isKYCVerified || false,
+            admin_approval: matchedClient.adminApproval || 'PENDING',
+            kyc_link: matchedClient.kycLink || null,
+            updated_at: new Date().toISOString(),
+          };
+          
+          // Check if record exists by drgreen_client_id
+          const { data: existing } = await supabaseAdmin
             .from('drgreen_clients')
-            .upsert({
-              user_id: localUserId,
-              drgreen_client_id: clientId,
-              email: matchedClient.email,
-              full_name: fullName || null,
-              country_code: matchedClient.countryCode || matchedClient.country || 'PT',
-              is_kyc_verified: matchedClient.isKYCVerified || false,
-              admin_approval: matchedClient.adminApproval || 'PENDING',
-              kyc_link: matchedClient.kycLink || null,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'user_id'
-            });
+            .select('id, user_id')
+            .eq('drgreen_client_id', clientId)
+            .maybeSingle();
+          
+          let upsertError: any = null;
+          if (existing) {
+            // Update existing record — don't change user_id to avoid unique constraint violations
+            const { error } = await supabaseAdmin
+              .from('drgreen_clients')
+              .update(syncFields)
+              .eq('drgreen_client_id', clientId);
+            upsertError = error;
+          } else {
+            // Check if this user_id already has a record (unique constraint)
+            const { data: existingByUser } = await supabaseAdmin
+              .from('drgreen_clients')
+              .select('id')
+              .eq('user_id', localUserId)
+              .maybeSingle();
+            
+            if (existingByUser) {
+              // User already has a different client linked — just update that record's drgreen_client_id
+              const { error } = await supabaseAdmin
+                .from('drgreen_clients')
+                .update({ ...syncFields, drgreen_client_id: clientId })
+                .eq('user_id', localUserId);
+              upsertError = error;
+            } else {
+              // Insert new record
+              const { error } = await supabaseAdmin
+                .from('drgreen_clients')
+                .insert({ ...syncFields, user_id: localUserId, drgreen_client_id: clientId });
+              upsertError = error;
+            }
+          }
           
           if (upsertError) {
             logError("Failed to upsert client to local DB", { error: upsertError.message });
