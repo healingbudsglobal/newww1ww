@@ -1,53 +1,53 @@
 
 
-# Fix: Replace `/dapp/clients/{id}` with List-and-Filter
+# Fix: Client Not Found (404) During Checkout and Order Creation
 
 ## Problem
 
-The Dr. Green API key does not have permission to access `GET /dapp/clients/{id}` (returns 401), but `GET /dapp/clients` (list all) works and returns all 7 clients with full data including `adminApproval`, `isKYCVerified`, shipping, etc.
+The client ID `dfd81e64-c17d-4a1b-8111-cdf49f879e82` (Scott K) **exists** in the Dr. Green API -- `sync-client-by-email` finds it successfully. However, `get-my-details` and `create-order` return 404 because of two issues:
 
-Multiple proxy actions currently call the forbidden endpoint, causing 401 errors throughout the admin and patient flows.
+1. **`findClientById` only fetches 1 page (200 clients)** -- if the client is beyond the first 200 results, it's missed. Meanwhile, `sync-client-by-email` paginates up to 3 pages (600 clients).
+2. **`get-my-details` doesn't pass `adminEnvConfig`** -- it calls `findClientById(clientId)` without the environment config, potentially using different credentials.
+3. **`create-order` Step 1 calls `PATCH /dapp/clients/{clientId}` directly** -- this direct endpoint call fails with 404/401 when the API key lacks individual client access.
 
-## Solution
+## Changes
 
-Create a shared helper function inside `drgreen-proxy` that fetches the full client list from `GET /dapp/clients` and filters for the requested client ID. Then replace all occurrences of `/dapp/clients/${clientId}` GET calls with this helper.
+### 1. Update `findClientById` to paginate (drgreen-proxy/index.ts ~lines 1304-1366)
 
-## Affected Actions (GET only -- writes like PATCH/PUT/DELETE are separate endpoints and may still work)
+Match the pagination logic from `sync-client-by-email`:
+- Paginate up to 3 pages (PAGE_SIZE=200, MAX_PAGES=3)
+- Handle the same response shape variations (`data.items`, `data.clients`, etc.)
+- Update cache to store full paginated results
+- Also handle the `listData.data.items` response shape that `sync-client-by-email` handles but `findClientById` currently does not
 
-| Action | Current Call | Fix |
-|---|---|---|
-| `dapp-client-details` | `GET /dapp/clients/{id}` | Use list-and-filter helper |
-| `sync-client-status` | `GET /dapp/clients/{id}` | Use list-and-filter helper |
-| `get-client` | `GET /dapp/clients/{id}` | Use list-and-filter helper |
-| `get-my-details` | `GET /dapp/clients/{id}` | Use list-and-filter helper |
-| `admin-reregister-client` (broken check) | `GET /dapp/clients/{id}` | Use list-and-filter helper |
+### 2. Pass `adminEnvConfig` to `findClientById` in `get-my-details` (~line 2418)
 
-## Technical Details
-
-### 1. New Helper Function
-
-Add a `findClientById` helper near the top of the proxy that:
-- Calls `GET /dapp/clients?take=200&page=1` (the working endpoint)
-- Parses the response and finds the client matching the requested ID
-- Returns a synthetic `Response` object matching what the individual endpoint would have returned
-- Caches the list briefly if multiple lookups happen in the same request
-
-### 2. Replace Each Affected Action
-
-For each action listed above, replace:
+Change:
 ```typescript
-response = await drGreenRequestQuery(`/dapp/clients/${clientId}`, ...);
+apiResponse = await findClientById(clientId);
 ```
-With:
+To:
 ```typescript
-response = await findClientById(clientId, adminEnvConfig);
+apiResponse = await findClientById(clientId, adminEnvConfig);
 ```
 
-### 3. Keep Write Endpoints As-Is
+### 3. Handle 404 in `get-my-details` like 401 (~line 2427)
 
-`PATCH`, `PUT`, `DELETE`, and `POST` calls to `/dapp/clients/{id}` (for activate, deactivate, update, shipping updates) will remain unchanged -- those are different HTTP methods that may have different permissions. If they also fail with 401, we can address them separately.
+Currently the code only falls back to local data on 401. Add 404 to the fallback condition so the local database record is used when the API can't find the client:
 
-### 4. No Frontend Changes Required
+```typescript
+} else if (apiResponse.status === 401 || apiResponse.status === 404) {
+  logInfo("Dr. Green API returned 401/404 for client details, using local fallback", { clientId });
+}
+```
 
-The proxy response shape stays the same. Frontend code (`useDrGreenApi.ts`, `AdminClientManager`, etc.) will continue working without modification.
+### 4. Make `create-order` Step 1 (PATCH shipping) resilient to 404 (~line 2991)
+
+The PATCH to `/dapp/clients/${clientId}` is already marked as "non-blocking" in the code (it continues on failure). But ensure the local shipping address is still saved to the `drgreen_clients` table as fallback so checkout can proceed even when the direct PATCH fails.
+
+## Expected Outcome
+
+- `get-my-details` will find Scott K via paginated list lookup and return full API data (not just local fallback)
+- `create-order` will still work even if PATCH shipping fails (existing non-blocking behavior) but will use the correct paginated client lookup
+- Both predefined clients will be found reliably regardless of their position in the API's client list
 
