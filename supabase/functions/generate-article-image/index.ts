@@ -25,7 +25,7 @@ serve(async (req) => {
   }
 
   try {
-    const { articleId, title, category, slug } = await req.json();
+    const { articleId, title, category, slug, previewOnly, imageBase64 } = await req.json();
 
     if (!articleId || !title || !slug) {
       return new Response(
@@ -34,9 +34,56 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    // If imageBase64 is provided, skip AI generation and just upload
+    if (imageBase64 && !previewOnly) {
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+        return new Response(
+          JSON.stringify({ error: "Missing required environment configuration" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      const imageBuffer = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
+      const filename = `articles/${slug}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(filename, imageBuffer, { contentType: "image/png", upsert: true });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return new Response(
+          JSON.stringify({ error: "Failed to upload image" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(filename);
+
+      const imageUrl = publicUrlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("articles")
+        .update({ featured_image: imageUrl })
+        .eq("id", articleId);
+
+      if (updateError) console.error("DB update error:", updateError);
+
+      console.log(`Image published from preview: ${imageUrl}`);
+      return new Response(
+        JSON.stringify({ success: true, imageUrl, articleId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(
@@ -48,7 +95,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const prompt = buildPrompt(title, category || "industry");
 
-    console.log(`Generating article image for: "${title}" [${category}]`);
+    console.log(`Generating article image for: "${title}" [${category}] previewOnly=${!!previewOnly}`);
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -84,7 +131,16 @@ serve(async (req) => {
       );
     }
 
-    // Upload to storage
+    // Preview mode: return base64 without saving
+    if (previewOnly) {
+      console.log(`Preview generated for: "${title}"`);
+      return new Response(
+        JSON.stringify({ success: true, imageBase64: imageData, articleId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Full mode: upload to storage and update DB
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const filename = `articles/${slug}.png`;
@@ -107,15 +163,12 @@ serve(async (req) => {
 
     const imageUrl = publicUrlData.publicUrl;
 
-    // Update article
     const { error: updateError } = await supabase
       .from("articles")
       .update({ featured_image: imageUrl })
       .eq("id", articleId);
 
-    if (updateError) {
-      console.error("DB update error:", updateError);
-    }
+    if (updateError) console.error("DB update error:", updateError);
 
     console.log(`Image generated and saved: ${imageUrl}`);
 

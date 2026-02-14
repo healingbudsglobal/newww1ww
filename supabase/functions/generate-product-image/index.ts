@@ -7,13 +7,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { productId, productName, originalImageUrl } = await req.json();
+    const { productId, productName, originalImageUrl, previewOnly, imageBase64 } = await req.json();
     
     if (!productId || !productName) {
       console.error("Missing required fields:", { productId, productName });
@@ -23,14 +22,66 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Generating branded image for product: ${productName} (${productId})`);
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
+    // If imageBase64 provided, skip AI and just upload
+    if (imageBase64 && !previewOnly) {
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+        return new Response(
+          JSON.stringify({ error: "Supabase credentials not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      const imageBuffer = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
+      const safeProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+      const filename = `${safeProductName}-${productId.slice(0, 8)}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(filename, imageBuffer, { contentType: "image/png", upsert: true });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return new Response(
+          JSON.stringify({ error: "Failed to upload image" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(filename);
+
+      const generatedImageUrl = publicUrlData.publicUrl;
+
+      const { error: insertError } = await supabase
+        .from("generated_product_images")
+        .upsert({
+          product_id: productId,
+          product_name: productName,
+          original_image_url: originalImageUrl || null,
+          generated_image_url: generatedImageUrl,
+          generated_at: new Date().toISOString(),
+        }, { onConflict: "product_id" });
+
+      if (insertError) console.error("Database insert error:", insertError);
+
+      console.log(`Image published from preview: ${generatedImageUrl}`);
+      return new Response(
+        JSON.stringify({ imageUrl: generatedImageUrl, cached: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Generating branded image for product: ${productName} (${productId}) previewOnly=${!!previewOnly}`);
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
     if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY is not configured");
       return new Response(
         JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -38,43 +89,35 @@ serve(async (req) => {
     }
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Supabase credentials not configured");
       return new Response(
         JSON.stringify({ error: "Supabase credentials not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Initialize Supabase client with service role
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check if we already have a generated image for this product
-    const { data: existingImage, error: checkError } = await supabase
-      .from("generated_product_images")
-      .select("*")
-      .eq("product_id", productId)
-      .maybeSingle();
+    // Check cache only if not preview mode
+    if (!previewOnly) {
+      const { data: existingImage, error: checkError } = await supabase
+        .from("generated_product_images")
+        .select("*")
+        .eq("product_id", productId)
+        .maybeSingle();
 
-    if (checkError) {
-      console.error("Error checking existing image:", checkError);
+      if (checkError) console.error("Error checking existing image:", checkError);
+
+      if (existingImage) {
+        console.log(`Found existing generated image for ${productName}`);
+        return new Response(
+          JSON.stringify({ imageUrl: existingImage.generated_image_url, cached: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    if (existingImage) {
-      console.log(`Found existing generated image for ${productName}`);
-      return new Response(
-        JSON.stringify({ 
-          imageUrl: existingImage.generated_image_url,
-          cached: true 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Use the jar template as base and edit it to add cannabis buds
-    // First, get the jar template image from storage or use embedded base64
+    // Get jar template
     const jarTemplateUrl = `${SUPABASE_URL}/storage/v1/object/public/product-images/jar-template.jpg`;
-    
-    // Fetch the jar template
     let jarTemplateBase64 = "";
     try {
       const templateResponse = await fetch(jarTemplateUrl);
@@ -123,21 +166,14 @@ PHOTOGRAPHY STYLE:
 
     console.log("Calling Lovable AI for image generation...");
 
-    // Build the request based on whether we have a template
     const messageContent: any[] = [
-      {
-        type: "text",
-        text: jarTemplateBase64 ? editPrompt : generatePrompt,
-      },
+      { type: "text", text: jarTemplateBase64 ? editPrompt : generatePrompt },
     ];
 
-    // If we have the jar template, include it for editing
     if (jarTemplateBase64) {
       messageContent.push({
         type: "image_url",
-        image_url: {
-          url: `data:image/jpeg;base64,${jarTemplateBase64}`,
-        },
+        image_url: { url: `data:image/jpeg;base64,${jarTemplateBase64}` },
       });
       console.log("Using jar template for image editing");
     } else {
@@ -152,12 +188,7 @@ PHOTOGRAPHY STYLE:
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: messageContent,
-          },
-        ],
+        messages: [{ role: "user", content: messageContent }],
         modalities: ["image", "text"],
       }),
     });
@@ -188,7 +219,6 @@ PHOTOGRAPHY STYLE:
     const aiData = await aiResponse.json();
     console.log("AI response received");
 
-    // Extract the base64 image from the response
     const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageData) {
@@ -199,23 +229,26 @@ PHOTOGRAPHY STYLE:
       );
     }
 
-    // Extract base64 data (remove data:image/png;base64, prefix if present)
+    // Preview mode: return base64 without saving
+    if (previewOnly) {
+      console.log(`Preview generated for product: ${productName}`);
+      return new Response(
+        JSON.stringify({ imageBase64: imageData, cached: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Full mode: upload and save
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-    
-    // Generate filename
     const safeProductName = productName.toLowerCase().replace(/[^a-z0-9]/g, "-");
     const filename = `${safeProductName}-${productId.slice(0, 8)}.png`;
 
     console.log(`Uploading image to storage: ${filename}`);
 
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("product-images")
-      .upload(filename, imageBuffer, {
-        contentType: "image/png",
-        upsert: true,
-      });
+      .upload(filename, imageBuffer, { contentType: "image/png", upsert: true });
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
@@ -225,7 +258,6 @@ PHOTOGRAPHY STYLE:
       );
     }
 
-    // Get public URL
     const { data: publicUrlData } = supabase.storage
       .from("product-images")
       .getPublicUrl(filename);
@@ -233,7 +265,6 @@ PHOTOGRAPHY STYLE:
     const generatedImageUrl = publicUrlData.publicUrl;
     console.log(`Image uploaded successfully: ${generatedImageUrl}`);
 
-    // Save to database for caching
     const { error: insertError } = await supabase
       .from("generated_product_images")
       .upsert({
@@ -244,16 +275,10 @@ PHOTOGRAPHY STYLE:
         generated_at: new Date().toISOString(),
       }, { onConflict: "product_id" });
 
-    if (insertError) {
-      console.error("Database insert error:", insertError);
-      // Don't fail the request, image was still generated and uploaded
-    }
+    if (insertError) console.error("Database insert error:", insertError);
 
     return new Response(
-      JSON.stringify({ 
-        imageUrl: generatedImageUrl,
-        cached: false 
-      }),
+      JSON.stringify({ imageUrl: generatedImageUrl, cached: false }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

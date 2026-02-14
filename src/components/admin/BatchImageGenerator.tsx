@@ -1,57 +1,69 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Sparkles, Check, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, Sparkles, Check, AlertCircle, Loader2, Eye, RefreshCw } from "lucide-react";
 
-// Import the jar template
 import jarTemplate from "@/assets/jar-template-reference.jpg";
 
-interface BatchResult {
-  productId: string;
-  productName: string;
-  status: "generated" | "cached" | "error";
-  imageUrl?: string;
+interface Strain {
+  id: string;
+  name: string;
+  image_url: string | null;
+}
+
+type PreviewStatus = "idle" | "generating" | "previewing" | "publishing" | "done" | "error";
+
+interface PreviewItem {
+  strain: Strain;
+  status: PreviewStatus;
+  previewBase64?: string;
+  publishedUrl?: string;
   error?: string;
 }
 
 export function BatchImageGenerator() {
   const [isUploading, setIsUploading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [templateUploaded, setTemplateUploaded] = useState(false);
-  const [results, setResults] = useState<BatchResult[]>([]);
-  const [summary, setSummary] = useState<{
-    total: number;
-    generated: number;
-    cached: number;
-    errors: number;
-  } | null>(null);
+  const [items, setItems] = useState<PreviewItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    fetchStrains();
+  }, []);
+
+  const fetchStrains = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("strains")
+      .select("id, name, image_url")
+      .eq("is_archived", false)
+      .order("name");
+    setItems((data || []).map(s => ({ strain: s, status: "idle" as PreviewStatus })));
+    setLoading(false);
+  };
+
+  const updateItem = (id: string, update: Partial<PreviewItem>) => {
+    setItems(prev => prev.map(i => i.strain.id === id ? { ...i, ...update } : i));
+  };
 
   const uploadTemplate = async () => {
     setIsUploading(true);
     try {
-      // Fetch the jar template image and convert to base64
       const response = await fetch(jarTemplate);
       const blob = await response.blob();
-      
-      // Convert blob to base64
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          // Remove data:image/jpeg;base64, prefix
-          resolve(result.split(",")[1]);
-        };
+        reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
         reader.readAsDataURL(blob);
       });
 
-      // Upload to storage via edge function
-      const { data, error } = await supabase.functions.invoke("upload-jar-template", {
+      const { error } = await supabase.functions.invoke("upload-jar-template", {
         body: { imageBase64: base64 },
       });
-
       if (error) throw error;
 
       setTemplateUploaded(true);
@@ -64,42 +76,80 @@ export function BatchImageGenerator() {
     }
   };
 
-  const generateImages = async () => {
-    setIsGenerating(true);
-    setResults([]);
-    setSummary(null);
-
+  const generatePreview = async (item: PreviewItem) => {
+    updateItem(item.strain.id, { status: "generating" });
     try {
-      toast.info("Starting batch image generation. This may take a few minutes...");
-
-      const { data, error } = await supabase.functions.invoke("batch-generate-images", {
-        body: {},
+      const { data, error } = await supabase.functions.invoke("generate-product-image", {
+        body: {
+          productId: item.strain.id,
+          productName: item.strain.name,
+          originalImageUrl: item.strain.image_url,
+          previewOnly: true,
+        },
       });
-
-      if (error) throw error;
-
-      setResults(data.results || []);
-      setSummary(data.summary || null);
-
-      if (data.summary) {
-        const { generated, cached, errors, total } = data.summary;
-        if (errors > 0) {
-          toast.warning(`Completed: ${generated} generated, ${cached} cached, ${errors} errors`);
-        } else {
-          toast.success(`All ${total} images processed successfully!`);
-        }
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      
+      if (data.cached) {
+        updateItem(item.strain.id, { status: "done", publishedUrl: data.imageUrl });
+        return "cached";
       }
-    } catch (error) {
-      console.error("Generation error:", error);
-      toast.error("Failed to generate images");
-    } finally {
-      setIsGenerating(false);
+      
+      updateItem(item.strain.id, { status: "previewing", previewBase64: data.imageBase64 });
+      return "preview";
+    } catch (err: any) {
+      updateItem(item.strain.id, { status: "error", error: err.message });
+      return "error";
     }
   };
 
-  const progress = summary 
-    ? ((summary.generated + summary.cached) / summary.total) * 100 
-    : 0;
+  const publishImage = async (item: PreviewItem) => {
+    if (!item.previewBase64) return;
+    updateItem(item.strain.id, { status: "publishing" });
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-product-image", {
+        body: {
+          productId: item.strain.id,
+          productName: item.strain.name,
+          originalImageUrl: item.strain.image_url,
+          imageBase64: item.previewBase64,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      updateItem(item.strain.id, { status: "done", publishedUrl: data.imageUrl, previewBase64: undefined });
+      toast.success(`Published image for "${item.strain.name}"`);
+    } catch (err: any) {
+      updateItem(item.strain.id, { status: "error", error: err.message });
+      toast.error(`Failed to publish "${item.strain.name}"`);
+    }
+  };
+
+  const previewAll = async () => {
+    setGenerating(true);
+    for (const item of items) {
+      if (item.status === "done" || item.status === "previewing") continue;
+      await generatePreview(item);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    toast.success("All previews generated!");
+    setGenerating(false);
+  };
+
+  const publishAll = async () => {
+    setGenerating(true);
+    let count = 0;
+    for (const item of items) {
+      if (item.status !== "previewing") continue;
+      await publishImage(item);
+      count++;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    toast.success(`Published ${count} image${count !== 1 ? "s" : ""}`);
+    setGenerating(false);
+  };
+
+  const previewCount = items.filter(i => i.status === "previewing").length;
+  const doneCount = items.filter(i => i.status === "done").length;
+  const progress = items.length > 0 ? ((previewCount + doneCount) / items.length) * 100 : 0;
 
   return (
     <Card>
@@ -109,7 +159,7 @@ export function BatchImageGenerator() {
           AI Product Image Generator
         </CardTitle>
         <CardDescription>
-          Generate branded 4K product images for all strains using AI
+          Generate branded 4K product images with preview before publishing
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -117,86 +167,93 @@ export function BatchImageGenerator() {
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <h4 className="font-medium">Step 1: Upload Jar Template</h4>
-            <p className="text-sm text-muted-foreground">
-              Upload the HB branded jar template to storage
-            </p>
+            <p className="text-sm text-muted-foreground">Upload the HB branded jar template to storage</p>
           </div>
-          <Button
-            onClick={uploadTemplate}
-            disabled={isUploading || templateUploaded}
-            variant={templateUploaded ? "outline" : "default"}
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : templateUploaded ? (
-              <Check className="h-4 w-4 mr-2" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
+          <Button onClick={uploadTemplate} disabled={isUploading || templateUploaded} variant={templateUploaded ? "outline" : "default"} size="sm">
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : templateUploaded ? <Check className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
             {templateUploaded ? "Uploaded" : "Upload Template"}
           </Button>
         </div>
 
-        {/* Step 2: Generate Images */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <h4 className="font-medium">Step 2: Generate All Images</h4>
-            <p className="text-sm text-muted-foreground">
-              Generate 4K branded images for all 7 strains
-            </p>
+        {/* Step 2: Generate Previews */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h4 className="font-medium">Step 2: Generate & Preview Images</h4>
+            <p className="text-sm text-muted-foreground">{items.length} strains available</p>
           </div>
-          <Button
-            onClick={generateImages}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
+          <div className="flex gap-2">
+            <Button onClick={previewAll} disabled={generating} variant="outline" size="sm">
+              {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {generating ? "Generating…" : "Preview All"}
+            </Button>
+            {previewCount > 0 && (
+              <Button onClick={publishAll} disabled={generating} size="sm">
+                <Upload className="h-4 w-4 mr-2" /> Publish All ({previewCount})
+              </Button>
             )}
-            {isGenerating ? "Generating..." : "Generate All"}
-          </Button>
+          </div>
         </div>
 
-        {/* Progress */}
-        {isGenerating && (
-          <div className="space-y-2">
-            <Progress value={progress} />
-            <p className="text-sm text-muted-foreground text-center">
-              Processing images... This may take 2-3 minutes.
-            </p>
+        {generating && <Progress value={progress} className="h-2" />}
+
+        {/* Results Grid */}
+        {!loading && items.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
+            {items.map(item => (
+              <div key={item.strain.id} className="border rounded-lg overflow-hidden">
+                {/* Image Preview */}
+                <div className="aspect-square bg-muted/30 flex items-center justify-center relative">
+                  {item.previewBase64 && item.status === "previewing" ? (
+                    <img src={item.previewBase64} alt={item.strain.name} className="w-full h-full object-cover" />
+                  ) : item.publishedUrl && item.status === "done" ? (
+                    <img src={item.publishedUrl} alt={item.strain.name} className="w-full h-full object-cover" />
+                  ) : item.status === "generating" || item.status === "publishing" ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  ) : item.status === "error" ? (
+                    <AlertCircle className="w-8 h-8 text-destructive" />
+                  ) : (
+                    <Sparkles className="w-8 h-8 text-muted-foreground/40" />
+                  )}
+                  {item.status === "done" && (
+                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                {/* Info & Actions */}
+                <div className="p-2 space-y-1">
+                  <p className="text-sm font-medium truncate">{item.strain.name}</p>
+                  <div className="flex gap-1">
+                    {(!item.status || item.status === "idle" || item.status === "error") && (
+                      <Button variant="ghost" size="sm" className="flex-1 h-7 text-xs" onClick={() => generatePreview(item)} disabled={generating}>
+                        <Eye className="w-3 h-3 mr-1" /> Preview
+                      </Button>
+                    )}
+                    {item.status === "previewing" && (
+                      <>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => generatePreview(item)} disabled={generating}>
+                          <RefreshCw className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" className="flex-1 h-7 text-xs" onClick={() => publishImage(item)} disabled={generating}>
+                          <Upload className="w-3 h-3 mr-1" /> Publish
+                        </Button>
+                      </>
+                    )}
+                    {item.status === "done" && (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Published
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Results */}
-        {results.length > 0 && (
-          <div className="space-y-2 mt-4">
-            <h4 className="font-medium">Results</h4>
-            {summary && (
-              <div className="flex gap-4 text-sm">
-                <span className="text-green-600">Generated: {summary.generated}</span>
-                <span className="text-blue-600">Cached: {summary.cached}</span>
-                <span className="text-red-600">Errors: {summary.errors}</span>
-              </div>
-            )}
-            <div className="grid gap-2 max-h-60 overflow-y-auto">
-              {results.map((result) => (
-                <div
-                  key={result.productId}
-                  className="flex items-center gap-2 p-2 rounded-md bg-muted/50"
-                >
-                  {result.status === "error" ? (
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <Check className="h-4 w-4 text-green-500" />
-                  )}
-                  <span className="flex-1">{result.productName}</span>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {result.status}
-                  </span>
-                </div>
-              ))}
-            </div>
+        {loading && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading strains…
           </div>
         )}
       </CardContent>
