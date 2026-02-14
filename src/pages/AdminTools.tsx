@@ -7,6 +7,7 @@ import { BatchImageGenerator } from "@/components/admin/BatchImageGenerator";
 import { AdminClientImport } from "@/components/admin/AdminClientImport";
 import { AdminEmailTrigger } from "@/components/admin/AdminEmailTrigger";
 import { KYCJourneyViewer } from "@/components/admin/KYCJourneyViewer";
+import { ArticleImageGenerator } from "@/components/admin/ArticleImageGenerator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Newspaper } from "lucide-react";
@@ -62,6 +63,7 @@ const AdminTools = () => (
   >
     <div className="space-y-8">
       <RefreshWireButton />
+      <ArticleImageGenerator />
       <ApiTestRunner />
       <ApiComparisonDashboard />
       <ApiDebugPanel />
