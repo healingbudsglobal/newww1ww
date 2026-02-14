@@ -155,8 +155,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
           className={cn(
             "transition-all duration-500",
             scrolled 
-              ? "bg-[#1A2E2A]/98 backdrop-blur-xl shadow-2xl shadow-black/30" 
-              : "bg-[#1A2E2A]"
+              ? "bg-[hsl(var(--navbar-forest))]/98 backdrop-blur-xl shadow-2xl shadow-black/30" 
+              : "bg-[hsl(var(--navbar-forest))]"
           )}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -244,7 +244,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
                         <span className={cn(
                           "text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full w-fit",
                           isAdmin && !roleLoading
-                            ? "bg-[#EAB308]/20 text-[#EAB308]"
+                            ? "bg-[hsl(var(--navbar-gold))]/20 text-[hsl(var(--navbar-gold))]"
                             : "bg-emerald-500/20 text-emerald-400"
                         )}>
                           {isAdmin && !roleLoading ? 'Admin' : 'Patient'}
@@ -307,7 +307,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
         </div>
         
         {/* Separator Line - Consistent Gold Accent */}
-        <div className="h-[2px] shadow-sm bg-[#EAB308]/60" />
+        <div className="h-[2px] shadow-sm bg-[hsl(var(--navbar-gold))]/60" />
       </header>
 
       {/* Mobile Navigation Overlay */}
