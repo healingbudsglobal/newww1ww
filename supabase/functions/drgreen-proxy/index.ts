@@ -91,6 +91,7 @@ const ADMIN_ACTIONS = [
   'admin-list-all-clients', // List all clients for debugging
   'admin-update-shipping-address', // Admin can update any client's address
   'admin-reregister-client', // Re-register a client with current API key pair
+  'get-clients-summary', 'get-sales', // Admin dashboard endpoints
 ];
 
 // Actions that require ownership verification (user must own the resource)
