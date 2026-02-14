@@ -4210,45 +4210,72 @@ serve(async (req) => {
         
         logInfo(`Syncing client by email: ${email.slice(0,3)}***`);
         
-        // Search for client on Dr Green API
-        const searchResponse = await drGreenRequest(
-          `/dapp/clients?search=${encodeURIComponent(email)}&searchBy=email&take=10&page=1`,
-          "GET"
-        );
+        // Use list-and-filter approach (search/searchBy params not supported, 
+        // and drGreenRequest signs body not query string for GET → 401)
+        // Fetch all clients and filter by email locally, same as get-client-by-auth-email
+        const PAGE_SIZE = 200;
+        const MAX_PAGES = 3;
+        let allClients: any[] = [];
+        let matchedClient: any = null;
         
-        if (!searchResponse.ok) {
-          const errorText = await searchResponse.text();
-          logError("Dr Green API search failed", { status: searchResponse.status, error: errorText });
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: `Dr Green API error: ${searchResponse.status}`,
-              message: "Could not search for client on Dr Green. Check API permissions.",
-              apiStatus: searchResponse.status
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          const listResponse = await drGreenRequestQuery('/dapp/clients', { take: PAGE_SIZE, page, orderBy: 'desc' }, false, adminEnvConfig);
+          
+          if (!listResponse.ok) {
+            const errorText = await listResponse.text();
+            logError("Dr Green API client list failed", { status: listResponse.status, error: errorText.slice(0, 200) });
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: `Dr Green API error: ${listResponse.status}`,
+                message: "Could not search for client on Dr Green. Check API permissions.",
+                apiStatus: listResponse.status
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+            );
+          }
+          
+          const listData = await listResponse.json();
+          // Handle various response shapes
+          let clients: any[] = [];
+          if (Array.isArray(listData.data)) {
+            clients = listData.data;
+          } else if (listData.data?.items && Array.isArray(listData.data.items)) {
+            clients = listData.data.items;
+          } else if (Array.isArray(listData.clients)) {
+            clients = listData.clients;
+          } else if (listData.data?.clients && Array.isArray(listData.data.clients)) {
+            clients = listData.data.clients;
+          }
+          
+          if (!clients.length) break;
+          allClients = [...allClients, ...clients];
+          
+          // Check for match on this page
+          const match = clients.find((c: any) => 
+            c.email?.toLowerCase() === email.toLowerCase()
           );
+          if (match) {
+            matchedClient = match;
+            logInfo(`Found client on page ${page}`, { clientId: match.id });
+            break;
+          }
+          
+          // Stop if we got fewer than PAGE_SIZE (last page)
+          if (clients.length < PAGE_SIZE) break;
         }
         
-        const searchData = await searchResponse.json();
-        const clients = searchData?.data?.clients || searchData?.clients || [];
-        
-        if (!clients.length) {
+        if (!matchedClient) {
           return new Response(
             JSON.stringify({ 
               success: false, 
               error: 'not_found',
               message: `No client found with email: ${email}`,
-              searchResults: 0
+              searchResults: allClients.length
             }),
             { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
           );
         }
-        
-        // Find exact email match
-        const matchedClient = clients.find((c: any) => 
-          c.email?.toLowerCase() === email.toLowerCase()
-        ) || clients[0];
         
         logInfo("Found client on Dr Green", { 
           clientId: matchedClient.id || matchedClient.clientId,
@@ -4313,22 +4340,57 @@ serve(async (req) => {
       
       case "search-clients-drgreen": {
         // Search clients on Dr Green API without syncing
-        const { search, searchBy, page, take } = body || {};
+        // Uses list-and-filter approach (search/searchBy params cause 401)
+        const { search: searchTerm, page: searchPage, take: searchTake } = body || {};
         
-        if (!search || !validateStringLength(search, 100)) {
+        if (!searchTerm || !validateStringLength(searchTerm, 100)) {
           throw new Error("Search term is required");
         }
         
-        const queryParams = new URLSearchParams({
-          search: String(search).slice(0, 100),
-          searchBy: searchBy || 'email',
-          page: String(page || 1),
-          take: String(take || 20),
-          orderBy: 'desc'
-        });
+        logInfo(`Searching Dr Green clients: ${searchTerm.slice(0,10)}***`);
         
-        logInfo(`Searching Dr Green clients: ${search.slice(0,10)}***`);
-        response = await drGreenRequest(`/dapp/clients?${queryParams.toString()}`, "GET");
+        // Fetch all clients and filter locally
+        const searchListResponse = await drGreenRequestQuery('/dapp/clients', { 
+          take: 200, page: 1, orderBy: 'desc' 
+        }, false, adminEnvConfig);
+        
+        if (!searchListResponse.ok) {
+          response = searchListResponse;
+          break;
+        }
+        
+        const searchListData = await searchListResponse.json();
+        let searchClients: any[] = [];
+        if (Array.isArray(searchListData.data)) {
+          searchClients = searchListData.data;
+        } else if (searchListData.data?.items) {
+          searchClients = searchListData.data.items;
+        } else if (searchListData.data?.clients) {
+          searchClients = searchListData.data.clients;
+        } else if (Array.isArray(searchListData.clients)) {
+          searchClients = searchListData.clients;
+        }
+        
+        // Filter by search term (email or name)
+        const searchLower = searchTerm.toLowerCase();
+        const filtered = searchClients.filter((c: any) => 
+          c.email?.toLowerCase().includes(searchLower) ||
+          c.firstName?.toLowerCase().includes(searchLower) ||
+          c.lastName?.toLowerCase().includes(searchLower) ||
+          `${c.firstName} ${c.lastName}`.toLowerCase().includes(searchLower)
+        );
+        
+        // Paginate results
+        const startIdx = ((Number(searchPage) || 1) - 1) * (Number(searchTake) || 20);
+        const endIdx = startIdx + (Number(searchTake) || 20);
+        const paginatedResults = filtered.slice(startIdx, endIdx);
+        
+        response = new Response(JSON.stringify({
+          data: { clients: paginatedResults, total: filtered.length }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
         break;
       }
       
