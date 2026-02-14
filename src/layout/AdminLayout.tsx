@@ -2,7 +2,7 @@
  * AdminLayout Component
  * 
  * Dedicated layout for admin pages with sidebar navigation.
- * CRM-style high-density layout for management UX.
+ * Earthy green palette with modern 2026 design aesthetic.
  */
 
 import { ReactNode, useState, useEffect } from "react";
@@ -19,7 +19,6 @@ import { EnvironmentSelector } from "@/components/admin/EnvironmentSelector";
 
 import {
   LayoutDashboard,
-  FileText,
   Leaf,
   RefreshCw,
   Settings,
@@ -33,7 +32,6 @@ import {
   Users,
   ShoppingCart,
   Bug,
-  Wallet,
   ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,14 +59,12 @@ const navItems: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/clients", label: "Clients", icon: Users },
   { to: "/admin/orders", label: "Orders", icon: ShoppingCart },
-  { to: "/admin/prescriptions", label: "Prescriptions", icon: FileText },
   { to: "/admin/strains", label: "Strains", icon: Leaf },
   { to: "/admin/strain-sync", label: "Strain Sync", icon: RefreshCw },
 ];
 
 const secondaryNavItems: NavItem[] = [
-  { to: "/admin/roles", label: "User Roles", icon: Shield },
-  { to: "/admin/wallet-mappings", label: "Wallet Mappings", icon: Wallet },
+  { to: "/admin/team", label: "Team & Access", icon: Shield },
   { to: "/admin/settings", label: "Settings", icon: Settings },
   { to: "/admin/tools", label: "Developer Tools", icon: Bug },
 ];
@@ -84,7 +80,6 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  // Redirect to auth if not logged in (prevents 401s on admin API calls)
   useEffect(() => {
     if (!isLoading && !user) {
       const returnUrl = encodeURIComponent(location.pathname + location.search);
@@ -93,69 +88,47 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   }, [isLoading, user, location.pathname, location.search, navigate]);
 
   const isActive = (path: string) => {
-    if (path === "/admin") {
-      return location.pathname === "/admin";
-    }
+    if (path === "/admin") return location.pathname === "/admin";
     return location.pathname.startsWith(path);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out.",
-    });
+    toast({ title: "Signed out", description: "You have been successfully signed out." });
     navigate("/");
   };
 
-  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex">
-        <div className="w-64 border-r border-border bg-card p-4">
-          <Skeleton className="h-10 w-32 mb-8" />
+      <div className="min-h-screen bg-[hsl(var(--admin-parchment))] dark:bg-background flex">
+        <div className="w-64 bg-[hsl(var(--admin-forest))] p-4">
+          <Skeleton className="h-10 w-32 mb-8 bg-white/10" />
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <Skeleton key={i} className="h-10 w-full bg-white/10" />
             ))}
           </div>
         </div>
         <div className="flex-1 p-8">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-4 w-64 mb-8" />
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
         </div>
       </div>
     );
   }
 
-  // Access denied state
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-md p-8"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-md p-8">
           <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
             <Shield className="w-8 h-8 text-destructive" />
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-6">
-            You do not have administrator privileges to access this area.
-          </p>
+          <p className="text-muted-foreground mb-6">You do not have administrator privileges.</p>
           <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              Go Back
-            </Button>
-            <Button onClick={() => navigate("/")}>
-              Return Home
-            </Button>
+            <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+            <Button onClick={() => navigate("/")}>Return Home</Button>
           </div>
         </motion.div>
       </div>
@@ -171,19 +144,19 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
         to={item.to}
         onClick={() => setMobileMenuOpen(false)}
         className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
           active
-            ? "bg-primary text-primary-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            ? "bg-white/15 text-white font-medium shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-sm"
+            : "text-white/60 hover:text-white hover:bg-white/8"
         )}
       >
-        <Icon className={cn("w-5 h-5 flex-shrink-0", active && "text-primary-foreground")} />
+        <Icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", active ? "text-white" : "text-white/50 group-hover:text-white/80")} />
         {!collapsed && (
           <>
-            <span className="flex-1">{item.label}</span>
+            <span className="flex-1 text-sm">{item.label}</span>
             {item.badge && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-[hsl(var(--admin-gold))]/20 text-[hsl(var(--admin-gold))] rounded-full">
                 {item.badge}
               </span>
             )}
@@ -195,85 +168,76 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
     if (collapsed) {
       return (
         <Tooltip delayDuration={0}>
-          <TooltipTrigger asChild>
-            {linkContent}
-          </TooltipTrigger>
-          <TooltipContent side="right" className="font-medium">
-            {item.label}
-            {item.badge && ` (${item.badge})`}
-          </TooltipContent>
+          <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">{item.label}</TooltipContent>
         </Tooltip>
       );
     }
-
     return linkContent;
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-[hsl(var(--admin-parchment))] dark:bg-background flex">
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "hidden lg:flex flex-col border-r border-border bg-card transition-all duration-300",
+          "hidden lg:flex flex-col transition-all duration-300 relative",
           sidebarCollapsed ? "w-[72px]" : "w-64"
         )}
+        style={{
+          background: 'linear-gradient(180deg, hsl(var(--admin-forest)), hsl(var(--admin-forest-deep)))',
+        }}
       >
-        {/* Logo Area */}
+        {/* Logo */}
         <div className={cn(
-          "flex items-center border-b border-border",
+          "flex items-center border-b border-white/10",
           sidebarCollapsed ? "h-16 justify-center px-2" : "h-16 px-4"
         )}>
           <Link to="/admin" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-              <Shield className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-lg bg-[hsl(var(--admin-fir))] flex items-center justify-center flex-shrink-0 shadow-lg">
+              <Shield className="w-4 h-4 text-white" />
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
-                <span className="font-semibold text-foreground text-sm leading-tight">Admin Portal</span>
-                <span className="text-xs text-muted-foreground">{tenant.name}</span>
+                <span className="font-semibold text-white text-sm leading-tight">Admin Portal</span>
+                <span className="text-xs text-white/40">{tenant.name}</span>
               </div>
             )}
           </Link>
         </div>
 
-        {/* Navigation */}
+        {/* Accent bar */}
+        <div className="h-0.5 bg-gradient-to-r from-[hsl(var(--admin-fir))] via-[hsl(var(--admin-sage))] to-transparent" />
+
+        {/* Nav */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink key={item.to} item={item} collapsed={sidebarCollapsed} />
           ))}
-
-          {/* Divider */}
-          <div className="my-4 border-t border-border" />
-
-          {/* Secondary Nav */}
+          <div className="my-4 border-t border-white/10" />
           {secondaryNavItems.map((item) => (
             <NavLink key={item.to} item={item} collapsed={sidebarCollapsed} />
           ))}
         </nav>
 
         {/* User Section */}
-        <div className={cn(
-          "border-t border-border p-3",
-          sidebarCollapsed && "flex flex-col items-center gap-2"
-        )}>
+        <div className={cn("border-t border-white/10 p-3", sidebarCollapsed && "flex flex-col items-center gap-2")}>
           {!sidebarCollapsed && (
             <>
               <Link
                 to="/"
-                className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-3"
+                className="flex items-center gap-3 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors mb-3"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span className="text-sm font-medium">Back to Website</span>
+                <span className="text-sm">Back to Website</span>
               </Link>
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 mb-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-4 h-4 text-primary" />
+              <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5 mb-3">
+                <div className="w-8 h-8 rounded-full bg-[hsl(var(--admin-fir))]/50 flex items-center justify-center">
+                  <User className="w-4 h-4 text-white/80" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {user?.email?.split('@')[0] || 'Admin'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Administrator</p>
+                  <p className="text-sm font-medium text-white truncate">{user?.email?.split('@')[0] || 'Admin'}</p>
+                  <p className="text-xs text-white/40">Administrator</p>
                 </div>
               </div>
             </>
@@ -281,10 +245,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
           {sidebarCollapsed && (
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Link
-                  to="/"
-                  className="flex items-center justify-center p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-2"
-                >
+                <Link to="/" className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 transition-colors mb-2">
                   <ExternalLink className="w-4 h-4" />
                 </Link>
               </TooltipTrigger>
@@ -292,135 +253,90 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
             </Tooltip>
           )}
 
-          <div className={cn(
-            "flex gap-2",
-            sidebarCollapsed ? "flex-col" : "flex-row"
-          )}>
+          <div className={cn("flex gap-2", sidebarCollapsed ? "flex-col" : "flex-row")}>
             <ThemeToggle isDark={isDark} />
-            
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  className="text-muted-foreground hover:text-destructive"
-                >
+                <Button variant="ghost" size="icon" onClick={handleLogout} className="text-white/50 hover:text-red-400 hover:bg-white/5">
                   <LogOut className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side={sidebarCollapsed ? "right" : "top"}>
-                Sign Out
-              </TooltipContent>
+              <TooltipContent side={sidebarCollapsed ? "right" : "top"}>Sign Out</TooltipContent>
             </Tooltip>
           </div>
 
-          {/* Collapse Toggle */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className={cn(
-              "mt-2 w-full text-muted-foreground hover:text-foreground",
-              sidebarCollapsed && "px-0"
-            )}
+            className={cn("mt-2 w-full text-white/40 hover:text-white hover:bg-white/5", sidebarCollapsed && "px-0")}
           >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Collapse
-              </>
-            )}
+            {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4 mr-2" />Collapse</>}
           </Button>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 bg-card border-b border-border flex items-center justify-between px-4">
-        <Link to="/admin" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Shield className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-foreground">Admin Portal</span>
-        </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </Button>
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50">
+        <div className="h-1 bg-gradient-to-r from-[hsl(var(--admin-forest))] via-[hsl(var(--admin-fir))] to-[hsl(var(--admin-sage))]" />
+        <div className="h-14 bg-[hsl(var(--admin-forest))] flex items-center justify-between px-4">
+          <Link to="/admin" className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-[hsl(var(--admin-fir))] flex items-center justify-center">
+              <Shield className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-semibold text-white text-sm">Admin</span>
+          </Link>
+          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white/80 hover:bg-white/10">
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
+        </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 z-40 bg-black/50"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
+              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="lg:hidden fixed top-0 left-0 bottom-0 w-72 z-50 bg-card border-r border-border flex flex-col"
+              className="lg:hidden fixed top-0 left-0 bottom-0 w-72 z-50 flex flex-col"
+              style={{ background: 'linear-gradient(180deg, hsl(var(--admin-forest)), hsl(var(--admin-forest-deep)))' }}
             >
-              {/* Mobile Logo */}
-              <div className="h-16 flex items-center px-4 border-b border-border">
+              <div className="h-1 bg-gradient-to-r from-[hsl(var(--admin-fir))] via-[hsl(var(--admin-sage))] to-transparent" />
+              <div className="h-14 flex items-center px-4 border-b border-white/10">
                 <Link to="/admin" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
-                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-primary-foreground" />
+                  <div className="w-7 h-7 rounded-lg bg-[hsl(var(--admin-fir))] flex items-center justify-center">
+                    <Shield className="w-3.5 h-3.5 text-white" />
                   </div>
-                  <span className="font-semibold text-foreground">Admin Portal</span>
+                  <span className="font-semibold text-white">Admin Portal</span>
                 </Link>
               </div>
-
-              {/* Mobile Nav */}
               <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                {navItems.map((item) => (
-                  <NavLink key={item.to} item={item} />
-                ))}
-                <div className="my-4 border-t border-border" />
-                {secondaryNavItems.map((item) => (
-                  <NavLink key={item.to} item={item} />
-                ))}
+                {navItems.map((item) => <NavLink key={item.to} item={item} />)}
+                <div className="my-4 border-t border-white/10" />
+                {secondaryNavItems.map((item) => <NavLink key={item.to} item={item} />)}
               </nav>
-
-              {/* Mobile User */}
-              <div className="border-t border-border p-4">
-                <Link
-                  to="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 hover:bg-primary/10 text-primary transition-colors mb-3"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span className="text-sm font-medium">Back to Website</span>
+              <div className="border-t border-white/10 p-4">
+                <Link to="/" onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 transition-colors mb-3">
+                  <ExternalLink className="w-4 h-4" /><span className="text-sm">Back to Website</span>
                 </Link>
-                <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-4 h-4 text-primary" />
+                <div className="flex items-center gap-3 p-2 rounded-xl bg-white/5 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-[hsl(var(--admin-fir))]/50 flex items-center justify-center">
+                    <User className="w-4 h-4 text-white/80" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {user?.email?.split('@')[0] || 'Admin'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Administrator</p>
+                    <p className="text-sm font-medium text-white truncate">{user?.email?.split('@')[0] || 'Admin'}</p>
+                    <p className="text-xs text-white/40">Administrator</p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
+                <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />Sign Out
                 </Button>
               </div>
             </motion.div>
@@ -429,30 +345,22 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className={cn(
-        "flex-1 min-h-screen",
-        "lg:pt-0 pt-16" // Account for mobile header
-      )}>
-        {/* Page Header */}
-        <div className="border-b border-border bg-card/50 px-6 py-4 lg:px-8">
+      <main className={cn("flex-1 min-h-screen", "lg:pt-0 pt-[60px]")}>
+        <div className="border-b border-[hsl(var(--admin-soft-green))]/20 bg-white/60 dark:bg-card/50 backdrop-blur-sm px-6 py-5 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
             <div>
               {title && (
-                <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+                <h1 className="text-2xl lg:text-3xl font-bold text-[hsl(var(--admin-forest))] dark:text-foreground tracking-tight">{title}</h1>
               )}
               {description && (
-                <p className="text-muted-foreground mt-1">{description}</p>
+                <p className="text-[hsl(var(--admin-sage))] dark:text-muted-foreground mt-1 text-sm">{description}</p>
               )}
             </div>
             <EnvironmentSelector />
           </div>
         </div>
-
-        {/* Page Content */}
-        <div className="p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
     </div>

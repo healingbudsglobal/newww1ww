@@ -52,9 +52,8 @@ const AdminStrainSync = lazy(() => import("./pages/AdminStrainSync"));
 const AdminStrainKnowledge = lazy(() => import("./pages/AdminStrainKnowledge"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminClients = lazy(() => import("./pages/AdminClients"));
-const AdminRoles = lazy(() => import("./pages/AdminRoles"));
+const AdminTeam = lazy(() => import("./pages/AdminTeam"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
-const AdminWalletMappings = lazy(() => import("./pages/AdminWalletMappings"));
 const AdminTools = lazy(() => import("./pages/AdminTools"));
 const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const Research = lazy(() => import("./pages/Research"));
@@ -114,12 +113,10 @@ const AnimatedRoutes = () => {
           <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/clients" element={<ProtectedRoute requiredRole="admin"><AdminClients /></ProtectedRoute>} />
           <Route path="/admin/orders" element={<ProtectedRoute requiredRole="admin"><AdminOrders /></ProtectedRoute>} />
-          <Route path="/admin/prescriptions" element={<ProtectedRoute requiredRole="admin"><AdminPrescriptions /></ProtectedRoute>} />
           <Route path="/admin/strains" element={<ProtectedRoute requiredRole="admin"><AdminStrains /></ProtectedRoute>} />
           <Route path="/admin/strain-sync" element={<ProtectedRoute requiredRole="admin"><AdminStrainSync /></ProtectedRoute>} />
           <Route path="/admin/strain-knowledge" element={<ProtectedRoute requiredRole="admin"><AdminStrainKnowledge /></ProtectedRoute>} />
-          <Route path="/admin/roles" element={<ProtectedRoute requiredRole="admin"><AdminRoles /></ProtectedRoute>} />
-          <Route path="/admin/wallet-mappings" element={<ProtectedRoute requiredRole="admin"><AdminWalletMappings /></ProtectedRoute>} />
+          <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
           <Route path="/admin/tools" element={<ProtectedRoute requiredRole="admin"><AdminTools /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettings /></ProtectedRoute>} />
           
