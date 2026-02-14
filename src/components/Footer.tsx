@@ -55,27 +55,27 @@ const Footer = () => {
               <div>
               <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
                   <HBIcon size="sm" variant="white" className="flex-shrink-0" />
-                  Patient
+                  {t('footer.patientAccess')}
                 </h4>
                 <ul className="space-y-3">
                   <li>
                     <Link to="/eligibility" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Check Eligibility
+                      {t('nav.checkEligibility')}
                     </Link>
                   </li>
                   <li>
                     <Link to="/shop" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Strains
+                      {t('nav.shop')}
                     </Link>
                   </li>
                   <li>
                     <Link to="/dashboard" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Patient Portal
+                      {t('nav.dashboard')}
                     </Link>
                   </li>
                   <li>
                     <Link to="/the-wire" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      The Wire
+                      {t('nav.theWire')}
                     </Link>
                   </li>
                 </ul>
@@ -85,17 +85,17 @@ const Footer = () => {
               <div>
               <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
                   <HBIcon size="sm" variant="white" className="flex-shrink-0" />
-                  Support
+                  {t('footer.resources')}
                 </h4>
                 <ul className="space-y-3">
                   <li>
-                    <Link to="/support" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
+                    <Link to="/support#faq" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
                       FAQ
                     </Link>
                   </li>
                   <li>
-                    <Link to="/support" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Contact Us
+                    <Link to="/support#contact" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
+                      {t('nav.contactUs')}
                     </Link>
                   </li>
                   <li>
@@ -110,17 +110,17 @@ const Footer = () => {
               <div>
               <h4 className="font-jakarta font-semibold text-sm uppercase tracking-wider mb-5 text-white/90 flex items-center gap-2">
                   <HBIcon size="sm" variant="white" className="flex-shrink-0" />
-                  Legal
+                  {t('footer.legal')}
                 </h4>
                 <ul className="space-y-3">
                   <li>
                     <Link to="/privacy-policy" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Privacy Policy
+                      {t('footer.privacyPolicy')}
                     </Link>
                   </li>
                   <li>
                     <Link to="/terms-of-service" className="font-body text-sm text-white/60 hover:text-white transition-colors inline-block hover:translate-x-1 transform duration-200">
-                      Terms of Service
+                      {t('footer.termsOfService')}
                     </Link>
                   </li>
                 </ul>
