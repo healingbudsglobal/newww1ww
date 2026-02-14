@@ -1,111 +1,121 @@
 
-## Admin Portal Overhaul: Visual Upgrade, Team Consolidation, and Image Regeneration
 
-### Overview
-A comprehensive update to the admin portal covering three areas: (1) allowing regeneration of existing article images, (2) a visual overhaul of the entire admin portal with an earthy green colour palette inspired by your reference images, and (3) consolidating User Roles + Wallet Mappings into a unified "Team and Access" section with a new Commission management tab.
+## Admin Portal Visual Refinement: Colour Harmony and Design Polish
 
-### Colour Palette Update (from reference images)
+### Research Findings
 
-The new admin palette draws from the earthy green harmony you provided:
+**2026 UI Colour Trends (from Updivision, TubikStudio, ProDesignSchool):**
+- **Elevated Neutrals**: Replacing harsh white with warm sand, stone, oatmeal -- reducing eye strain for long admin sessions
+- **Eco-Inspired Palettes**: Moss greens, ocean blues, terracotta, clay -- grounding and organic warmth
+- **Soft Gradients 2.0**: Subtle, airy blends like light passing through glass -- not loud rainbows
+- **Hyper-Saturated Accents**: Single bold accent on calm backgrounds for CTAs and key data
+- **Adaptive Colour Systems**: Palettes that work beautifully in both light and dark modes
+
+**Your Reference Image Analysis:**
+All five palette references share a common thread: tropical/botanical greens paired with dusty sky blues and warm sand/parchment. The dominant harmony is:
+- Soft sage-green (leaves in sunlight)
+- Dusty steel-blue (sky)
+- Deep forest-green (dark foliage)
+- Warm sand/parchment (ground, warmth)
+- Olive/lime accent (new growth)
+
+### Colour Palette Refinement
+
+The current admin tokens (`--admin-forest`, `--admin-fir`, `--admin-sage`, `--admin-parchment`) are a solid foundation. The refinement adds the **dusty blue** and **warm sand** tones visible in your palm tree references, plus softens some values for better eye comfort during long sessions.
+
+**Updated/New Token Values:**
 
 ```text
-#344E41  - Forest green (sidebar bg, primary accents)
-#3A5A40  - Muted green (nav hover, secondary surfaces)
-#588157  - Fir green (active states, buttons)
-#A3B18A  - Sage (muted text, borders, secondary badges)
-#DAD7CD  - Parchment (background, card surfaces)
-#C8D1D3  - Cool sage (light surfaces)
-#8AA894  - Soft green (input borders, dividers)
-#D4B925  - Gold accent (commission highlights, warnings)
+Current                          Refined
+--admin-forest: 144 22% 26%  -> 150 25% 24%   (slightly cooler, deeper)
+--admin-forest-deep: 140 21% 30% -> 148 22% 28% (more green, less muddy)
+--admin-fir: 130 22% 42%     -> 140 28% 40%   (richer, more saturated fir)
+--admin-sage: 90 16% 63%     -> 95 18% 65%    (warmer sage, closer to olive)
+--admin-parchment: 40 14% 83% -> 38 20% 90%   (lighter, warmer sand -- key change for backgrounds)
+--admin-cool-sage: 192 7% 81% -> 200 14% 82%  (nudge toward dusty blue from palms)
+--admin-soft-green: 148 13% 60% -> 148 16% 58% (slightly richer)
+--admin-gold: 48 72% 49%     -> 45 65% 52%    (warmer, less electric gold)
+
+NEW tokens:
+--admin-sky: 205 25% 72%     (dusty sky blue from palm references)
+--admin-sand: 35 25% 85%     (warm sand undertone)
+--admin-olive: 78 30% 48%    (olive/lime accent for growth indicators)
 ```
 
-These will be added as new admin-specific CSS custom properties in `theme.css` and referenced in `AdminLayout.tsx`.
+### Visual Changes by File
 
-### Changes
+#### 1. `src/styles/theme.css` -- Palette Token Update
+- Refine existing admin token values as shown above
+- Add 3 new tokens: `--admin-sky`, `--admin-sand`, `--admin-olive`
+- Update dark mode admin variants to maintain harmony (deeper, more muted versions)
+- Add a new `--admin-bg-gradient` for the main content background: subtle warm gradient from sand to cool-sage
 
-#### 1. Article Image Generator -- Regenerate Existing Images
-**File:** `src/components/admin/ArticleImageGenerator.tsx`
-- Add a "Show all articles" toggle switch at the top
-- When enabled, fetch ALL articles (not just those missing images), showing current featured image as a small thumbnail
-- For articles with existing images: show "Regenerate" button that enters the same preview/publish flow
-- The existing preview/publish workflow handles the rest seamlessly
+#### 2. `src/layout/AdminLayout.tsx` -- Sidebar and Content Refinements
+- **Sidebar gradient**: Shift from pure forest-to-forest-deep to include a subtle blue-green undertone at the bottom (forest -> forest-deep with a hint of sky)
+- **Content area background**: Change from flat parchment to a very subtle gradient (`--admin-sand` at top fading to `--admin-parchment`) for depth
+- **Page header**: Add a thin bottom border with a gradient accent using the new sky-blue token
+- **Active nav indicator**: Use the refined fir green with a subtle left-border accent (3px solid) instead of just background change -- more modern, less heavy
+- **Mobile header**: Add the dusty sky-blue as a secondary gradient colour in the top accent strip
 
-#### 2. Remove Prescriptions from Navigation and Routes
-**Files:** `src/layout/AdminLayout.tsx`, `src/App.tsx`
-- Remove the Prescriptions nav item from `navItems` array
-- Remove the `/admin/prescriptions` route from App.tsx
-- Keep the page file (no deletion needed, just unreferenced)
+#### 3. `src/pages/AdminDashboard.tsx` -- Dashboard KPI Cards
+- Apply earthy palette to KPI card icon backgrounds: use `--admin-olive` for growth/success metrics, `--admin-sky` for info metrics, keep amber for warnings
+- Add subtle card hover state with a `--admin-sand` background shift
+- Sales Overview card: use the new olive accent for positive numbers
+- Recent Activity: use `--admin-sky` for client events, `--admin-olive` for order events
 
-#### 3. Consolidate into "Team and Access" Page
-**Files:** `src/App.tsx`, `src/layout/AdminLayout.tsx`
-- Replace separate "User Roles" and "Wallet Mappings" nav items with a single "Team and Access" item at `/admin/team`
-- Remove individual `/admin/roles` and `/admin/wallet-mappings` routes, add `/admin/team`
+#### 4. `src/components/admin/AdminClientManager.tsx` -- Metric Cards Colour Harmony
+- Total Clients metric card icon: use `--admin-forest` (deep green) instead of generic primary
+- Pending metric: keep amber (semantic)
+- Verified metric: use `--admin-olive` (earthy green success) instead of generic green
+- Rejected metric: keep red (semantic)
+- Filter pill active state: use `--admin-fir` (already correct, just verify consistency)
 
-**New file:** `src/pages/AdminTeam.tsx`
-- Three tabs: "Roles" | "Wallet Mappings" | "Commissions"
-- Roles tab embeds existing `AdminUserRoles` component
-- Wallet Mappings tab embeds existing `WalletEmailMappings` component
-- Commissions tab uses new `TeamCommissions` component
+#### 5. `src/pages/AdminOrders.tsx` -- Stats Card Harmony
+- Total Orders card: use `--admin-forest` background
+- Synced card: use `--admin-olive` instead of generic emerald
+- Today card: use `--admin-sky` instead of generic blue
+- Keep amber/red for pending/failed (semantic colours)
 
-**New file:** `src/components/admin/TeamCommissions.tsx`
-- Table/card layout showing team members with: Display Name, Role Type, ETH Wallet Address, Commission Percentage, Active status
-- "Add Member" dialog with fields: name, role (dropdown: admin, affiliate, agent, employee, referral), ETH wallet address (with 0x validation), commission percentage
-- Edit and deactivate existing members
-- Mobile-first: cards on small screens, table on desktop
-- Note: "All commission payouts are settled on-chain to the attached ETH wallet"
+#### 6. `src/pages/AdminTeam.tsx` -- Tab Styling
+- Tab list background: use `--admin-sand` instead of parchment for subtler warmth
+- Active tab: already uses `--admin-fir` (good)
 
-**Database migration:** Create `team_commissions` table:
+#### 7. `src/components/admin/TeamCommissions.tsx` -- Role Badge Colours
+- Agent badge: use `--admin-sky` instead of generic blue
+- Employee badge: keep purple (distinct)
+- Referral badge: use `--admin-olive` instead of generic cyan
+
+#### 8. `src/pages/AdminStrains.tsx` -- Card Consistency
+- Apply consistent card border using `--admin-soft-green` tokens
+- Use `--admin-fir` for strain-related action buttons
+
+### Dark Mode Harmony
+
+All new tokens get dark mode counterparts:
 ```text
-id           uuid (PK, default gen_random_uuid)
-user_id      uuid (nullable, for linking to auth users later)
-display_name text (not null)
-role_type    text (not null) -- admin, affiliate, agent, employee, referral
-wallet_address text -- ETH address
-commission_percentage numeric(5,2) default 0
-is_active    boolean default true
-notes        text (nullable)
-created_at   timestamptz default now()
-updated_at   timestamptz default now()
+.dark {
+  --admin-sky: 205 18% 35%;
+  --admin-sand: 35 10% 16%;
+  --admin-olive: 78 20% 35%;
+}
 ```
-RLS: Only users with admin role can read/write (using existing `user_roles` check pattern).
 
-#### 4. Admin Portal Visual Overhaul
-**File:** `src/styles/theme.css`
-- Add new CSS custom properties for the earthy green admin palette:
-  - `--admin-bg`, `--admin-sidebar`, `--admin-sidebar-hover`, `--admin-sidebar-active`
-  - `--admin-surface`, `--admin-accent`, `--admin-gold`
-- Dark mode variants that deepen these tones
+### Design Principles Applied
+- **Elevated neutrals**: Warmer, lighter parchment/sand backgrounds reduce eye fatigue
+- **Eco-inspired**: Palm-reference greens and blues create organic, trustworthy feel
+- **Hyper-saturated accent**: Gold remains the single bold accent for commissions and important callouts
+- **Consistency**: All admin pages use the same token vocabulary, no more generic Tailwind colours for admin-specific elements
 
-**File:** `src/layout/AdminLayout.tsx` -- Major visual redesign:
-- Sidebar: Deep forest green gradient background (`#344E41` to `#3A5A40`), frosted glass effect with `backdrop-blur-xl`
-- Nav items: White text on dark green, pill-shaped active indicator with sage glow, subtle hover transitions
-- Logo area: Refined with brand accent bar underneath
-- Mobile header: Sleeker with forest green accent strip at top
-- Page header: Larger typography with gradient underline accent
-- Content area: Warm parchment background (`#DAD7CD` mapped) for contrast
+### Files Modified
 
-**File:** `src/components/admin/AdminClientManager.tsx` -- Mobile-first redesign:
-- Summary stats as a 2x2 grid of compact metric cards at top (Total, Pending, Verified, Rejected) with coloured indicators matching the earthy palette
-- Filter: Pill-style toggle group instead of full-width tabs
-- Search: Full-width on mobile with rounded styling
-- Client list on desktop: Clean table-style rows with inline status, actions in a dropdown
-- Client list on mobile: Stacked cards showing name + status badge at a glance, expandable for details
-- Remove excessive nested `TooltipProvider` wrappers (already provided at App level)
-- Dr. Green Portal link moved into a dropdown menu to reduce toolbar clutter
-
-**File:** `src/pages/AdminClients.tsx`
-- Move `AdminClientCreator` into a collapsible panel or dialog trigger to reduce initial page density
-
-### File Summary
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/styles/theme.css` | Edit -- add admin earthy green palette tokens |
-| `src/layout/AdminLayout.tsx` | Edit -- visual overhaul with earthy sidebar, nav restructure |
-| `src/App.tsx` | Edit -- route changes (remove prescriptions, roles, wallet-mappings; add team) |
-| `src/components/admin/ArticleImageGenerator.tsx` | Edit -- add "show all" toggle for regeneration |
-| `src/components/admin/AdminClientManager.tsx` | Edit -- mobile-first redesign with metric cards |
-| `src/pages/AdminClients.tsx` | Edit -- collapsible client creator |
-| `src/pages/AdminTeam.tsx` | Create -- unified team and access page with tabs |
-| `src/components/admin/TeamCommissions.tsx` | Create -- commission management component |
-| Database migration | Create `team_commissions` table with admin-only RLS |
+| `src/styles/theme.css` | Refine admin tokens, add sky/sand/olive, dark mode variants |
+| `src/layout/AdminLayout.tsx` | Sidebar gradient refinement, content area gradient, nav active style |
+| `src/pages/AdminDashboard.tsx` | KPI card colours aligned to palette |
+| `src/components/admin/AdminClientManager.tsx` | Metric card colours aligned |
+| `src/pages/AdminOrders.tsx` | Stats card colours aligned |
+| `src/pages/AdminTeam.tsx` | Tab background refinement |
+| `src/components/admin/TeamCommissions.tsx` | Role badge colours aligned |
+| `src/pages/AdminStrains.tsx` | Card border consistency |
+
