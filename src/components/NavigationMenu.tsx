@@ -56,12 +56,12 @@ const NavigationMenu = ({ scrolled, isDark = true }: NavigationMenuProps) => {
             
             {/* Active indicator dot */}
             {active && (
-              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#EAB308]" />
+              <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[hsl(var(--navbar-gold))]" />
             )}
             
             {/* Hover underline */}
             <span className={cn(
-              "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 transition-all duration-300 bg-[#EAB308]",
+              "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 transition-all duration-300 bg-[hsl(var(--navbar-gold))]",
               active ? "w-full opacity-100" : "w-0 opacity-0 group-hover:w-3/4 group-hover:opacity-60"
             )} />
           </Link>

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   Mail, 
   MessageCircle, 
@@ -196,6 +196,22 @@ const Support = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('eligibility');
   const locationConfig = useGeoLocation();
+  const location = useLocation();
+
+  // Scroll to hash anchor on mount/navigation
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      // Small delay to allow page render
+      const timer = setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash]);
 
   return (
     <PageTransition variant="premium">

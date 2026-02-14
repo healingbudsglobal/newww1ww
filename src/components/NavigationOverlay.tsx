@@ -331,9 +331,9 @@ const NavigationOverlay = ({
                       className={cn(
                         "flex items-center justify-center gap-3 py-5 px-6 rounded-xl transition-all duration-200",
                         "touch-manipulation min-h-[60px] active:scale-[0.97]",
-                        "bg-[#EAB308]/20 text-[#EAB308] font-semibold text-lg border-2 border-[#EAB308]/60",
-                        "hover:bg-[#EAB308]/30 hover:border-[#EAB308]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EAB308]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1A2E2A]"
+                        "bg-[hsl(var(--navbar-gold))]/20 text-[hsl(var(--navbar-gold))] font-semibold text-lg border-2 border-[hsl(var(--navbar-gold))]/60",
+                        "hover:bg-[hsl(var(--navbar-gold))]/30 hover:border-[hsl(var(--navbar-gold))]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--navbar-gold))]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--navbar-forest))]"
                       )}
                     >
                       <User className="w-5 h-5" />
