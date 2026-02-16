@@ -160,34 +160,28 @@ const AdminDashboard = () => {
       const pendingOrders = ordersRes.data?.filter(o => o.status === 'PENDING').length || 0;
       const totalClients = clientsRes.data?.length || 0;
       const verifiedClients = clientsRes.data?.filter(c => c.is_kyc_verified && c.admin_approval === 'VERIFIED').length || 0;
+      const pendingClients = clientsRes.data?.filter(c => !c.is_kyc_verified || c.admin_approval !== 'VERIFIED').length || 0;
 
-      let dappTotalClients = 0, dappTotalOrders = 0, dappTotalSales = 0, dappPendingClients = 0;
-
+      // Use local DB as source of truth (kept in sync by sync-clients edge function)
+      // Dr. Green API dashboard/sales endpoints return 401, so we rely on synced local data
+      let dappTotalSales = 0;
       try {
-        const { data: clientSummary, error: clientError } = await getClientsSummary();
-        if (!clientError && clientSummary?.summary) {
-          dappTotalClients = clientSummary.summary.totalCount || 0;
-          dappPendingClients = clientSummary.summary.PENDING || 0;
-        }
-
-        if (!clientSummary?.summary) {
-          const { data: clientsData, error: clientsError } = await getDappClients({ take: 100 });
-          if (!clientsError && clientsData?.clients) {
-            dappTotalClients = clientsData.total || clientsData.clients.length;
-            dappPendingClients = clientsData.clients.filter((c: any) => c.adminApproval === 'PENDING').length;
-          }
-        }
-
-        const { data: dappSummary, error: dappError } = await getDashboardSummary();
-        if (!dappError && dappSummary) dappTotalOrders = dappSummary.totalOrders || 0;
-
         const { data: salesSummary, error: salesError } = await getSalesSummary();
         if (!salesError && salesSummary) dappTotalSales = salesSummary.totalSales || 0;
       } catch (dappErr) {
-        console.log('Dr Green API stats unavailable:', dappErr);
+        console.log('Dr Green sales API unavailable, using local data');
       }
 
-      setStats({ totalOrders, pendingOrders, totalClients, verifiedClients, dappTotalClients, dappTotalOrders, dappTotalSales, dappPendingClients });
+      setStats({
+        totalOrders,
+        pendingOrders,
+        totalClients,
+        verifiedClients,
+        dappTotalClients: totalClients,
+        dappTotalOrders: totalOrders,
+        dappTotalSales,
+        dappPendingClients: pendingClients,
+      });
 
       if (showRefreshToast) {
         toast({ title: "Data Refreshed", description: "Dashboard statistics updated." });
