@@ -272,7 +272,7 @@ export function AdminClientManager() {
           {[
             { label: "Total Clients", value: summary.totalCount, icon: Users, color: "text-[hsl(var(--admin-forest))]", bg: "bg-[hsl(var(--admin-forest))]/10" },
             { label: "Pending", value: summary.PENDING, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10" },
-            { label: "Verified", value: summary.VERIFIED, icon: ShieldCheck, color: "text-green-600", bg: "bg-green-500/10" },
+            { label: "Verified", value: summary.VERIFIED, icon: ShieldCheck, color: "text-[hsl(var(--admin-olive))]", bg: "bg-[hsl(var(--admin-olive))]/10" },
             { label: "Rejected", value: summary.REJECTED, icon: XCircle, color: "text-red-500", bg: "bg-red-500/10" },
           ].map((m) => (
             <Card key={m.label} className="border-[hsl(var(--admin-soft-green))]/20 bg-white/80 dark:bg-card">

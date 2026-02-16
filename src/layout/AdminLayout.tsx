@@ -144,11 +144,11 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
         to={item.to}
         onClick={() => setMobileMenuOpen(false)}
         className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
           active
-            ? "bg-white/15 text-white font-medium shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-sm"
-            : "text-white/60 hover:text-white hover:bg-white/8"
+            ? "bg-white/12 text-white font-medium border-l-[3px] border-[hsl(var(--admin-sky))] pl-[9px]"
+            : "text-white/60 hover:text-white hover:bg-white/8 border-l-[3px] border-transparent pl-[9px]"
         )}
       >
         <Icon className={cn("w-5 h-5 flex-shrink-0 transition-colors", active ? "text-white" : "text-white/50 group-hover:text-white/80")} />
@@ -177,7 +177,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--admin-parchment))] dark:bg-background flex">
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(180deg, hsl(var(--admin-sand)), hsl(var(--admin-parchment)))' }}>
       {/* Desktop Sidebar */}
       <aside
         className={cn(
@@ -185,7 +185,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
           sidebarCollapsed ? "w-[72px]" : "w-64"
         )}
         style={{
-          background: 'linear-gradient(180deg, hsl(var(--admin-forest)), hsl(var(--admin-forest-deep)))',
+          background: 'linear-gradient(180deg, hsl(var(--admin-forest)), hsl(var(--admin-forest-deep)), hsl(var(--admin-forest-deep) / 0.95))',
         }}
       >
         {/* Logo */}
@@ -207,7 +207,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
         </div>
 
         {/* Accent bar */}
-        <div className="h-0.5 bg-gradient-to-r from-[hsl(var(--admin-fir))] via-[hsl(var(--admin-sage))] to-transparent" />
+        <div className="h-0.5 bg-gradient-to-r from-[hsl(var(--admin-fir))] via-[hsl(var(--admin-sky))] to-transparent opacity-60" />
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -278,7 +278,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
 
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50">
-        <div className="h-1 bg-gradient-to-r from-[hsl(var(--admin-forest))] via-[hsl(var(--admin-fir))] to-[hsl(var(--admin-sage))]" />
+        <div className="h-1 bg-gradient-to-r from-[hsl(var(--admin-forest))] via-[hsl(var(--admin-fir))] to-[hsl(var(--admin-sky))]" />
         <div className="h-14 bg-[hsl(var(--admin-forest))] flex items-center justify-between px-4">
           <Link to="/admin" className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-[hsl(var(--admin-fir))] flex items-center justify-center">
@@ -346,7 +346,7 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
 
       {/* Main Content */}
       <main className={cn("flex-1 min-h-screen", "lg:pt-0 pt-[60px]")}>
-        <div className="border-b border-[hsl(var(--admin-soft-green))]/20 bg-white/60 dark:bg-card/50 backdrop-blur-sm px-6 py-5 lg:px-8">
+        <div className="border-b border-[hsl(var(--admin-soft-green))]/20 bg-white/60 dark:bg-card/50 backdrop-blur-sm px-6 py-5 lg:px-8 relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gradient-to-r after:from-[hsl(var(--admin-fir))] after:via-[hsl(var(--admin-sky))]/40 after:to-transparent">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
             <div>
               {title && (

@@ -204,8 +204,8 @@ const AdminOrders = () => {
       title: "Total Orders",
       value: stats?.total || 0,
       icon: Package,
-      color: "text-foreground",
-      bgColor: "bg-muted",
+      color: "text-[hsl(var(--admin-forest))]",
+      bgColor: "bg-[hsl(var(--admin-forest))]/10",
     },
     {
       title: "Pending Sync",
@@ -218,8 +218,8 @@ const AdminOrders = () => {
       title: "Synced",
       value: stats?.synced || 0,
       icon: CheckCircle,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bgColor: "bg-emerald-500/10",
+      color: "text-[hsl(var(--admin-olive))] dark:text-[hsl(var(--admin-olive))]",
+      bgColor: "bg-[hsl(var(--admin-olive))]/10",
     },
     {
       title: "Failed",
@@ -232,8 +232,8 @@ const AdminOrders = () => {
       title: "Today",
       value: stats?.today || 0,
       icon: CalendarDays,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-500/10",
+      color: "text-[hsl(var(--admin-sky))] dark:text-[hsl(var(--admin-sky))]",
+      bgColor: "bg-[hsl(var(--admin-sky))]/10",
     },
   ];
 

@@ -308,7 +308,7 @@ const AdminStrains = () => {
         </div>
 
         {/* Search */}
-        <Card className="mb-6 bg-card/50 backdrop-blur-sm border-border/50">
+        <Card className="mb-6 bg-card/50 backdrop-blur-sm border-[hsl(var(--admin-soft-green))]/30">
           <CardContent className="pt-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -323,7 +323,7 @@ const AdminStrains = () => {
         </Card>
 
         {/* Strains Table */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+        <Card className="bg-card/50 backdrop-blur-sm border-[hsl(var(--admin-soft-green))]/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
@@ -396,7 +396,7 @@ const AdminStrains = () => {
                               {strain.is_archived ? (
                                 <Badge variant="secondary">Archived</Badge>
                               ) : strain.availability ? (
-                                <Badge variant="default" className="bg-green-600">Available</Badge>
+                                <Badge variant="default" className="bg-[hsl(var(--admin-fir))]">Available</Badge>
                               ) : (
                                 <Badge variant="destructive">Unavailable</Badge>
                               )}
