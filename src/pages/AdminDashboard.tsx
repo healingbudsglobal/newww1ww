@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { formatPrice } from "@/lib/currency";
 import { motion } from "framer-motion";
@@ -36,6 +36,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { useDrGreenClientSync } from "@/hooks/useDrGreenClientSync";
+import { useDrGreenAutoSync } from "@/hooks/useDrGreenAutoSync";
 import { useApiEnvironment } from "@/context/ApiEnvironmentContext";
 import { useAccount, useDisconnect, useChainId } from "wagmi";
 import { useDrGreenKeyOwnership } from "@/hooks/useNFTOwnership";
@@ -68,6 +69,7 @@ const AdminDashboard = () => {
   const { getDashboardSummary, getSalesSummary, getClientsSummary, getDappClients } = useDrGreenApi();
   const { syncClientsToSupabase, syncing: syncingClients } = useDrGreenClientSync();
   const { environment, environmentLabel } = useApiEnvironment();
+  const { syncNow, syncing: autoSyncing, lastSync } = useDrGreenAutoSync();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -279,16 +281,37 @@ const AdminDashboard = () => {
     >
       <div className="space-y-8">
         {/* Top Bar: Refresh */}
-        <div className="flex flex-wrap items-center justify-end gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchStats(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            {lastSync && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Last synced {formatDistanceToNow(lastSync, { addSuffix: true })}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={async () => {
+                await syncNow();
+                await Promise.all([fetchStats(true), fetchRecentActivity()]);
+              }}
+              disabled={autoSyncing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${autoSyncing ? 'animate-spin' : ''}`} />
+              {autoSyncing ? 'Syncing…' : 'Sync Now'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchStats(true)}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* KPI Cards */}
@@ -355,15 +378,6 @@ const AdminDashboard = () => {
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/orders')}>
               <Package className="w-4 h-4 mr-2" /> Process Orders
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncClientsToSupabase()}
-              disabled={syncingClients}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncingClients ? 'animate-spin' : ''}`} />
-              Sync Client Data
             </Button>
             <Button
               variant="outline"
