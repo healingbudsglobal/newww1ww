@@ -1,38 +1,64 @@
 
 
-## Add Automatic Sync with Instant Dashboard Refresh
+## Make Local Database Mirror Dr. Green as Source of Truth
 
-### What This Does
-Adds a "Sync Now" button to the Admin Dashboard that triggers the `sync-clients` backend function (which pulls all client data from the Dr. Green API), then immediately refreshes the dashboard stats and recent activity. Also makes the existing background auto-sync (every 5 minutes) automatically refresh the dashboard after each cycle.
+### Problem
+Currently the `sync-clients` edge function only inserts/updates records for Dr. Green API clients that have a matching email in `auth.users`. The remaining clients (6 of 9) are counted as "unlinked" and dropped -- they never appear in the local `drgreen_clients` table. Orders are also not synced from Dr. Green. The dashboard KPIs therefore undercount.
 
-### Changes
+### Solution
 
-**1. Update `src/hooks/useDrGreenAutoSync.ts`**
-- Add a return value: expose `syncAllClients` and `lastSync` so the dashboard can call it on demand and show last sync time.
-- Add an optional `onComplete` callback parameter so the dashboard can refresh after each auto-sync cycle completes.
+**1. Update `sync-clients` edge function to store ALL Dr. Green clients**
 
-**2. Update `src/pages/AdminDashboard.tsx`**
-- Import and use the updated `useDrGreenAutoSync` hook.
-- Replace the existing "Sync Client Data" quick-action button with a prominent "Sync Now" button in the top bar (next to Refresh).
-- When "Sync Now" is clicked: invoke the sync function, show a loading spinner, then call `fetchStats()` and `fetchRecentActivity()` to refresh all dashboard data.
-- Display a "Last synced X ago" indicator next to the Sync button.
-- After each background auto-sync cycle, automatically refresh dashboard stats (via the `onComplete` callback).
+Currently, clients without a matching auth user are skipped (`totalUnlinked++`). Change this so unlinked clients are also inserted into `drgreen_clients` with a placeholder `user_id`. This requires:
 
-### Technical Details
+- Add a system/placeholder UUID for unlinked clients (e.g. a fixed "unlinked" UUID constant like `00000000-0000-0000-0000-000000000000`).
+- However, since `user_id` has a NOT NULL constraint and is used in RLS, a better approach is to make the column nullable via a migration.
+- Alternatively, store unlinked clients with a sentinel user_id and match them later when a user signs up with a matching email.
 
-**`useDrGreenAutoSync.ts`** will return:
-```typescript
-{
-  syncNow: () => Promise<void>,
-  syncing: boolean,
-  lastSync: Date | null,
-}
+**Recommended approach**: Make `user_id` nullable on `drgreen_clients` so unlinked Dr. Green clients can be stored without a local auth account. When a user later signs up with a matching email, the `linkUserToClient` flow will update the `user_id`.
+
+Database migration:
+```sql
+ALTER TABLE drgreen_clients ALTER COLUMN user_id DROP NOT NULL;
 ```
 
-**Dashboard top bar** will change from just "Refresh" to:
-- "Sync Now" button (calls edge function then refreshes stats)
-- "Refresh" button (just re-reads local DB)
-- Last sync timestamp badge
+Then update the `sync-clients` edge function: instead of skipping unlinked clients, insert them with `user_id: null`.
 
-The existing "Sync Client Data" button in Quick Actions will be removed since it is replaced by the top-bar Sync Now button.
+**2. Add order sync to the `sync-clients` edge function**
+
+After syncing clients, also paginate through Dr. Green orders (via `GET /dapp/orders`) and upsert them into the `drgreen_orders` table. This ensures local orders reflect what Dr. Green has. Orders matched by `drgreen_order_id` get updated; new ones get inserted.
+
+**3. Update `AdminDashboard.tsx` to use local DB counts (which now mirror Dr. Green)**
+
+Since the local DB now contains ALL Dr. Green clients and orders, the existing local-DB-based `fetchStats()` will automatically show correct numbers. No API calls needed for KPIs -- the sync keeps the DB current.
+
+**4. Auto-sync on dashboard load already works**
+
+The `useDrGreenAutoSync` hook already runs `syncNow()` on mount and every 5 minutes, triggering the edge function. After the edge function returns, the dashboard refreshes stats. This loop ensures the local DB stays current with Dr. Green.
+
+**5. Admin role remains local-only (not from Dr. Green)**
+
+Admin roles stay in `user_roles` table, verified via NFT wallet auth. This is not overwritten by Dr. Green sync. The sync only manages client/patient data and orders.
+
+### Technical Changes
+
+**Migration**: `ALTER TABLE drgreen_clients ALTER COLUMN user_id DROP NOT NULL;`
+
+**`supabase/functions/sync-clients/index.ts`**:
+- After the existing client-matching logic, insert unlinked clients with `user_id: null` instead of skipping them.
+- Add a second pagination loop for orders: `GET /dapp/orders?page=X&take=50&orderBy=desc`.
+- For each order, upsert into `drgreen_orders` matching on `drgreen_order_id`.
+
+**`src/pages/AdminDashboard.tsx`**:
+- `fetchStats()` already reads from local DB. After migration + updated sync, the counts will be correct automatically.
+- No changes needed here beyond what is already in place.
+
+**`src/hooks/useDrGreenAutoSync.ts`**:
+- Wire `onComplete` callback to refresh dashboard stats after each sync cycle completes.
+
+### What Does NOT Change
+- Admin role assignment stays in `user_roles`, managed independently.
+- NFT wallet auth continues to govern admin access.
+- The `drgreen-proxy` edge function is untouched.
+- RLS policies: add a new policy allowing admins to see clients with `user_id IS NULL`.
 
