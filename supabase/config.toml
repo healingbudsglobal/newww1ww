@@ -1,10 +1,1 @@
-project_id = "fvpmzwnqbtxpjjvcsxun"
-
-[functions.drgreen-proxy]
-verify_jwt = false
-
-[functions.drgreen-rehome]
-verify_jwt = false
-
-[functions.generate-article-image]
-verify_jwt = false
+project_id = "rtwitsbhxcjfltpetpaz"
