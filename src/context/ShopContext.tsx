@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { updateCachedRates } from '@/lib/currency';
 import { useStrainSync } from '@/hooks/useStrainSync';
+import { useDrGreenAutoSync } from '@/hooks/useDrGreenAutoSync';
 
 interface CartItem {
   id: string;
@@ -106,6 +107,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const { rates, lastUpdated, convertPrice } = useExchangeRates();
   // Auto-sync strains on app initialization and periodically
   useStrainSync();
+  // Auto-sync Dr. Green clients in background (admin only)
+  useDrGreenAutoSync();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [drGreenClient, setDrGreenClient] = useState<DrGreenClient | null>(null);
@@ -393,7 +396,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
 
     // Listener for ONGOING auth changes - defer with setTimeout to avoid deadlock
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
+      (event, session) => {
         if (!isMounted) return;
         if (event === 'SIGNED_OUT') {
           setDrGreenClient(null);
@@ -401,11 +404,20 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         // Defer async calls to avoid Supabase auth deadlock
-        setTimeout(() => {
-          if (isMounted) {
-            fetchCart();
-            fetchClient();
+        setTimeout(async () => {
+          if (!isMounted) return;
+          fetchCart();
+          
+          if (event === 'SIGNED_IN' && session?.user) {
+            // Auto-discover and link Dr. Green client on every login
+            console.log('[ShopContext] SIGNED_IN event — running auto-discovery...');
+            const linked = await linkClientFromDrGreenByAuthEmail(session.user.id, true);
+            if (linked) {
+              console.log('[ShopContext] Auto-discovery linked client on login');
+            }
           }
+          
+          fetchClient();
         }, 0);
       }
     );
