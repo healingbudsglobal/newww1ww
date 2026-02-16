@@ -158,7 +158,7 @@ export type Database = {
           rehomed_at: string | null
           shipping_address: Json | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           admin_approval?: string | null
@@ -177,7 +177,7 @@ export type Database = {
           rehomed_at?: string | null
           shipping_address?: Json | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           admin_approval?: string | null
@@ -196,7 +196,7 @@ export type Database = {
           rehomed_at?: string | null
           shipping_address?: Json | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -219,7 +219,7 @@ export type Database = {
           synced_at: string | null
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           client_id?: string | null
@@ -239,7 +239,7 @@ export type Database = {
           synced_at?: string | null
           total_amount: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           client_id?: string | null
@@ -259,7 +259,7 @@ export type Database = {
           synced_at?: string | null
           total_amount?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
