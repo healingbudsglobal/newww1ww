@@ -1,31 +1,38 @@
 
 
-## Sync Benjamin Varcianna's Dr. Green Client Record to Local Database
+## Add Automatic Sync with Instant Dashboard Refresh
 
-The Dr. Green API has confirmed this client record exists. The local `drgreen_clients` table is currently empty. We need to insert this record to link the auth user to their Dr. Green client.
+### What This Does
+Adds a "Sync Now" button to the Admin Dashboard that triggers the `sync-clients` backend function (which pulls all client data from the Dr. Green API), then immediately refreshes the dashboard stats and recent activity. Also makes the existing background auto-sync (every 5 minutes) automatically refresh the dashboard after each cycle.
 
-### What will be done
+### Changes
 
-Insert one row into `drgreen_clients`:
+**1. Update `src/hooks/useDrGreenAutoSync.ts`**
+- Add a return value: expose `syncAllClients` and `lastSync` so the dashboard can call it on demand and show last sync time.
+- Add an optional `onComplete` callback parameter so the dashboard can refresh after each auto-sync cycle completes.
 
-| Field | Value |
-|-------|-------|
-| user_id | `3c5b8d43-5dcf-4af8-b023-cef47f2fde9d` |
-| drgreen_client_id | `a4357132-7e8c-4c8a-b005-6f818b3f173e` |
-| email | `varseainc@gmail.com` |
-| full_name | `Benjamin Varcianna` |
-| country_code | `ZAF` |
-| is_kyc_verified | `false` (default, pending actual KYC status) |
-| admin_approval | `PENDING` (default) |
-| shipping_address | JSON with: 123 Rivonia Road, Sandton, 2148, ZA |
-
-### Why this matters
-- Links the local auth user to their Dr. Green API client ID
-- Enables the shop, cart, and checkout eligibility checks to work
-- The auto-sync hook added earlier will keep this record updated going forward
+**2. Update `src/pages/AdminDashboard.tsx`**
+- Import and use the updated `useDrGreenAutoSync` hook.
+- Replace the existing "Sync Client Data" quick-action button with a prominent "Sync Now" button in the top bar (next to Refresh).
+- When "Sync Now" is clicked: invoke the sync function, show a loading spinner, then call `fetchStats()` and `fetchRecentActivity()` to refresh all dashboard data.
+- Display a "Last synced X ago" indicator next to the Sync button.
+- After each background auto-sync cycle, automatically refresh dashboard stats (via the `onComplete` callback).
 
 ### Technical Details
-- Single `INSERT` into `drgreen_clients` using the data tool
-- No schema changes needed
-- The auto-sync (`useDrGreenAutoSync`) will refresh KYC/approval status from the API automatically after this seed
+
+**`useDrGreenAutoSync.ts`** will return:
+```typescript
+{
+  syncNow: () => Promise<void>,
+  syncing: boolean,
+  lastSync: Date | null,
+}
+```
+
+**Dashboard top bar** will change from just "Refresh" to:
+- "Sync Now" button (calls edge function then refreshes stats)
+- "Refresh" button (just re-reads local DB)
+- Last sync timestamp badge
+
+The existing "Sync Client Data" button in Quick Actions will be removed since it is replaced by the top-bar Sync Now button.
 
