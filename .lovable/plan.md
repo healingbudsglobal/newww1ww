@@ -1,22 +1,31 @@
 
 
-## Update Password for Benjamin Varcianna
+## Create Benjamin Varcianna Account and Sync Database
 
-### Current Status
-No user named "Benjamin Varcianna" exists in this project's database yet. The profiles table and client records are empty (this is a remixed project with no migrated user data).
+### Step 1: Create User Account
+- Call the `admin-update-user` edge function with:
+  - **email**: `healingbudsglobal@gmail.com`
+  - **password**: `123455678`
+  - **verify**: `true` (auto-confirm email)
+- This will create the auth user and trigger the `handle_new_user` function to auto-create a profile
+- The `auto_assign_admin_role` trigger will also fire since `healingbudsglobal@gmail.com` is in the admin list, granting admin access automatically
 
-### What Needs to Happen
+### Step 2: Update Profile
+- Update the `profiles` table to set `full_name` to "Benjamin Varcianna"
 
-1. **Create the user first** using the `admin-update-user` edge function with their email address
-2. **Set their password** to `123455678`
+### Step 3: Database Sync Status
+Current state of the database:
+- **Strains**: 7 already synced (Caribbean Breeze, Peanut Butter Breath, Blue Zushi, Femme Fatale, BlockBerry, etc.)
+- **Clients**: Empty (no Dr. Green clients yet -- these are created when patients go through the onboarding/medical questionnaire flow)
+- **Profiles**: Empty (no users yet)
+- **18 tables** exist and are ready
 
-### What I Need From You
-- What is Benjamin Varcianna's **email address**? The edge function needs an email to find or create the user account.
+### Step 4: Verify Automatic Sync
+- The `useStrainSync` hook already handles automatic strain syncing (24h freshness, 6h background interval)
+- Confirm the multi-country sync is working for ZAF, PRT, GBR, THA
 
-### Technical Steps (once email is provided)
-1. Call the `admin-update-user` edge function with:
-   - `email`: (their email)
-   - `password`: `123455678`
-   - `verify`: `true` (to confirm their email automatically)
-2. This will either create the user with that password, or update the existing user's password if they sign up before the change is made.
+### Technical Details
+- Edge function: `admin-update-user` (already deployed)
+- Admin auto-assignment trigger: active for `healingbudsglobal@gmail.com`
+- No schema changes needed -- all tables exist
 
