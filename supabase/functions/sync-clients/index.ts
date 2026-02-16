@@ -296,8 +296,19 @@ serve(async (req) => {
               totalCreated++;
             }
             totalSynced++;
-          } else {
-            totalUnlinked++;
+        } else {
+            // Store unlinked client with null user_id — Dr. Green is source of truth
+            await adminClient.from('drgreen_clients').insert({
+              user_id: null as any,
+              drgreen_client_id: clientId,
+              is_kyc_verified: isKYCVerified,
+              admin_approval: adminApproval,
+              email: email || null,
+              full_name: `${firstName} ${lastName}`.trim() || null,
+              country_code: countryCode,
+            });
+            totalCreated++;
+            totalSynced++;
           }
         }
       }
@@ -307,7 +318,99 @@ serve(async (req) => {
       if (page > 20) break;
     }
 
-    const result = { success: true, synced: totalSynced, created: totalCreated, updated: totalUpdated, unlinked: totalUnlinked, syncedAt: new Date().toISOString() };
+    // --- Order Sync ---
+    let orderPage = 1;
+    let totalOrdersSynced = 0, totalOrdersCreated = 0, totalOrdersUpdated = 0;
+    let hasMoreOrders = true;
+
+    while (hasMoreOrders) {
+      const orderQs = `page=${orderPage}&take=${take}&orderBy=desc`;
+      const orderSig = signPayload(orderQs, privateKey);
+      const orderUrl = `${API_BASE}/dapp/orders?${orderQs}`;
+
+      const orderResp = await fetch(orderUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-apikey': apiKey,
+          'x-auth-signature': orderSig,
+        },
+      });
+
+      if (!orderResp.ok) {
+        console.error(`[SyncClients] Orders API error page ${orderPage}: ${orderResp.status}`);
+        break;
+      }
+
+      const orderJson = await orderResp.json() as { data?: { orders?: Array<Record<string, unknown>> } };
+      const orders = orderJson.data?.orders || [];
+
+      if (orders.length === 0) { hasMoreOrders = false; break; }
+
+      for (const order of orders) {
+        const orderId = order.id as string;
+        const clientId = order.clientId as string || '';
+        const status = order.status as string || 'PENDING';
+        const paymentStatus = order.paymentStatus as string || 'PENDING';
+        const totalAmount = Number(order.totalAmount || order.total || 0);
+        const currency = order.currency as string || 'EUR';
+        const customerEmail = (order.email as string) || '';
+        const customerName = (order.customerName as string) || '';
+        const items = order.items || [];
+        const shippingAddress = order.shippingAddress || null;
+        const countryCode = order.countryCode as string || '';
+
+        // Match client to get user_id
+        const { data: clientRow } = await adminClient
+          .from('drgreen_clients').select('user_id')
+          .eq('drgreen_client_id', clientId).maybeSingle();
+
+        const userId = clientRow?.user_id || null;
+
+        const { data: existingOrder } = await adminClient
+          .from('drgreen_orders').select('id, status, payment_status')
+          .eq('drgreen_order_id', orderId).maybeSingle();
+
+        if (existingOrder) {
+          if (existingOrder.status !== status || existingOrder.payment_status !== paymentStatus) {
+            await adminClient.from('drgreen_orders').update({
+              status, payment_status: paymentStatus, total_amount: totalAmount,
+              currency, customer_email: customerEmail, customer_name: customerName,
+              items: items as any, shipping_address: shippingAddress as any,
+              country_code: countryCode, client_id: clientId,
+              user_id: userId as any,
+              synced_at: new Date().toISOString(), sync_status: 'synced',
+              updated_at: new Date().toISOString(),
+            }).eq('id', existingOrder.id);
+            totalOrdersUpdated++;
+          }
+          totalOrdersSynced++;
+        } else {
+          await adminClient.from('drgreen_orders').insert({
+            drgreen_order_id: orderId, user_id: userId as any,
+            client_id: clientId, status, payment_status: paymentStatus,
+            total_amount: totalAmount, currency,
+            customer_email: customerEmail, customer_name: customerName,
+            items: items as any, shipping_address: shippingAddress as any,
+            country_code: countryCode,
+            synced_at: new Date().toISOString(), sync_status: 'synced',
+          });
+          totalOrdersCreated++;
+          totalOrdersSynced++;
+        }
+      }
+
+      hasMoreOrders = orders.length === take;
+      orderPage++;
+      if (orderPage > 20) break;
+    }
+
+    const result = {
+      success: true,
+      clients: { synced: totalSynced, created: totalCreated, updated: totalUpdated, unlinked: totalUnlinked },
+      orders: { synced: totalOrdersSynced, created: totalOrdersCreated, updated: totalOrdersUpdated },
+      syncedAt: new Date().toISOString(),
+    };
     console.log(`[SyncClients] Complete:`, result);
 
     return new Response(JSON.stringify(result), {
