@@ -1,64 +1,66 @@
 
 
-## Make Local Database Mirror Dr. Green as Source of Truth
+## Dashboard KPIs from Dr. Green API + Expandable Client Detail Records
 
-### Problem
-Currently the `sync-clients` edge function only inserts/updates records for Dr. Green API clients that have a matching email in `auth.users`. The remaining clients (6 of 9) are counted as "unlinked" and dropped -- they never appear in the local `drgreen_clients` table. Orders are also not synced from Dr. Green. The dashboard KPIs therefore undercount.
+### Part 1: Dashboard KPIs from Dr. Green API
 
-### Solution
+**Problem**: `fetchStats()` in `AdminDashboard.tsx` only queries local `drgreen_clients` and `drgreen_orders` tables. Even though the sync keeps these updated, the KPIs should also attempt to pull live numbers from the Dr. Green API (`getClientsSummary`) as the primary source, falling back to local DB if the API is unavailable.
 
-**1. Update `sync-clients` edge function to store ALL Dr. Green clients**
+**Changes to `src/pages/AdminDashboard.tsx`**:
+- In `fetchStats()`, call `getClientsSummary()` first (same as `AdminClientManager` does)
+- If it returns data, use `summary.totalCount`, `summary.PENDING`, `summary.VERIFIED`, `summary.REJECTED` for the KPI cards
+- If the API call fails (401/timeout), fall back to local DB counts as currently implemented
+- Also attempt `getDappClients({ take: 1 })` to get the real total from the API's pagination metadata if the summary endpoint fails
+- This ensures the dashboard always shows Dr. Green's live numbers when available
 
-Currently, clients without a matching auth user are skipped (`totalUnlinked++`). Change this so unlinked clients are also inserted into `drgreen_clients` with a placeholder `user_id`. This requires:
+### Part 2: Expandable Client Detail Record
 
-- Add a system/placeholder UUID for unlinked clients (e.g. a fixed "unlinked" UUID constant like `00000000-0000-0000-0000-000000000000`).
-- However, since `user_id` has a NOT NULL constraint and is used in RLS, a better approach is to make the column nullable via a migration.
-- Alternatively, store unlinked clients with a sentinel user_id and match them later when a user signs up with a matching email.
+**Problem**: Clicking a client row in `AdminClientManager` currently only opens a dropdown menu or expands a shipping address panel. There is no full client detail view -- you cannot see KYC status details, order history, medical record flags, or contact details in one place.
 
-**Recommended approach**: Make `user_id` nullable on `drgreen_clients` so unlinked Dr. Green clients can be stored without a local auth account. When a user later signs up with a matching email, the `linkUserToClient` flow will update the `user_id`.
+**Changes to `src/components/admin/AdminClientManager.tsx`**:
 
-Database migration:
-```sql
-ALTER TABLE drgreen_clients ALTER COLUMN user_id DROP NOT NULL;
+- Make the entire client row clickable (not just the dropdown). Clicking expands a detailed record panel below the row.
+- The expanded panel will show:
+  - **Identity section**: Full name, email, phone, client ID (copyable), registration date
+  - **Status section**: KYC verified badge, admin approval status, account linked status (has local user_id or not)
+  - **Shipping address**: Current address on file (fetched from Dr. Green API via `getDappClientDetails`)
+  - **Action buttons**: Sync Status, Re-Register, Copy ID, View in Dr. Green Portal, Edit Address (inline form)
+- Replace the current address-only expand with this richer detail view
+- Add smooth expand/collapse animation (already using framer-motion `AnimatePresence`)
+- On mobile, the detail panel stacks vertically with the same sections
+
+**UX Improvements**:
+- Add a subtle chevron indicator on each row showing it is expandable
+- Highlight the active/expanded row with a border accent
+- Add a "linked" vs "unlinked" indicator showing whether the Dr. Green client has a local Healing Buds account
+- Show the client's order count if available from the detail fetch
+- Improve the mobile card layout: move the status badge below the name instead of cramming it beside the dropdown
+
+### Technical Details
+
+**`AdminDashboard.tsx` changes**:
+```
+fetchStats() {
+  // 1. Try Dr. Green API summary
+  const summaryResult = await getClientsSummary();
+  if (summaryResult.data?.summary) {
+    use summary.totalCount, PENDING, VERIFIED, REJECTED
+  }
+  // 2. Fallback to local DB
+  else {
+    query drgreen_clients as before
+  }
+  // Orders: always from local DB (synced)
+}
 ```
 
-Then update the `sync-clients` edge function: instead of skipping unlinked clients, insert them with `user_id: null`.
+**`AdminClientManager.tsx` changes**:
+- Rename `expandedClientId` usage from address-only to full detail panel
+- When a client row is clicked, toggle `expandedClientId`
+- In the expanded section, fetch `getDappClientDetails(clientId)` to get full details including shipping
+- Render a 2-column grid (desktop) or stacked layout (mobile) with identity, status, address, and actions
+- Add a chevron rotation indicator on each row
+- Keep the 3-dot dropdown menu for quick actions, but the row click now opens the detail panel
 
-**2. Add order sync to the `sync-clients` edge function**
-
-After syncing clients, also paginate through Dr. Green orders (via `GET /dapp/orders`) and upsert them into the `drgreen_orders` table. This ensures local orders reflect what Dr. Green has. Orders matched by `drgreen_order_id` get updated; new ones get inserted.
-
-**3. Update `AdminDashboard.tsx` to use local DB counts (which now mirror Dr. Green)**
-
-Since the local DB now contains ALL Dr. Green clients and orders, the existing local-DB-based `fetchStats()` will automatically show correct numbers. No API calls needed for KPIs -- the sync keeps the DB current.
-
-**4. Auto-sync on dashboard load already works**
-
-The `useDrGreenAutoSync` hook already runs `syncNow()` on mount and every 5 minutes, triggering the edge function. After the edge function returns, the dashboard refreshes stats. This loop ensures the local DB stays current with Dr. Green.
-
-**5. Admin role remains local-only (not from Dr. Green)**
-
-Admin roles stay in `user_roles` table, verified via NFT wallet auth. This is not overwritten by Dr. Green sync. The sync only manages client/patient data and orders.
-
-### Technical Changes
-
-**Migration**: `ALTER TABLE drgreen_clients ALTER COLUMN user_id DROP NOT NULL;`
-
-**`supabase/functions/sync-clients/index.ts`**:
-- After the existing client-matching logic, insert unlinked clients with `user_id: null` instead of skipping them.
-- Add a second pagination loop for orders: `GET /dapp/orders?page=X&take=50&orderBy=desc`.
-- For each order, upsert into `drgreen_orders` matching on `drgreen_order_id`.
-
-**`src/pages/AdminDashboard.tsx`**:
-- `fetchStats()` already reads from local DB. After migration + updated sync, the counts will be correct automatically.
-- No changes needed here beyond what is already in place.
-
-**`src/hooks/useDrGreenAutoSync.ts`**:
-- Wire `onComplete` callback to refresh dashboard stats after each sync cycle completes.
-
-### What Does NOT Change
-- Admin role assignment stays in `user_roles`, managed independently.
-- NFT wallet auth continues to govern admin access.
-- The `drgreen-proxy` edge function is untouched.
-- RLS policies: add a new policy allowing admins to see clients with `user_id IS NULL`.
+**No new files needed** -- all changes are within existing components.
 
