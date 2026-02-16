@@ -3,7 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as secp256k1 from "https://esm.sh/@noble/secp256k1@2.1.0";
 import { sha256 } from "https://esm.sh/@noble/hashes@1.4.0/sha256";
 import { hmac } from "https://esm.sh/@noble/hashes@1.4.0/hmac";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 // Initialize secp256k1
 secp256k1.etc.hmacSha256Sync = (key: Uint8Array, ...messages: Uint8Array[]) => {
@@ -19,47 +18,153 @@ const corsHeaders = {
 
 const API_BASE = "https://api.drgreennft.com/api/v1";
 
-function extractRawPrivateKey(base64Key: string): Uint8Array {
-  const decoded = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
-  // PKCS8 DER: raw 32-byte key is typically at the end
-  if (decoded.length > 32) {
-    // Look for the octet string tag (0x04, 0x20) that precedes the 32-byte key
-    for (let i = 0; i < decoded.length - 33; i++) {
-      if (decoded[i] === 0x04 && decoded[i + 1] === 0x20) {
-        return decoded.slice(i + 2, i + 34);
-      }
-    }
-    // Fallback: last 32 bytes
-    return decoded.slice(decoded.length - 32);
+// --- Crypto helpers (matching drgreen-proxy) ---
+
+function cleanBase64(input: string): string {
+  let cleaned = input.replace(/[\r\n\s]/g, '');
+  cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingNeeded = (4 - (cleaned.length % 4)) % 4;
+  if (paddingNeeded > 0 && paddingNeeded < 4) cleaned += '='.repeat(paddingNeeded);
+  return cleaned;
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const cleaned = cleanBase64(base64);
+  const binaryString = atob(cleaned);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function isBase64(str: string): boolean {
+  const cleaned = cleanBase64(str);
+  if (!cleaned || cleaned.length === 0) return false;
+  return /^[A-Za-z0-9+/]*=*$/.test(cleaned);
+}
+
+function extractSecp256k1PrivateKey(derBytes: Uint8Array): Uint8Array {
+  if (derBytes.length === 32) return derBytes;
+
+  let offset = 0;
+  function readLength(): number {
+    const firstByte = derBytes[offset++];
+    if (firstByte < 0x80) return firstByte;
+    const numBytes = firstByte & 0x7f;
+    let length = 0;
+    for (let i = 0; i < numBytes; i++) length = (length << 8) | derBytes[offset++];
+    return length;
   }
-  return decoded;
+
+  // Outer SEQUENCE
+  if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE');
+  readLength();
+
+  const nextTag = derBytes[offset];
+  if (nextTag === 0x02) {
+    // Read version INTEGER
+    offset++;
+    const vLen = readLength();
+    let version = 0;
+    for (let i = 0; i < vLen; i++) version = (version << 8) | derBytes[offset + i];
+    offset += vLen;
+
+    if (version === 1) {
+      // SEC1
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING');
+      const keyLen = readLength();
+      if (keyLen !== 32) throw new Error(`Expected 32-byte key, got ${keyLen}`);
+      return derBytes.slice(offset, offset + 32);
+    } else if (version === 0) {
+      // PKCS#8
+      if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE (algorithm)');
+      const algLen = readLength();
+      offset += algLen;
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING');
+      readLength();
+      if (derBytes[offset++] !== 0x30) throw new Error('Expected SEQUENCE (SEC1)');
+      readLength();
+      if (derBytes[offset++] !== 0x02) throw new Error('Expected INTEGER (SEC1 version)');
+      const sec1VersionLen = readLength();
+      offset += sec1VersionLen;
+      if (derBytes[offset++] !== 0x04) throw new Error('Expected OCTET STRING (private key)');
+      const keyLen = readLength();
+      if (keyLen !== 32) throw new Error(`Expected 32-byte key, got ${keyLen}`);
+      return derBytes.slice(offset, offset + 32);
+    }
+  }
+  throw new Error(`Unsupported key format`);
 }
 
-function signPayload(payload: string, privateKeyBase64: string): string {
-  const rawKey = extractRawPrivateKey(privateKeyBase64);
-  const msgHash = sha256(new TextEncoder().encode(payload));
-  const signature = secp256k1.sign(msgHash, rawKey);
-  const derSig = signature.toDERRawBytes();
-  return base64Encode(derSig);
+function signPayload(data: string, base64PrivateKey: string): string {
+  const secret = (base64PrivateKey || '').trim();
+  let decodedSecretBytes = base64ToBytes(secret);
+
+  // Check for PEM format
+  const decodedAsText = new TextDecoder().decode(decodedSecretBytes);
+  let keyDerBytes: Uint8Array;
+
+  const isPem = decodedAsText.includes('-----BEGIN') || decodedAsText.includes('BEGIN') ||
+    (decodedSecretBytes.length >= 2 && decodedSecretBytes[0] === 0x2D && decodedSecretBytes[1] === 0x2D);
+
+  if (isPem) {
+    const pemBody = decodedAsText
+      .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
+      .replace(/-----END [A-Z0-9 ]+-----/g, '')
+      .replace(/-{2,}[^\n]*\n?/g, '')
+      .replace(/[\r\n\s]/g, '')
+      .trim();
+    if (!pemBody || !isBase64(pemBody)) throw new Error('Invalid PEM format');
+    keyDerBytes = base64ToBytes(pemBody);
+  } else {
+    keyDerBytes = decodedSecretBytes;
+  }
+
+  const privateKeyBytes = extractSecp256k1PrivateKey(keyDerBytes);
+  const dataBytes = new TextEncoder().encode(data);
+  const messageHash = sha256(dataBytes);
+
+  // Sign with secp256k1
+  const signature = secp256k1.sign(messageHash, privateKeyBytes);
+
+  // Use toCompactRawBytes + manual DER (toDERRawBytes doesn't exist)
+  const compactSig = signature.toCompactRawBytes();
+  const r = compactSig.slice(0, 32);
+  const s = compactSig.slice(32, 64);
+
+  function integerToDER(val: Uint8Array): Uint8Array {
+    let start = 0;
+    while (start < val.length - 1 && val[start] === 0) start++;
+    let trimmed = val.slice(start);
+    const needsPadding = trimmed[0] >= 0x80;
+    const result = new Uint8Array((needsPadding ? 1 : 0) + trimmed.length);
+    if (needsPadding) result[0] = 0x00;
+    result.set(trimmed, needsPadding ? 1 : 0);
+    return result;
+  }
+
+  const rDer = integerToDER(r);
+  const sDer = integerToDER(s);
+  const innerLen = 2 + rDer.length + 2 + sDer.length;
+  const derSig = new Uint8Array(2 + innerLen);
+  derSig[0] = 0x30;
+  derSig[1] = innerLen;
+  derSig[2] = 0x02;
+  derSig[3] = rDer.length;
+  derSig.set(rDer, 4);
+  derSig[4 + rDer.length] = 0x02;
+  derSig[5 + rDer.length] = sDer.length;
+  derSig.set(sDer, 6 + rDer.length);
+
+  return bytesToBase64(derSig);
 }
 
-async function drGreenGet(path: string, queryParams: Record<string, string | number>, apiKey: string, privateKey: string): Promise<Response> {
-  const qs = Object.entries(queryParams)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-    .join('&');
-  
-  const signature = signPayload(qs, privateKey);
-  const url = `${API_BASE}${path}?${qs}`;
-  
-  return fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-auth-apikey': apiKey,
-      'x-auth-signature': signature,
-    },
-  });
-}
+// --- Main handler ---
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -67,7 +172,6 @@ serve(async (req) => {
   }
 
   try {
-    // Auth check - admin only
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Authentication required' }), {
@@ -79,7 +183,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Verify caller is admin
     const userClient = createClient(supabaseUrl, supabaseAnon, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -92,11 +195,7 @@ serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
     const { data: roleData } = await adminClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
+      .from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
 
     if (!roleData) {
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
@@ -104,43 +203,50 @@ serve(async (req) => {
       });
     }
 
-    // Get API credentials
     const apiKey = Deno.env.get('DRGREEN_API_KEY')!;
     const privateKey = Deno.env.get('DRGREEN_PRIVATE_KEY')!;
 
-    // Fetch ALL auth users (service role can do this)
+    // Fetch all auth users (service role)
     const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     const emailToUserId = new Map<string, string>();
     for (const u of authUsers || []) {
       if (u.email) emailToUserId.set(u.email.toLowerCase(), u.id);
     }
-
     console.log(`[SyncClients] Found ${emailToUserId.size} auth users`);
 
-    // Paginate through Dr. Green API clients
+    // Paginate Dr. Green API clients
     let page = 1;
     const take = 50;
-    let totalSynced = 0;
-    let totalCreated = 0;
-    let totalUpdated = 0;
-    let totalUnlinked = 0;
+    let totalSynced = 0, totalCreated = 0, totalUpdated = 0, totalUnlinked = 0;
     let hasMore = true;
 
     while (hasMore) {
-      const resp = await drGreenGet('/dapp/clients', { page, take, orderBy: 'desc' }, apiKey, privateKey);
-      
+      const queryParams: Record<string, string | number> = { page, take, orderBy: 'desc' };
+      const qs = Object.entries(queryParams)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+        .join('&');
+
+      const signature = signPayload(qs, privateKey);
+      const url = `${API_BASE}/dapp/clients?${qs}`;
+
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-apikey': apiKey,
+          'x-auth-signature': signature,
+        },
+      });
+
       if (!resp.ok) {
-        console.error(`[SyncClients] API error page ${page}:`, resp.status);
+        console.error(`[SyncClients] API error page ${page}: ${resp.status}`);
         break;
       }
 
       const json = await resp.json() as { data?: { clients?: Array<Record<string, unknown>> } };
       const clients = json.data?.clients || [];
 
-      if (clients.length === 0) {
-        hasMore = false;
-        break;
-      }
+      if (clients.length === 0) { hasMore = false; break; }
 
       for (const client of clients) {
         const clientId = client.id as string;
@@ -153,74 +259,45 @@ serve(async (req) => {
         const phoneCountryCode = client.phoneCountryCode as string || '';
         const countryCode = shippings[0]?.country || phoneCountryCode || 'PT';
 
-        // Check if already in drgreen_clients
         const { data: existing } = await adminClient
-          .from('drgreen_clients')
-          .select('id, is_kyc_verified, admin_approval, user_id')
-          .eq('drgreen_client_id', clientId)
-          .maybeSingle();
+          .from('drgreen_clients').select('id, is_kyc_verified, admin_approval, user_id')
+          .eq('drgreen_client_id', clientId).maybeSingle();
 
         if (existing) {
-          // Update if status changed
           if (existing.is_kyc_verified !== isKYCVerified || existing.admin_approval !== adminApproval) {
-            await adminClient
-              .from('drgreen_clients')
-              .update({
-                is_kyc_verified: isKYCVerified,
-                admin_approval: adminApproval,
-                email,
-                full_name: `${firstName} ${lastName}`.trim(),
-                country_code: countryCode,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existing.id);
+            await adminClient.from('drgreen_clients').update({
+              is_kyc_verified: isKYCVerified, admin_approval: adminApproval,
+              email, full_name: `${firstName} ${lastName}`.trim(),
+              country_code: countryCode, updated_at: new Date().toISOString(),
+            }).eq('id', existing.id);
             totalUpdated++;
           }
           totalSynced++;
         } else {
-          // Match by email to auth user
           const userId = emailToUserId.get(email);
           if (userId) {
-            // Check if this user already has a drgreen_clients record
             const { data: userExisting } = await adminClient
-              .from('drgreen_clients')
-              .select('id')
-              .eq('user_id', userId)
-              .maybeSingle();
+              .from('drgreen_clients').select('id').eq('user_id', userId).maybeSingle();
 
             if (userExisting) {
-              // Update existing record with this client ID
-              await adminClient
-                .from('drgreen_clients')
-                .update({
-                  drgreen_client_id: clientId,
-                  is_kyc_verified: isKYCVerified,
-                  admin_approval: adminApproval,
-                  email,
-                  full_name: `${firstName} ${lastName}`.trim(),
-                  country_code: countryCode,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', userExisting.id);
+              await adminClient.from('drgreen_clients').update({
+                drgreen_client_id: clientId, is_kyc_verified: isKYCVerified,
+                admin_approval: adminApproval, email,
+                full_name: `${firstName} ${lastName}`.trim(),
+                country_code: countryCode, updated_at: new Date().toISOString(),
+              }).eq('id', userExisting.id);
               totalUpdated++;
             } else {
-              await adminClient
-                .from('drgreen_clients')
-                .insert({
-                  user_id: userId,
-                  drgreen_client_id: clientId,
-                  is_kyc_verified: isKYCVerified,
-                  admin_approval: adminApproval,
-                  email,
-                  full_name: `${firstName} ${lastName}`.trim(),
-                  country_code: countryCode,
-                });
+              await adminClient.from('drgreen_clients').insert({
+                user_id: userId, drgreen_client_id: clientId,
+                is_kyc_verified: isKYCVerified, admin_approval: adminApproval,
+                email, full_name: `${firstName} ${lastName}`.trim(), country_code: countryCode,
+              });
               totalCreated++;
             }
             totalSynced++;
           } else {
             totalUnlinked++;
-            console.log(`[SyncClients] Unlinked: ${email} (no auth user)`);
           }
         }
       }
@@ -230,15 +307,7 @@ serve(async (req) => {
       if (page > 20) break;
     }
 
-    const result = {
-      success: true,
-      synced: totalSynced,
-      created: totalCreated,
-      updated: totalUpdated,
-      unlinked: totalUnlinked,
-      syncedAt: new Date().toISOString(),
-    };
-
+    const result = { success: true, synced: totalSynced, created: totalCreated, updated: totalUpdated, unlinked: totalUnlinked, syncedAt: new Date().toISOString() };
     console.log(`[SyncClients] Complete:`, result);
 
     return new Response(JSON.stringify(result), {
