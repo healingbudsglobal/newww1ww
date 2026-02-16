@@ -320,8 +320,32 @@ const cannabisMethodOptions = [
   { value: 'topical', label: 'Topical' },
 ];
 
+const STORAGE_KEY = 'hb-registration-progress';
+
+function loadSavedProgress(): { step: number; data: any } {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { step: parsed.step || 0, data: parsed.data || {} };
+    }
+  } catch {}
+  return { step: 0, data: {} };
+}
+
+function saveProgress(step: number, data: any) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, data, savedAt: Date.now() }));
+  } catch {}
+}
+
+function clearSavedProgress() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
 export function ClientOnboarding() {
-  const [currentStep, setCurrentStep] = useState(0);
+  const saved = loadSavedProgress();
+  const [currentStep, setCurrentStep] = useState(saved.step);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [ageError, setAgeError] = useState<string | null>(null);
@@ -337,7 +361,7 @@ export function ClientOnboarding() {
     business?: Business;
     medicalHistory?: MedicalHistory;
     medical?: Medical;
-  }>({});
+  }>(saved.data);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { refreshClient } = useShop();
@@ -365,6 +389,13 @@ export function ClientOnboarding() {
     checkExistingRegistration();
     logEvent('registration.started', 'pending', { step: 0, stepName: 'personal' });
   }, [navigate, logEvent]);
+
+  // Auto-save progress when formData or step changes
+  useEffect(() => {
+    if (currentStep < 5) {
+      saveProgress(currentStep, formData);
+    }
+  }, [currentStep, formData]);
 
   const personalForm = useForm<PersonalDetails>({
     resolver: zodResolver(personalDetailsSchema),
@@ -562,6 +593,7 @@ export function ClientOnboarding() {
             setKycLinkReceived(!!existingCheck.kycLink);
             setKycStatus('success');
             setCurrentStep(5);
+            clearSavedProgress();
             await refreshClient();
             
             toast({
@@ -803,6 +835,7 @@ export function ClientOnboarding() {
       setKycLinkReceived(!!kycLink);
       setKycStatus('success');
       setCurrentStep(5); // Go to Complete step
+      clearSavedProgress();
 
       // Send welcome email
       try {
@@ -931,13 +964,53 @@ export function ClientOnboarding() {
   };
 
   const goBack = () => {
-    if (currentStep > 0) setCurrentStep(currentStep - 1);
+    if (currentStep > 0) {
+      const prevStep = currentStep - 1;
+      // Restore form values when going back
+      if (prevStep === 0 && formData.personal) personalForm.reset(formData.personal);
+      if (prevStep === 1 && formData.address) addressForm.reset(formData.address);
+      if (prevStep === 2 && formData.business) businessForm.reset(formData.business);
+      if (prevStep === 3 && formData.medicalHistory) medicalHistoryForm.reset(formData.medicalHistory);
+      if (prevStep === 4 && formData.medical) medicalForm.reset(formData.medical);
+      setCurrentStep(prevStep);
+    }
+  };
+
+  // Validation error summary component
+  const ValidationSummary = ({ errors }: { errors: Record<string, any> }) => {
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length === 0) return null;
+    return (
+      <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm space-y-1">
+        <div className="flex items-center gap-2 text-destructive font-medium">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{errorKeys.length} field{errorKeys.length > 1 ? 's' : ''} need{errorKeys.length === 1 ? 's' : ''} attention</span>
+        </div>
+        <ul className="text-xs text-destructive/80 list-disc list-inside">
+          {errorKeys.slice(0, 5).map((key) => {
+            const err = errors[key];
+            const msg = err?.message || (typeof err === 'string' ? err : `${key} is required`);
+            return <li key={key}>{msg}</li>;
+          })}
+          {errorKeys.length > 5 && <li>...and {errorKeys.length - 5} more</li>}
+        </ul>
+      </div>
+    );
   };
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
       {/* Progress indicator */}
       <div className="mb-8">
+        {/* Mobile step counter */}
+        <div className="sm:hidden text-center mb-4">
+          <p className="text-sm font-medium text-primary">
+            Step {Math.min(currentStep + 1, steps.length - 1)} of {steps.length - 1}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {steps[Math.min(currentStep, steps.length - 1)].title}
+          </p>
+        </div>
         <div className="flex justify-between">
           {steps.map((step, index) => (
             <div
@@ -974,6 +1047,10 @@ export function ClientOnboarding() {
             transition={{ duration: 0.3 }}
           />
         </div>
+        {/* Desktop step counter */}
+        <p className="hidden sm:block text-xs text-muted-foreground text-center mt-3">
+          Step {Math.min(currentStep + 1, steps.length - 1)} of {steps.length - 1} — Your progress is saved automatically
+        </p>
       </div>
 
       <AnimatePresence mode="wait">
@@ -1107,6 +1184,7 @@ export function ClientOnboarding() {
                         <span>{ageError}</span>
                       </div>
                     )}
+                    <ValidationSummary errors={personalForm.formState.errors} />
                     <Button type="submit" className="w-full">
                       Continue
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -1218,6 +1296,7 @@ export function ClientOnboarding() {
                         <span>{postalError}</span>
                       </div>
                     )}
+                    <ValidationSummary errors={addressForm.formState.errors} />
                     <div className="flex gap-3">
                       <Button
                         type="button"
@@ -1432,6 +1511,7 @@ export function ClientOnboarding() {
                       </motion.div>
                     )}
 
+                    <ValidationSummary errors={businessForm.formState.errors} />
                     <div className="flex gap-3 pt-2">
                       <Button
                         type="button"
@@ -1895,6 +1975,7 @@ export function ClientOnboarding() {
                       />
                     )}
 
+                    <ValidationSummary errors={medicalHistoryForm.formState.errors} />
                     <div className="flex gap-3">
                       <Button
                         type="button"
@@ -2051,6 +2132,7 @@ export function ClientOnboarding() {
                         </FormItem>
                       )}
                     />
+                    <ValidationSummary errors={medicalForm.formState.errors} />
                     <div className="flex gap-3">
                       <Button
                         type="button"
@@ -2282,56 +2364,81 @@ export function ClientOnboarding() {
                 </motion.div>
                 <h2 className="text-2xl font-bold mb-2">Registration Submitted!</h2>
                 
-                {kycLinkReceived ? (
-                  // Success state - KYC link received
+                {/* Next Steps Timeline */}
+                <div className="bg-muted/30 rounded-xl p-5 my-6 text-left">
+                  <h3 className="font-semibold text-sm mb-4">What happens next:</h3>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-2 text-primary">
-                      <Mail className="h-5 w-5" />
-                      <p className="text-muted-foreground">
-                        Your verification link has been sent. Check your email to continue.
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</div>
+                      <div>
+                        <p className="font-medium text-sm">Complete KYC Verification</p>
+                        <p className="text-xs text-muted-foreground">Check your email for the identity verification link</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">2</div>
+                      <div>
+                        <p className="font-medium text-sm">Medical Review</p>
+                        <p className="text-xs text-muted-foreground">Our medical team reviews your application (1-2 business days)</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">3</div>
+                      <div>
+                        <p className="font-medium text-sm">Access Granted</p>
+                        <p className="text-xs text-muted-foreground">Once approved, you can browse and order medical cannabis products</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {kycLinkReceived ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2 p-3 bg-primary/10 rounded-lg">
+                      <Mail className="h-5 w-5 text-primary" />
+                      <p className="text-sm text-foreground">
+                        Verification link sent to your email
                       </p>
                     </div>
-                  <Button onClick={() => navigate('/dashboard/status')}>
+                    <Button onClick={() => navigate('/dashboard/status')} className="w-full">
                       View Account Status
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </div>
                 ) : (
-                  // Pending state - KYC link not received yet
-                  <div className="space-y-4">
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-left">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-5 w-5 text-amber-600" />
-                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                  <div className="space-y-3">
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-amber-600" />
+                        <span className="font-medium text-sm text-amber-700 dark:text-amber-400">
                           Verification link pending
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Your registration was saved successfully. We're preparing your verification link.
+                      <p className="text-xs text-muted-foreground">
+                        We're preparing your verification link. Check your email shortly.
                       </p>
-                      <Button
-                        variant="outline"
-                        onClick={retryKycLink}
-                        disabled={isRetrying}
-                        className="w-full"
-                      >
-                        {isRetrying ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Requesting...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Request Verification Link
-                          </>
-                        )}
-                      </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Or check your email in the next 24 hours. If you don't receive it, please contact support.
-                    </p>
-                    <Button onClick={() => navigate('/dashboard/status')}>
+                    <Button
+                      variant="outline"
+                      onClick={retryKycLink}
+                      disabled={isRetrying}
+                      className="w-full"
+                    >
+                      {isRetrying ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Request Verification Link
+                        </>
+                      )}
+                    </Button>
+                    <Button onClick={() => navigate('/dashboard/status')} className="w-full">
                       View Account Status
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </div>
                 )}
