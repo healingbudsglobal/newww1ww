@@ -11,7 +11,7 @@ const AdminTeam = () => (
     description="Manage user roles, wallet mappings, and commission structures"
   >
     <Tabs defaultValue="roles" className="space-y-6">
-      <TabsList className="inline-flex h-11 rounded-xl bg-[hsl(var(--admin-parchment))] dark:bg-[hsl(var(--admin-forest-deep))] p-1 gap-1">
+      <TabsList className="inline-flex h-11 rounded-xl bg-[hsl(var(--admin-sand))] dark:bg-[hsl(var(--admin-forest-deep))] p-1 gap-1">
         <TabsTrigger value="roles" className="rounded-lg gap-2 data-[state=active]:bg-[hsl(var(--admin-fir))] data-[state=active]:text-white px-4">
           <Shield className="w-4 h-4" />
           Roles

@@ -27,9 +27,9 @@ const ROLE_OPTIONS = ["admin", "affiliate", "agent", "employee", "referral"];
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-[hsl(var(--admin-fir))]/15 text-[hsl(var(--admin-fir))] border-[hsl(var(--admin-fir))]/30",
   affiliate: "bg-[hsl(var(--admin-gold))]/15 text-[hsl(var(--admin-gold))] border-[hsl(var(--admin-gold))]/30",
-  agent: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  agent: "bg-[hsl(var(--admin-sky))]/15 text-[hsl(var(--admin-sky))] border-[hsl(var(--admin-sky))]/30",
   employee: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  referral: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+  referral: "bg-[hsl(var(--admin-olive))]/15 text-[hsl(var(--admin-olive))] border-[hsl(var(--admin-olive))]/30",
 };
 
 export function TeamCommissions() {

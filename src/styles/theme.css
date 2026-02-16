@@ -142,28 +142,34 @@
   --header-offset: 0.5rem;
 }
 
-/* ===== ADMIN EARTHY GREEN PALETTE ===== */
+/* ===== ADMIN EARTHY GREEN PALETTE (Refined 2026) ===== */
 :root {
-  --admin-forest: 144 22% 26%;        /* #344E41 */
-  --admin-forest-deep: 140 21% 30%;   /* #3A5A40 */
-  --admin-fir: 130 22% 42%;           /* #588157 */
-  --admin-sage: 90 16% 63%;           /* #A3B18A */
-  --admin-parchment: 40 14% 83%;      /* #DAD7CD */
-  --admin-cool-sage: 192 7% 81%;      /* #C8D1D3 */
-  --admin-soft-green: 148 13% 60%;    /* #8AA894 */
-  --admin-gold: 48 72% 49%;           /* #D4B925 */
-  --admin-sidebar-gradient: linear-gradient(180deg, hsl(144 22% 26%), hsl(140 21% 30%));
+  --admin-forest: 150 25% 24%;
+  --admin-forest-deep: 148 22% 28%;
+  --admin-fir: 140 28% 40%;
+  --admin-sage: 95 18% 65%;
+  --admin-parchment: 38 20% 90%;
+  --admin-cool-sage: 200 14% 82%;
+  --admin-soft-green: 148 16% 58%;
+  --admin-gold: 45 65% 52%;
+  --admin-sky: 205 25% 72%;
+  --admin-sand: 35 25% 85%;
+  --admin-olive: 78 30% 48%;
+  --admin-sidebar-gradient: linear-gradient(180deg, hsl(150 25% 24%), hsl(148 22% 28%));
 }
 
 .dark {
-  --admin-forest: 144 20% 18%;
-  --admin-forest-deep: 140 18% 22%;
-  --admin-fir: 130 18% 32%;
-  --admin-sage: 90 10% 45%;
-  --admin-parchment: 40 6% 14%;
-  --admin-cool-sage: 192 5% 20%;
-  --admin-soft-green: 148 10% 38%;
-  --admin-gold: 48 65% 45%;
+  --admin-forest: 150 20% 18%;
+  --admin-forest-deep: 148 18% 22%;
+  --admin-fir: 140 22% 32%;
+  --admin-sage: 95 10% 45%;
+  --admin-parchment: 38 8% 14%;
+  --admin-cool-sage: 200 8% 20%;
+  --admin-soft-green: 148 12% 38%;
+  --admin-gold: 45 55% 45%;
+  --admin-sky: 205 18% 35%;
+  --admin-sand: 35 10% 16%;
+  --admin-olive: 78 20% 35%;
 }
 
 /* ===== DARK MODE ===== */
