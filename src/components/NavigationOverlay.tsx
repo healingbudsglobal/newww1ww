@@ -123,7 +123,7 @@ const NavigationOverlay = ({
     { to: "/eligibility", label: "Eligibility", icon: ClipboardCheck, active: isActive("/eligibility") },
     { to: "/shop", label: "Strains", icon: Leaf, active: isShopActive },
     { to: "/support", label: "Support", icon: HeadphonesIcon, active: isActive("/support") },
-    { to: "#cart", label: `Cart${cartCount > 0 ? ` (${cartCount})` : ''}`, icon: ShoppingCart, active: false, isCart: true }
+    ...(cartCount > 0 ? [{ to: "#cart", label: `Cart (${cartCount})`, icon: ShoppingCart, active: false, isCart: true }] : [])
   ];
 
   const navLinkStyles = (active: boolean) => cn(

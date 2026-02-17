@@ -9,6 +9,8 @@ import { Link, useLocation } from "react-router-dom";
 import { ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useShop } from "@/context/ShopContext";
+import { motion, AnimatePresence } from "framer-motion";
+
 
 interface NavigationMenuProps {
   scrolled: boolean;
@@ -62,24 +64,30 @@ const NavigationMenu = ({ scrolled, isDark = true }: NavigationMenuProps) => {
         );
       })}
 
-      {/* Cart button */}
-      <button
-        type="button"
-        onClick={() => setIsCartOpen(true)}
-        className={cn(
-          "relative px-2.5 py-2 rounded-lg font-medium transition-all duration-300",
-          "text-sm whitespace-nowrap flex-shrink-0 group flex items-center gap-1.5",
-          "text-white/90 hover:text-white hover:bg-white/10"
-        )}
-      >
-        <ShoppingCart className="w-4 h-4" />
-        Cart
+      {/* Cart button - only visible when items in cart */}
+      <AnimatePresence>
         {cartCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[hsl(var(--navbar-gold))] text-[10px] font-bold flex items-center justify-center text-black">
-            {cartCount > 9 ? '9+' : cartCount}
-          </span>
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsCartOpen(true)}
+            className={cn(
+              "relative px-2.5 py-2 rounded-lg font-medium transition-all duration-300",
+              "text-sm whitespace-nowrap flex-shrink-0 group flex items-center gap-1.5",
+              "text-white/90 hover:text-white hover:bg-white/10"
+            )}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Cart
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[hsl(var(--navbar-gold))] text-[10px] font-bold flex items-center justify-center text-black">
+              {cartCount > 9 ? '9+' : cartCount}
+            </span>
+          </motion.button>
         )}
-      </button>
+      </AnimatePresence>
     </nav>
   );
 };
