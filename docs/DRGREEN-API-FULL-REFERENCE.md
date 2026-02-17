@@ -528,21 +528,21 @@ The medical questionnaire is submitted as part of the `medicalRecord` object in 
 
 ## 8. Cart Endpoints
 
-### POST /dapp/carts — Add Items to Cart
+### POST /dapp/carts — Add One Item to Cart
+
+Adds a **single item** at a time. To add multiple items, call this endpoint once per item with a ~300ms delay between calls.
 
 **Proxy Action:** `add-to-cart`
 
 ```json
 {
-  "clientCartId": "client-uuid",
-  "items": [
-    {
-      "strainId": "strain-uuid",
-      "quantity": 2
-    }
-  ]
+  "clientId": "client-uuid",
+  "strainId": "strain-uuid",
+  "quantity": 1
 }
 ```
+
+> **Note:** There is no batch format. The legacy `clientCartId` + `items[]` pattern is NOT supported by the API. Each item requires a separate `POST /dapp/carts` call.
 
 ### GET /dapp/carts — List All Carts (Admin)
 
@@ -554,11 +554,15 @@ The medical questionnaire is submitted as part of the `medicalRecord` object in 
 | `take` | number | Items per page |
 | `page` | number | Page number |
 
-### GET /dapp/carts/:cartId — Get Specific Cart
+### GET /dapp/carts/:clientId — Get Cart for a Client
 
 **Proxy Action:** `get-cart`
 
-### DELETE /dapp/carts/:clientId — Empty Cart
+> **Note:** The path parameter is the **clientId**, not a cartId.
+
+### DELETE /dapp/carts/client/:clientId — Empty Cart
+
+Clears all items from a client's cart. Note the `/client/` segment in the path.
 
 **Proxy Action:** `empty-cart`
 
@@ -582,7 +586,7 @@ Creates an order from the client's cart items.
 
 The `create-order` proxy action performs a 3-step atomic flow:
 1. Update client shipping address (PATCH `/dapp/clients/:clientId`)
-2. Add items to server-side cart (POST `/dapp/carts`)
+2. Add items to server-side cart — **one item at a time** via `POST /dapp/carts` with `{ clientId, strainId, quantity }`, looping through items with a 300ms delay between calls
 3. Create order from cart (POST `/dapp/orders`)
 
 **Proxy Action:** `create-order`
@@ -605,6 +609,8 @@ The `create-order` proxy action performs a 3-step atomic flow:
   }
 }
 ```
+
+> **Important:** Step 2 iterates through `items[]` individually. Each item is added via a separate `POST /dapp/carts` call with `{ clientId, strainId, quantity }`. There is no batch endpoint.
 
 ### GET /dapp/orders — List All Orders
 

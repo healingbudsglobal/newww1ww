@@ -101,18 +101,9 @@ const triggerBackgroundSync = (alpha3Code: string) => {
   }
 };
 
-// Map Alpha-2 to Alpha-3 country codes for Dr Green API
-const countryCodeMap: Record<string, string> = {
-  PT: 'PRT',
-  ZA: 'ZAF',
-  TH: 'THA',
-  GB: 'GBR',
-};
+import { toAlpha3, SUPPORTED_COUNTRIES, DEFAULT_COUNTRY } from '@/lib/countries';
 
-// Supported countries for product display
-const SUPPORTED_COUNTRIES = ['PT', 'GB', 'ZA', 'TH'];
-
-export function useProducts(countryCode: string = 'ZA') {
+export function useProducts(countryCode: string = DEFAULT_COUNTRY) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +114,7 @@ export function useProducts(countryCode: string = 'ZA') {
     setError(null);
 
     // Validate country code
-    if (!SUPPORTED_COUNTRIES.includes(countryCode)) {
+    if (!(SUPPORTED_COUNTRIES as readonly string[]).includes(countryCode)) {
       console.warn(`Unsupported country code: ${countryCode}`);
       setProducts([]);
       setDataSource('none');
@@ -132,7 +123,7 @@ export function useProducts(countryCode: string = 'ZA') {
       return;
     }
 
-    const alpha3Code = countryCodeMap[countryCode] || 'PRT';
+    const alpha3Code = toAlpha3(countryCode);
     
     try {
       // First try to fetch from Dr Green API

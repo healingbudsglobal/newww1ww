@@ -10,18 +10,10 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { toAlpha3, getCountryFromPhone, DEFAULT_COUNTRY } from '@/lib/countries';
 
-// Country code conversion (Alpha-2 to Alpha-3 ISO codes)
-export const countryCodeMap: Record<string, string> = {
-  PT: 'PRT',
-  GB: 'GBR',
-  ZA: 'ZAF',
-  TH: 'THA',
-  US: 'USA',
-};
-
-// Convert Alpha-2 to Alpha-3 country code
-export const toAlpha3 = (code: string): string => countryCodeMap[code] || code;
+// Re-export for backwards compatibility
+export { toAlpha3 };
 
 // Types matching exact Dr. Green API payload structure
 export interface LegacyClientPayload {
@@ -350,18 +342,9 @@ export function parsePhoneNumber(fullNumber: string): {
     const prefix = match[1];
     const number = match[2];
     
-    // Map common prefixes to country codes
-    const prefixToCountry: Record<string, string> = {
-      '351': 'PT',
-      '44': 'GB',
-      '27': 'ZA',
-      '66': 'TH',
-      '1': 'US',
-    };
-    
     return {
       phoneCode: `+${prefix}`,
-      phoneCountryCode: prefixToCountry[prefix] || 'ZA',
+      phoneCountryCode: getCountryFromPhone(prefix),
       contactNumber: number,
     };
   }
@@ -369,7 +352,7 @@ export function parsePhoneNumber(fullNumber: string): {
   // Default fallback
   return {
     phoneCode: '+27',
-    phoneCountryCode: 'ZA',
+    phoneCountryCode: DEFAULT_COUNTRY,
     contactNumber: cleaned.replace(/^\+/, ''),
   };
 }
