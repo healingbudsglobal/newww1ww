@@ -3068,6 +3068,16 @@ serve(async (req) => {
           await sleep(1500);
         }
         
+        // Step 1.5: Clear any stale cart to prevent 409 conflicts
+        logInfo(`[${requestId}] Step 1.5: Clearing existing cart to prevent 409 conflict`);
+        try {
+          const emptyCartResponse = await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
+          logInfo(`[${requestId}] Step 1.5: Cart clear result`, { status: emptyCartResponse.status });
+        } catch (clearErr) {
+          logWarn(`[${requestId}] Step 1.5: Cart clear failed (non-blocking)`, { error: String(clearErr).slice(0, 100) });
+        }
+        await sleep(500);
+        
         // Step 2: Add items to server-side cart
         // API: POST /dapp/carts with { clientCartId, items: [{ strainId, quantity }] }
         const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
@@ -3095,7 +3105,7 @@ serve(async (req) => {
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
           try {
-            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, false, adminEnvConfig);
+            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, true, adminEnvConfig);
             lastCartStatus = cartResponse.status;
             if (cartResponse.ok) {
               logInfo(`[${requestId}] Step 2: Cart add success`, { attempt: cartAttempts });
@@ -3108,8 +3118,16 @@ serve(async (req) => {
                 error: lastCartError.slice(0, 200),
               });
               
-              // Non-retryable 400 errors (except shipping propagation delay)
-              if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
+              // On 409 Conflict, clear the cart and retry
+              if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
+                logInfo(`[${requestId}] Step 2: 409 conflict - clearing cart and retrying`);
+                try {
+                  await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
+                } catch (clearErr) {
+                  logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
+                }
+                await sleep(1000);
+              } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
                 const delay = cartAttempts * 1500;
                 logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
                 await sleep(delay);
