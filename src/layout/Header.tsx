@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { useTenant } from "@/hooks/useTenant";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useShop } from "@/context/ShopContext";
+import { useShopSafe } from "@/context/ShopContext";
 
 import EligibilityDialog from "@/components/EligibilityDialog";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -55,7 +55,10 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
-  const { isEligible, drGreenClient, isLoading: shopLoading } = useShop();
+  const shop = useShopSafe();
+  const isEligible = shop?.isEligible ?? false;
+  const drGreenClient = shop?.drGreenClient ?? null;
+  const shopLoading = shop?.isLoading ?? false;
   const headerRef = useRef<HTMLElement>(null);
   
   const isDark = resolvedTheme === 'dark';
