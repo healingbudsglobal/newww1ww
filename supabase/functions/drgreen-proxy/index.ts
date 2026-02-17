@@ -4304,14 +4304,15 @@ serve(async (req) => {
       }
       
       case "bulk-delete-clients": {
-        // Bulk delete clients - requires array of clientIds
-        if (!Array.isArray(body.clientIds) || body.clientIds.length === 0) {
-          throw new Error("Invalid clientIds - must be non-empty array");
+        // Bulk delete clients - DELETE /dapp/clients/bulk with { ids: [...] }
+        const clientIds = body.ids || body.clientIds;
+        if (!Array.isArray(clientIds) || clientIds.length === 0) {
+          throw new Error("Invalid ids - must be non-empty array");
         }
-        if (body.clientIds.length > 50) {
+        if (clientIds.length > 50) {
           throw new Error("Cannot delete more than 50 clients at once");
         }
-        response = await drGreenRequest("/dapp/clients/bulk-delete", "POST", { clientIds: body.clientIds }, adminEnvConfig);
+        response = await drGreenRequest("/dapp/clients/bulk", "DELETE", { ids: clientIds }, adminEnvConfig);
         break;
       }
       
