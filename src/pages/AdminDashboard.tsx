@@ -153,25 +153,50 @@ const AdminDashboard = () => {
     if (showRefreshToast) setRefreshing(true);
 
     try {
-      const [ordersRes, clientsRes] = await Promise.all([
-        supabase.from('drgreen_orders').select('status'),
-        supabase.from('drgreen_clients').select('is_kyc_verified, admin_approval'),
-      ]);
+      // 1. Try Dr. Green API as primary source of truth for client KPIs
+      let apiClientsUsed = false;
+      let totalClients = 0;
+      let verifiedClients = 0;
+      let pendingClients = 0;
 
-      const totalOrders = ordersRes.data?.length || 0;
-      const pendingOrders = ordersRes.data?.filter(o => o.status === 'PENDING').length || 0;
-      const totalClients = clientsRes.data?.length || 0;
-      const verifiedClients = clientsRes.data?.filter(c => c.is_kyc_verified && c.admin_approval === 'VERIFIED').length || 0;
-      const pendingClients = clientsRes.data?.filter(c => !c.is_kyc_verified || c.admin_approval !== 'VERIFIED').length || 0;
+      try {
+        const summaryResult = await getClientsSummary();
+        const summaryData = summaryResult.data as unknown as { data?: { summary?: { PENDING: number; VERIFIED: number; REJECTED: number; totalCount: number } } };
+        const summary = summaryData?.data?.summary || (summaryResult.data as { summary?: { PENDING: number; VERIFIED: number; REJECTED: number; totalCount: number } })?.summary;
+        
+        if (summary && summary.totalCount > 0) {
+          totalClients = summary.totalCount;
+          verifiedClients = summary.VERIFIED || 0;
+          pendingClients = summary.PENDING || 0;
+          apiClientsUsed = true;
+          console.log('[Dashboard] Using Dr. Green API for client KPIs:', summary);
+        }
+      } catch (apiErr) {
+        console.log('[Dashboard] Dr. Green client summary unavailable, falling back to local DB');
+      }
 
-      // Use local DB as source of truth (kept in sync by sync-clients edge function)
-      // Dr. Green API dashboard/sales endpoints return 401, so we rely on synced local data
+      // 2. Fallback to local DB if API unavailable
+      if (!apiClientsUsed) {
+        const { data: clientsRes } = await supabase
+          .from('drgreen_clients')
+          .select('is_kyc_verified, admin_approval');
+        totalClients = clientsRes?.length || 0;
+        verifiedClients = clientsRes?.filter(c => c.is_kyc_verified && c.admin_approval === 'VERIFIED').length || 0;
+        pendingClients = clientsRes?.filter(c => !c.is_kyc_verified || c.admin_approval !== 'VERIFIED').length || 0;
+      }
+
+      // 3. Orders always from local DB (synced)
+      const { data: ordersRes } = await supabase.from('drgreen_orders').select('status');
+      const totalOrders = ordersRes?.length || 0;
+      const pendingOrders = ordersRes?.filter(o => o.status === 'PENDING').length || 0;
+
+      // 4. Sales summary (optional)
       let dappTotalSales = 0;
       try {
         const { data: salesSummary, error: salesError } = await getSalesSummary();
         if (!salesError && salesSummary) dappTotalSales = salesSummary.totalSales || 0;
       } catch (dappErr) {
-        console.log('Dr Green sales API unavailable, using local data');
+        console.log('[Dashboard] Dr Green sales API unavailable');
       }
 
       setStats({
@@ -186,7 +211,7 @@ const AdminDashboard = () => {
       });
 
       if (showRefreshToast) {
-        toast({ title: "Data Refreshed", description: "Dashboard statistics updated." });
+        toast({ title: "Data Refreshed", description: `Dashboard updated${apiClientsUsed ? ' (live API)' : ' (local DB)'}.` });
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
