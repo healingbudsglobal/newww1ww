@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, RefreshCw, Search, CheckCircle, XCircle, Clock, ShieldCheck, ShieldAlert,
   Loader2, Copy, AlertTriangle, User, Mail, Globe, ExternalLink, Info, KeyRound,
-  MapPin, ChevronDown, MoreHorizontal,
+  MapPin, ChevronDown, ChevronRight, MoreHorizontal, Link2, Link2Off, Phone, Calendar, Hash,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { useDrGreenApi } from "@/hooks/useDrGreenApi";
 import { supabase } from "@/integrations/supabase/client";
 import { ShippingAddressForm, type ShippingAddress } from "@/components/shop/ShippingAddressForm";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
 interface DrGreenClient {
   id: string;
@@ -28,6 +29,8 @@ interface DrGreenClient {
   isKYCVerified: boolean;
   adminApproval: string;
   createdAt: string;
+  contactNumber?: string;
+  phoneCode?: string;
 }
 
 interface ClientsSummary {
@@ -35,6 +38,14 @@ interface ClientsSummary {
   VERIFIED: number;
   REJECTED: number;
   totalCount: number;
+}
+
+interface ClientDetailData {
+  shippings?: ShippingAddress[];
+  contactNumber?: string;
+  phoneCode?: string;
+  orders?: Array<{ id: string; status: string; totalAmount?: number }>;
+  [key: string]: unknown;
 }
 
 type FilterStatus = "all" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -57,14 +68,31 @@ export function AdminClientManager() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
-  const [fetchingAddressFor, setFetchingAddressFor] = useState<string | null>(null);
-  const [clientAddresses, setClientAddresses] = useState<Record<string, ShippingAddress | null>>({});
+  const [fetchingDetailFor, setFetchingDetailFor] = useState<string | null>(null);
+  const [clientDetails, setClientDetails] = useState<Record<string, ClientDetailData | null>>({});
+  const [linkedClientIds, setLinkedClientIds] = useState<Set<string>>(new Set());
 
   const filterRef = useRef(filter);
   const searchQueryRef = useRef(searchQuery);
   
   useEffect(() => { filterRef.current = filter; }, [filter]);
   useEffect(() => { searchQueryRef.current = searchQuery; }, [searchQuery]);
+
+  // Fetch which clients are linked to local auth accounts
+  const fetchLinkedStatus = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('drgreen_clients')
+        .select('drgreen_client_id, user_id');
+      const linked = new Set<string>();
+      (data || []).forEach(c => {
+        if (c.user_id) linked.add(c.drgreen_client_id);
+      });
+      setLinkedClientIds(linked);
+    } catch (err) {
+      console.warn('[AdminClientManager] Failed to fetch linked status:', err);
+    }
+  }, []);
 
   const syncClientsToLocalDb = useCallback(async (clientsList: DrGreenClient[]) => {
     try {
@@ -91,7 +119,7 @@ export function AdminClientManager() {
             is_kyc_verified: client.isKYCVerified ?? false,
             admin_approval: client.adminApproval || 'PENDING',
             country_code: 'PT',
-            user_id: existingMap.get(client.id) || crypto.randomUUID(),
+            user_id: existingMap.get(client.id) || null,
           }, { onConflict: 'drgreen_client_id', ignoreDuplicates: false });
       }
     } catch (err) {
@@ -134,6 +162,8 @@ export function AdminClientManager() {
       const summaryObj = summaryData?.data?.summary || (summaryResult.data as { summary?: ClientsSummary })?.summary;
       if (summaryObj) setSummary(summaryObj);
 
+      await fetchLinkedStatus();
+
       if (showToast) toast({ title: "Data Refreshed", description: "Client list updated from live API." });
     } catch (error) {
       console.error("Fetch error:", error);
@@ -143,7 +173,7 @@ export function AdminClientManager() {
       setIsRefetching(false);
       setInitialLoadComplete(true);
     }
-  }, [getDappClients, getClientsSummary, toast, syncClientsToLocalDb]);
+  }, [getDappClients, getClientsSummary, toast, syncClientsToLocalDb, fetchLinkedStatus]);
 
   useEffect(() => { fetchData({ isInitialLoad: true }); }, []);
   useEffect(() => { if (initialLoadComplete) fetchData(); }, [filter, searchQuery]);
@@ -201,23 +231,25 @@ export function AdminClientManager() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, label = "Client ID") => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied", description: "Client ID copied." });
+    toast({ title: "Copied", description: `${label} copied.` });
   };
 
-  const handleToggleAddress = async (clientId: string) => {
+  const handleToggleDetail = async (clientId: string) => {
     if (expandedClientId === clientId) { setExpandedClientId(null); return; }
     setExpandedClientId(clientId);
-    if (clientAddresses[clientId] !== undefined) return;
+    if (clientDetails[clientId] !== undefined) return;
     
-    setFetchingAddressFor(clientId);
+    setFetchingDetailFor(clientId);
     try {
       const result = await getDappClientDetails(clientId);
-      const responseData = result.data as unknown as { data?: { shippings?: ShippingAddress[] } };
-      const shipping = responseData?.data?.shippings?.[0] || (result.data as { shippings?: ShippingAddress[] })?.shippings?.[0] || null;
-      setClientAddresses(prev => ({ ...prev, [clientId]: shipping }));
+      const responseData = result.data as unknown as { data?: ClientDetailData };
+      const detail = responseData?.data || (result.data as ClientDetailData) || null;
+      setClientDetails(prev => ({ ...prev, [clientId]: detail }));
       
+      // Persist shipping address to local DB
+      const shipping = detail?.shippings?.[0];
       if (shipping) {
         await supabase.from('drgreen_clients').update({ 
           shipping_address: {
@@ -229,15 +261,18 @@ export function AdminClientManager() {
         }).eq('drgreen_client_id', clientId);
       }
     } catch (err) {
-      setClientAddresses(prev => ({ ...prev, [clientId]: null }));
-      toast({ title: "Error", description: "Failed to fetch address.", variant: "destructive" });
+      setClientDetails(prev => ({ ...prev, [clientId]: null }));
+      toast({ title: "Error", description: "Failed to fetch details.", variant: "destructive" });
     } finally {
-      setFetchingAddressFor(null);
+      setFetchingDetailFor(null);
     }
   };
 
   const handleAddressSaved = (clientId: string, address: ShippingAddress) => {
-    setClientAddresses(prev => ({ ...prev, [clientId]: address }));
+    setClientDetails(prev => ({
+      ...prev,
+      [clientId]: { ...prev[clientId], shippings: [address] } as ClientDetailData,
+    }));
     toast({ title: "Address Updated" });
   };
 
@@ -263,6 +298,147 @@ export function AdminClientManager() {
     { value: "VERIFIED", label: "Verified", color: "text-green-600" },
     { value: "REJECTED", label: "Rejected", color: "text-red-600" },
   ];
+
+  const isLinked = (clientId: string) => linkedClientIds.has(clientId);
+
+  const renderDetailPanel = (client: DrGreenClient) => {
+    const detail = clientDetails[client.id];
+    const shipping = detail?.shippings?.[0] || null;
+    const isLoading = fetchingDetailFor === client.id;
+
+    if (isLoading) {
+      return (
+        <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />Fetching client details…
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Identity & Status */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Identity</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="font-medium">{client.firstName} {client.lastName}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">{client.email}</span>
+            </div>
+            {(detail?.contactNumber || client.contactNumber) && (
+              <div className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground">
+                  {detail?.phoneCode || client.phoneCode || ''} {detail?.contactNumber || client.contactNumber}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Hash className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="font-mono text-xs text-muted-foreground">{client.id}</span>
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); copyToClipboard(client.id); }}>
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground text-xs">
+                Registered {formatDistanceToNow(new Date(client.createdAt), { addSuffix: true })}
+              </span>
+            </div>
+          </div>
+
+          {/* Status Badges */}
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">Status</h4>
+          <div className="flex flex-wrap gap-2">
+            {getStatusBadge(client)}
+            {client.isKYCVerified ? (
+              <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+                <CheckCircle className="w-3 h-3 mr-1" />KYC Verified
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                <XCircle className="w-3 h-3 mr-1" />KYC Pending
+              </Badge>
+            )}
+            {isLinked(client.id) ? (
+              <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+                <Link2 className="w-3 h-3 mr-1" />Linked
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground border-muted-foreground/20">
+                <Link2Off className="w-3 h-3 mr-1" />Unlinked
+              </Badge>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg text-xs"
+              onClick={(e) => { e.stopPropagation(); handleSyncStatus(client.id, `${client.firstName} ${client.lastName}`); }}
+              disabled={syncingClientId === client.id}
+            >
+              <RefreshCw className={cn("w-3 h-3 mr-1", syncingClientId === client.id && "animate-spin")} />
+              Sync Status
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg text-xs text-amber-600 border-amber-500/30 hover:bg-amber-500/5"
+              onClick={(e) => { e.stopPropagation(); handleReregister(client); }}
+              disabled={reregisteringClientId === client.id}
+            >
+              <KeyRound className="w-3 h-3 mr-1" />Re-Register
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg text-xs"
+              onClick={(e) => { e.stopPropagation(); window.open(DRGREEN_ADMIN_URL, '_blank'); }}
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />Dr. Green Portal
+            </Button>
+          </div>
+        </div>
+
+        {/* Shipping Address */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5" />Shipping Address
+          </h4>
+          {shipping ? (
+            <div className="p-3 rounded-xl bg-[hsl(var(--admin-parchment))]/50 dark:bg-muted/30 text-sm space-y-0.5">
+              <p className="font-medium">{shipping.address1}</p>
+              {shipping.address2 && <p className="text-muted-foreground">{shipping.address2}</p>}
+              <p className="text-muted-foreground">
+                {shipping.city}{shipping.state && `, ${shipping.state}`} {shipping.postalCode}
+              </p>
+              <p className="text-muted-foreground">{shipping.country}</p>
+            </div>
+          ) : (
+            detail !== undefined && (
+              <p className="text-sm text-muted-foreground p-3 rounded-xl bg-muted/30">No address on file</p>
+            )
+          )}
+          <ShippingAddressForm
+            clientId={client.id}
+            initialAddress={shipping}
+            variant="inline"
+            isAdmin={true}
+            submitLabel="Update Address"
+            onSuccess={(addr) => handleAddressSaved(client.id, addr)}
+            onCancel={() => setExpandedClientId(null)}
+          />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -294,7 +470,6 @@ export function AdminClientManager() {
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
-        {/* Filter pills */}
         <div className="flex gap-1.5 bg-[hsl(var(--admin-parchment))]/60 dark:bg-card rounded-xl p-1 flex-shrink-0">
           {filterOptions.map((f) => (
             <button
@@ -317,7 +492,6 @@ export function AdminClientManager() {
           ))}
         </div>
 
-        {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -329,7 +503,6 @@ export function AdminClientManager() {
           />
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 flex-shrink-0">
           <Button
             variant="outline"
@@ -371,156 +544,109 @@ export function AdminClientManager() {
         <div className={cn("transition-opacity duration-200", isRefetching && "opacity-60 pointer-events-none")}>
           <ScrollArea className="h-[600px]">
             <div className="space-y-2">
-              {clients.map((client, index) => (
-                <motion.div
-                  key={client.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                >
-                  <Card className="border-[hsl(var(--admin-soft-green))]/15 hover:border-[hsl(var(--admin-fir))]/30 transition-all bg-white/80 dark:bg-card rounded-xl overflow-hidden">
-                    <CardContent className="p-3 sm:p-4">
-                      {/* Desktop: single row */}
-                      <div className="hidden sm:flex items-center gap-4">
-                        <div className="w-9 h-9 rounded-full bg-[hsl(var(--admin-fir))]/10 flex items-center justify-center flex-shrink-0">
-                          <User className="w-4 h-4 text-[hsl(var(--admin-fir))]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{client.firstName} {client.lastName}</span>
-                            {getStatusBadge(client)}
+              {clients.map((client, index) => {
+                const isExpanded = expandedClientId === client.id;
+                return (
+                  <motion.div
+                    key={client.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: index * 0.03 }}
+                  >
+                    <Card
+                      className={cn(
+                        "transition-all rounded-xl overflow-hidden cursor-pointer",
+                        "border-[hsl(var(--admin-soft-green))]/15 hover:border-[hsl(var(--admin-fir))]/30 bg-white/80 dark:bg-card",
+                        isExpanded && "border-[hsl(var(--admin-fir))]/40 shadow-md"
+                      )}
+                      onClick={() => handleToggleDetail(client.id)}
+                    >
+                      <CardContent className="p-3 sm:p-4">
+                        {/* Desktop Row */}
+                        <div className="hidden sm:flex items-center gap-4">
+                          <div className="w-9 h-9 rounded-full bg-[hsl(var(--admin-fir))]/10 flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 text-[hsl(var(--admin-fir))]" />
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                            <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{client.email}</span>
-                            <span className="font-mono">{client.id.slice(0, 8)}…</span>
-                            <span>{new Date(client.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => copyToClipboard(client.id)}>
-                                <Copy className="w-4 h-4 mr-2" />Copy Client ID
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggleAddress(client.id)}>
-                                <MapPin className="w-4 h-4 mr-2" />
-                                {expandedClientId === client.id ? "Hide Address" : "View Address"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleSyncStatus(client.id, `${client.firstName} ${client.lastName}`)} disabled={syncingClientId === client.id}>
-                                <RefreshCw className="w-4 h-4 mr-2" />Sync Status
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleReregister(client)} disabled={reregisteringClientId === client.id}
-                                className="text-amber-600">
-                                <KeyRound className="w-4 h-4 mr-2" />Re-Register
-                              </DropdownMenuItem>
-                              {client.adminApproval === "PENDING" && (
-                                <DropdownMenuItem onClick={() => window.open(DRGREEN_ADMIN_URL, '_blank')}>
-                                  <ExternalLink className="w-4 h-4 mr-2" />Approve in Dr. Green
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-
-                      {/* Mobile: stacked card */}
-                      <div className="sm:hidden space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-[hsl(var(--admin-fir))]/10 flex items-center justify-center flex-shrink-0">
-                              <User className="w-3.5 h-3.5 text-[hsl(var(--admin-fir))]" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate">{client.firstName} {client.lastName}</p>
-                              <p className="text-xs text-muted-foreground truncate">{client.email}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {getStatusBadge(client)}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => copyToClipboard(client.id)}>
-                                  <Copy className="w-4 h-4 mr-2" />Copy ID
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleToggleAddress(client.id)}>
-                                  <MapPin className="w-4 h-4 mr-2" />Address
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleSyncStatus(client.id, `${client.firstName}`)}>
-                                  <RefreshCw className="w-4 h-4 mr-2" />Sync
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleReregister(client)} className="text-amber-600">
-                                  <KeyRound className="w-4 h-4 mr-2" />Re-Register
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Expandable Address Panel */}
-                      <AnimatePresence>
-                        {expandedClientId === client.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="mt-3 pt-3 border-t border-border/30">
-                              <div className="flex items-center gap-2 mb-3">
-                                <MapPin className="w-4 h-4 text-[hsl(var(--admin-fir))]" />
-                                <span className="font-medium text-sm">Shipping Address</span>
-                              </div>
-                              {fetchingAddressFor === client.id ? (
-                                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                                  <Loader2 className="w-4 h-4 animate-spin" />Fetching…
-                                </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{client.firstName} {client.lastName}</span>
+                              {getStatusBadge(client)}
+                              {isLinked(client.id) ? (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-500/30 text-blue-500">
+                                  <Link2 className="w-2.5 h-2.5 mr-0.5" />linked
+                                </Badge>
                               ) : (
-                                <>
-                                  {clientAddresses[client.id] && (
-                                    <div className="mb-3 p-3 rounded-xl bg-[hsl(var(--admin-parchment))]/50 dark:bg-muted/30 text-sm">
-                                      <p className="font-medium mb-1">Current:</p>
-                                      <p>{clientAddresses[client.id]!.address1}</p>
-                                      {clientAddresses[client.id]!.address2 && <p>{clientAddresses[client.id]!.address2}</p>}
-                                      <p>{clientAddresses[client.id]!.city}{clientAddresses[client.id]!.state && `, ${clientAddresses[client.id]!.state}`} {clientAddresses[client.id]!.postalCode}</p>
-                                      <p>{clientAddresses[client.id]!.country}</p>
-                                    </div>
-                                  )}
-                                  {!clientAddresses[client.id] && clientAddresses[client.id] !== undefined && (
-                                    <p className="text-sm text-muted-foreground mb-3">No address on file</p>
-                                  )}
-                                  <ShippingAddressForm
-                                    clientId={client.id}
-                                    initialAddress={clientAddresses[client.id]}
-                                    variant="inline"
-                                    isAdmin={true}
-                                    submitLabel="Update Address"
-                                    onSuccess={(addr) => handleAddressSaved(client.id, addr)}
-                                    onCancel={() => setExpandedClientId(null)}
-                                  />
-                                </>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-muted-foreground/20 text-muted-foreground">
+                                  <Link2Off className="w-2.5 h-2.5 mr-0.5" />unlinked
+                                </Badge>
                               )}
                             </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                              <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{client.email}</span>
+                              <span className="font-mono">{client.id.slice(0, 8)}…</span>
+                              <span>{new Date(client.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <ChevronRight className={cn(
+                              "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                              isExpanded && "rotate-90"
+                            )} />
+                          </div>
+                        </div>
+
+                        {/* Mobile Card */}
+                        <div className="sm:hidden space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-[hsl(var(--admin-fir))]/10 flex items-center justify-center flex-shrink-0">
+                                <User className="w-3.5 h-3.5 text-[hsl(var(--admin-fir))]" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm truncate">{client.firstName} {client.lastName}</p>
+                                <p className="text-xs text-muted-foreground truncate">{client.email}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className={cn(
+                              "w-4 h-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
+                              isExpanded && "rotate-90"
+                            )} />
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {getStatusBadge(client)}
+                            {isLinked(client.id) ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-500/30 text-blue-500">
+                                <Link2 className="w-2.5 h-2.5 mr-0.5" />linked
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-muted-foreground/20 text-muted-foreground">
+                                <Link2Off className="w-2.5 h-2.5 mr-0.5" />unlinked
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expandable Detail Panel */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.25 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-3 pt-3 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+                                {renderDetailPanel(client)}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
             </div>
           </ScrollArea>
         </div>
