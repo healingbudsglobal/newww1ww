@@ -553,3 +553,8 @@ export function useShop() {
   }
   return context;
 }
+
+export function useShopSafe() {
+  const context = useContext(ShopContext);
+  return context ?? null;
+}

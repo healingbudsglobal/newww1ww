@@ -2859,18 +2859,11 @@ serve(async (req) => {
           throw new Error("quantity must be at least 1");
         }
         
-        // POST /dapp/carts - API requires:
-        // - clientCartId (UUID) - the client's ID to add items to their cart
-        // - items[].strainId (UUID) - the strain/product ID
-        // - items[].quantity (number)
+        // POST /dapp/carts - flat format matching create-order flow
         const cartPayload = {
-          clientCartId: clientId, // API expects clientCartId, NOT clientId
-          items: [
-            {
-              strainId: cartData.strainId, // API expects strainId, NOT productId
-              quantity: cartData.quantity,
-            }
-          ]
+          clientId: clientId,
+          strainId: cartData.strainId,
+          quantity: cartData.quantity,
         };
         
         logInfo("Adding to cart", { 
