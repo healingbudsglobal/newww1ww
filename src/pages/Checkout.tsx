@@ -284,7 +284,7 @@ const Checkout = () => {
       setPaymentStatus('Initiating payment...');
 
       // Create payment via Dr Green API
-      const clientCountry = drGreenClient.country_code || countryCode || 'PT';
+      const clientCountry = countryCode || drGreenClient.country_code || 'ZA';
       const paymentResult = await retryOperation(
         () => createPayment({
           orderId: createdOrderId,

@@ -16,7 +16,7 @@ interface ProductDetailProps {
 
 export function ProductDetail({ product, onClose }: ProductDetailProps) {
   const [quantity, setQuantity] = useState(1);
-  const { addToCart, countryCode } = useShop();
+  const { addToCart, countryCode, convertFromEUR } = useShop();
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -87,7 +87,7 @@ export function ProductDetail({ product, onClose }: ProductDetailProps) {
                 </div>
 
                 <p className="text-2xl font-bold text-primary mb-4">
-                  {formatPrice(product.retailPrice, countryCode)}
+                  {formatPrice(convertFromEUR(product.retailPrice), countryCode)}
                   <span className="text-sm font-normal text-muted-foreground ml-1">
                     / gram
                   </span>
@@ -189,7 +189,7 @@ export function ProductDetail({ product, onClose }: ProductDetailProps) {
                   {/* Total and add to cart */}
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold">
-                      Total: {formatPrice(product.retailPrice * quantity, countryCode)}
+                      Total: {formatPrice(convertFromEUR(product.retailPrice * quantity), countryCode)}
                     </span>
                   </div>
 

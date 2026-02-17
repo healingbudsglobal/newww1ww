@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Eye } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
+import { useShop } from '@/context/ShopContext';
 
 interface OrderItem {
   strain_id: string;
@@ -81,6 +82,7 @@ function calculateTotalQty(items: OrderItem[]): number {
 
 export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProps) {
   const navigate = useNavigate();
+  const { convertFromEUR, countryCode } = useShop();
   return (
     <div className="rounded-2xl border border-border/50 overflow-hidden">
       <Table>
@@ -116,7 +118,7 @@ export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProp
                     {getDisplayStatus(order.status)}
                   </Badge>
                   <span className="text-xs font-semibold text-foreground">
-                    {formatPrice(order.total_amount, order.country_code || 'ZA')}
+                    {formatPrice(convertFromEUR(order.total_amount), countryCode)}
                   </span>
                 </div>
               </TableCell>
@@ -145,7 +147,7 @@ export function OrdersTable({ orders, onReorder, isReordering }: OrdersTableProp
                 {calculateTotalQty(order.items)}
               </TableCell>
               <TableCell className="hidden md:table-cell text-right font-semibold">
-                {formatPrice(order.total_amount, order.country_code || 'ZA')}
+                {formatPrice(convertFromEUR(order.total_amount), countryCode)}
               </TableCell>
               <TableCell className="text-right">
                 {onReorder && (

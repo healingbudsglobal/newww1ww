@@ -3020,9 +3020,35 @@ serve(async (req) => {
               const shippingError = await shippingResponse.clone().text();
               logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
                 status: shippingResponse.status,
-                error: shippingError.slice(0, 200),
+                errorBody: shippingError.slice(0, 500),
               });
-              // Non-blocking - continue anyway
+              
+              // PUT retry fallback
+              logInfo(`[${requestId}] Step 1: Retrying shipping update with PUT method`);
+              try {
+                const putResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PUT", shippingPayload, false, adminEnvConfig);
+                if (putResponse.ok) {
+                  const putData = await putResponse.clone().json();
+                  const putShipping = putData?.data?.shipping || putData?.shipping;
+                  if (putShipping && putShipping.address1) {
+                    logInfo(`[${requestId}] Step 1: Shipping verified via PUT fallback`, {
+                      address1: putShipping.address1,
+                      city: putShipping.city,
+                    });
+                    shippingVerified = true;
+                  } else {
+                    logWarn(`[${requestId}] Step 1: PUT succeeded but shipping not confirmed in response`);
+                  }
+                } else {
+                  const putError = await putResponse.clone().text();
+                  logWarn(`[${requestId}] Step 1: PUT fallback also failed`, {
+                    status: putResponse.status,
+                    errorBody: putError.slice(0, 500),
+                  });
+                }
+              } catch (putErr) {
+                logWarn(`[${requestId}] Step 1: PUT fallback exception`, { error: String(putErr).slice(0, 200) });
+              }
             } else {
               // Verify the response contains shipping data
               const responseData = await shippingResponse.clone().json();
