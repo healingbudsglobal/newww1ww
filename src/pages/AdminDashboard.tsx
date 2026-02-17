@@ -241,7 +241,7 @@ const AdminDashboard = () => {
         await supabase.from('drgreen_clients').insert({
           user_id: user.id,
           drgreen_client_id: `demo-${user.id}`,
-          country_code: 'PT',
+          country_code: 'ZA',
           is_kyc_verified: newStatus,
           admin_approval: newStatus ? 'VERIFIED' : 'PENDING',
         });

@@ -139,7 +139,7 @@ export function useDrGreenClientSync() {
 
           const countryCode = client.shippings?.[0]?.country || 
                               client.phoneCountryCode || 
-                              'PT';
+                              'ZA';
 
           if (existing) {
             // Update existing record if status changed
@@ -274,7 +274,7 @@ export function useDrGreenClientSync() {
             is_kyc_verified: status.isKYCVerified,
             admin_approval: status.adminApproval,
             email,
-            country_code: 'PT', // Default, will be updated on sync
+            country_code: 'ZA',
           });
 
         return !error;

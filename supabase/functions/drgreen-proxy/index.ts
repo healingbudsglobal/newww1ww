@@ -3581,7 +3581,11 @@ serve(async (req) => {
               isKYCVerified: foundClient.isKYCVerified ?? foundClient.is_kyc_verified ?? false,
               adminApproval: foundClient.adminApproval || foundClient.admin_approval || 'PENDING',
               kycLink: foundClient.kycLink || foundClient.kyc_link || null,
-              countryCode: foundClient.countryCode || foundClient.country_code || null,
+              countryCode: toAlpha2(foundClient.shipping?.countryCode)
+                || toAlpha2(foundClient.shippings?.[0]?.countryCode)
+                || toAlpha2(getCountryCodeFromName(foundClient.shipping?.country || foundClient.shippings?.[0]?.country))
+                || foundClient.phoneCountryCode 
+                || null,
               foundOnPage,
               totalClientsChecked: allClients.length,
             };

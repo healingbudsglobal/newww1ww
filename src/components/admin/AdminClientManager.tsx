@@ -118,7 +118,7 @@ export function AdminClientManager() {
             full_name: fullName || null,
             is_kyc_verified: client.isKYCVerified ?? false,
             admin_approval: client.adminApproval || 'PENDING',
-            country_code: 'PT',
+            country_code: (client as any).shippings?.[0]?.country || 'ZA',
             user_id: existingMap.get(client.id) || null,
           }, { onConflict: 'drgreen_client_id', ignoreDuplicates: false });
       }
