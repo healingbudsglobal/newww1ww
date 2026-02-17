@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPrice } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { useShop } from "@/context/ShopContext";
 
 interface OrderItem {
   strain_id: string;
@@ -88,7 +89,7 @@ function getTimelineIndex(status: string, paymentStatus: string): number {
 export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-
+  const { convertFromEUR, countryCode } = useShop();
   const { data: order, isLoading } = useQuery({
     queryKey: ["order-detail", orderId],
     queryFn: async () => {
@@ -107,7 +108,6 @@ export default function OrderDetail() {
     enabled: !!orderId,
   });
 
-  const cc = order?.country_code || "ZA";
   const timelineIdx = order ? getTimelineIndex(order.status, order.payment_status) : 0;
 
   return (
@@ -256,11 +256,11 @@ export default function OrderDetail() {
                         <div>
                           <p className="font-medium text-foreground">{item.strain_name}</p>
                           <p className="text-sm text-muted-foreground">
-                            Qty: {item.quantity} × {formatPrice(item.unit_price, cc)}
+                            Qty: {item.quantity} × {formatPrice(convertFromEUR(item.unit_price), countryCode)}
                           </p>
                         </div>
                         <p className="font-semibold text-foreground">
-                          {formatPrice(item.quantity * item.unit_price, cc)}
+                          {formatPrice(convertFromEUR(item.quantity * item.unit_price), countryCode)}
                         </p>
                       </div>
                     ))}
@@ -268,7 +268,7 @@ export default function OrderDetail() {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-foreground">Total</span>
                       <span className="text-lg font-bold text-foreground">
-                        {formatPrice(order.total_amount, cc)}
+                        {formatPrice(convertFromEUR(order.total_amount), countryCode)}
                       </span>
                     </div>
                   </CardContent>

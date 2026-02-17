@@ -3,6 +3,7 @@
  * 
  * Clean, premium desktop navigation with subtle gold hover accents.
  * Text-only links (no icons) for maximum horizontal space.
+ * v2 - force HMR re-evaluation
  */
 
 import { Link, useLocation } from "react-router-dom";
