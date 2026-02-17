@@ -1,139 +1,111 @@
 
 
-## Comprehensive Update: Order Flow Fix + Navigation UX + Color Scheme + Shop Hero
+## Fix Country Code Persistence and Verify Order Flow
 
----
+### Problem 1: Country Code Stuck on "PT"
 
-### Part 1: Order Flow Fix (Critical -- 3 Bugs Found)
+**Root Cause Traced:**
 
-The Postman "Dr Green Order Workflow Test" confirms the exact API contract. Comparing it against the current `drgreen-proxy/index.ts`, there are three specific bugs preventing orders:
+The Dr. Green API returns `phoneCountryCode: "PT"` for Benjamin (his phone registration country), but does NOT return a top-level `countryCode` field. The shipping address shows `country: "South Africa"`.
 
-**Bug 1 -- Wrong cart payload key (line 3114-3117)**
+The bug chain:
+1. Proxy `get-client-by-auth-email` (line 3584): `countryCode: foundClient.countryCode || foundClient.country_code || null` -- both are `undefined` on the API response, so returns `null`
+2. ShopContext (line 212): `country_code: data.countryCode || 'PT'` -- `null || 'PT'` = `'PT'`
+3. Every time Benjamin logs in, auto-discovery re-upserts `country_code = 'PT'`, overwriting any manual fix
 
-Current code sends:
-```json
-{ "clientCartId": "a4357...", "items": [{ "strainId": "...", "quantity": 1 }] }
+**Three fixes needed:**
+
+**Fix 1: `supabase/functions/drgreen-proxy/index.ts` (line 3584)**
+
+Derive country from the client's **shipping address**, not from `phoneCountryCode`:
+
+```
+countryCode: foundClient.shipping?.countryCode 
+  || foundClient.shippings?.[0]?.countryCode 
+  || getCountryCodeFromName(foundClient.shipping?.country || foundClient.shippings?.[0]?.country)
+  || foundClient.phoneCountryCode 
+  || null,
 ```
 
-Postman spec requires individual calls per item:
-```json
-POST /dapp/carts
-{ "clientId": "a4357...", "strainId": "...", "quantity": 1 }
+For Benjamin, `shipping.country = "South Africa"` resolves to `ZA` via `getCountryCodeFromName`.
+
+**Fix 2: `src/context/ShopContext.tsx` (line 212)**
+
+Change the fallback from `'PT'` to use the domain-derived country:
+
+```typescript
+country_code: data.countryCode || getCountryFromDomain(),
 ```
 
-The field is `clientId`, not `clientCartId`. And each item must be a separate `POST` call.
+This ensures if the proxy returns `null`, the frontend falls back to `ZA` (for Lovable/global domains) instead of hardcoded `PT`.
 
-**Bug 2 -- Wrong cart clear endpoint (line 3100)**
+**Fix 3: Multiple files with hardcoded `'PT'` fallbacks**
 
-Current: `DELETE /dapp/carts/${clientId}` (treats clientId as a cartItemId)
-Correct: `DELETE /dapp/carts/client/${clientId}` (clears all cart items for a client)
+These files also hardcode `'PT'` as the default country_code and need updating to `'ZA'`:
 
-Same bug repeated at line 3151 inside the 409 retry.
+- `src/hooks/useDrGreenClientSync.ts` (line 277): `country_code: 'PT'` should be `country_code: status.countryCode || 'ZA'`
+- `src/components/shop/ClientOnboarding.tsx` (lines 577, 817): `country_code: formData.address?.country || 'PT'` should use `|| 'ZA'`
+- `src/components/admin/AdminClientManager.tsx` (line 121): `country_code: 'PT'` should derive from `client.shipping?.country` or default `'ZA'`
+- `src/pages/AdminDashboard.tsx` (line 244): `country_code: 'PT'` should be `'ZA'`
+- `src/hooks/useProducts.ts` (line 115): `countryCode: string = 'PT'` should be `= 'ZA'`
+- `src/lib/drgreenApi.ts` (lines 364, 372): phone parsing defaults from `'PT'` to `'ZA'`
+- `src/hooks/useClientResync.ts` (line 65): `|| 'PT'` to `|| 'ZA'`
 
-**Bug 3 -- Unnecessary shipping update**
+**Fix 4: Database correction**
 
-Benjamin's address is already on the Dr. Green API (confirmed by screenshot). The shipping PATCH/PUT fails due to scope restrictions but is unnecessary. Add a pre-check: fetch the client first, and if `shipping.address1` is non-empty, skip the shipping update entirely.
+Run an UPDATE to fix Benjamin's record immediately (the auto-sync will no longer overwrite it after the code fix):
 
-**Changes in `supabase/functions/drgreen-proxy/index.ts`:**
+```sql
+UPDATE drgreen_clients 
+SET country_code = 'ZA' 
+WHERE drgreen_client_id = 'a4357132-7e8c-4c8a-b005-6f818b3f173e';
+```
 
-- **Line 2997-3095 (Step 1)**: Before attempting shipping PATCH, call `GET /dapp/clients/${clientId}` to check if `shipping.address1` exists. If non-empty, set `shippingVerified = true` and skip the entire PATCH/PUT block.
+Also fix the 4 existing orders that show `country_code: 'PT'` and `currency: 'EUR'`:
 
-- **Line 3100**: Change `DELETE /dapp/carts/${clientId}` to `DELETE /dapp/carts/client/${clientId}`
-
-- **Line 3107-3177 (Step 2)**: Replace batch cart add with individual item additions:
-  - Remove `cartPayload` object with `clientCartId` and `items` array
-  - Loop through `cartItems` and send individual `POST /dapp/carts` calls with `{ clientId, strainId, quantity }`
-  - Add 300ms delay between items to avoid rate limiting
-  - If any individual add returns 409, clear cart via `DELETE /dapp/carts/client/${clientId}` and retry the full sequence
-
-- **Line 3151**: Change `DELETE /dapp/carts/${clientId}` to `DELETE /dapp/carts/client/${clientId}` (inside 409 retry)
-
-- **Lines 3229-3307 (Fallback)**: Remove the "direct order" fallback that sends `items` and `shippingAddress` in the order body. The Postman collection confirms `POST /dapp/orders` only takes `{ clientId }` -- items must be in the cart first. Replace with a second attempt at the cart flow after a longer delay.
-
-- **Line 3370-3381 (get-orders)**: Add support for the Postman endpoint `GET /dapp/client/${clientId}/orders` as a fallback if the query-param approach returns empty.
-
----
-
-### Part 2: Navigation Menu UX/UI
-
-**`src/components/NavigationMenu.tsx`** (Desktop)
-- Add glassmorphism hover pill: `hover:bg-white/10 hover:backdrop-blur-sm rounded-lg`
-- Animated underline slides from left using framer-motion `layoutId` for smooth transitions
-- Persistent cart icon (always visible, dimmed when empty, gold badge with count when items exist)
-- Increase item spacing for premium breathing room
-
-**`src/layout/Header.tsx`**
-- Warmer forest green navbar background (`hsl(150, 25%, 18%)`) matching admin panel
-- Gold separator becomes gradient fade (`from-transparent via-[#EAB308]/40 to-transparent`)
-- Scrolled state: stronger `backdrop-blur-xl`
-- Logo cross-fade uses spring physics
-
-**`src/components/NavigationOverlay.tsx`** (Mobile)
-- Earthy forest gradient background
-- Staggered slide-in animation (50ms offset per item, `translateX(-20px)` ease-out)
-- Active item gets glowing gold left border with subtle shadow
-- Close button micro-rotation on press
-
-**`src/components/AnimatedMenuButton.tsx`**
-- Bar colors updated to warmer forest palette
-- Micro-scale pulse on initial render
+```sql
+UPDATE drgreen_orders 
+SET country_code = 'ZA', currency = 'ZAR' 
+WHERE client_id = 'a4357132-7e8c-4c8a-b005-6f818b3f173e' 
+  AND country_code = 'PT';
+```
 
 ---
 
-### Part 3: Site-Wide Color Scheme (Matching Admin Panel)
+### Problem 2: Orders Still Showing EUR
 
-**`src/styles/theme.css`**
+This is a direct consequence of Problem 1. The Checkout flow reads `drGreenClient.country_code` (which is `'PT'`) and calls `getCurrencyForCountry('PT')` which returns `'EUR'`. Once the country code is fixed to `ZA`, new orders will correctly use `ZAR`.
 
-Light Mode:
-- `--primary`: `175 42% 35%` becomes `160 38% 32%` (warmer sage-green)
-- `--navbar-teal` / `--navbar-forest`: becomes `150 25% 18%` (earthy forest)
-- `--card`: parchment warmth `150 8% 98%`
-- `--accent`: warmer sage `158 30% 90%`
-
-Dark Mode:
-- `--background`: `180 8% 7%` becomes `150 10% 6%` (warmer)
-- `--card`: `150 8% 10%`
-- `--primary`: `155 35% 40%`
-
-**`src/styles/navigation.css`**
-- Nav tokens aligned to new forest values
-- Overlay gradient updated
+The existing 4 orders will be corrected by the database UPDATE above.
 
 ---
 
-### Part 4: Shop Hero -- Animated Strain Carousel
+### Problem 3: Are Orders Working Now?
 
-**New file: `src/components/shop/StrainHeroCarousel.tsx`**
+The order flow code was fixed in the previous deployment (individual cart items, correct DELETE path). However, **no new test orders have been placed since the fix was deployed**, so we cannot confirm from logs. The code changes are structurally correct per the Postman spec:
 
-An auto-scrolling marquee filling the empty hero space between the title and product grid:
-- Infinite horizontal scroll via CSS `@keyframes marquee` (performant)
-- Glassmorphism cards showing: strain name, category badge (Sativa/Indica/Hybrid), THC/CBD percentages
-- Pause on hover with subtle scale-up and glow
-- Click navigates to strain detail page
-- Mobile: single card with horizontal swipe
-- Data from existing `strains` table (first 8-10 strains)
-- Skeleton fallback while loading
+- Cart clear: `DELETE /dapp/carts/client/{clientId}` (correct)
+- Cart add: individual `POST /dapp/carts` with `{ clientId, strainId, quantity }` (correct)
+- Order create: `POST /dapp/orders` with `{ clientId }` (correct)
 
-**`src/pages/Shop.tsx`**
-- Insert `StrainHeroCarousel` between hero section and product grid
-- Reduce hero bottom padding to accommodate carousel
-- Stronger gradient overlay for contrast
+The plan includes a test step after deployment to verify.
 
 ---
 
 ### Files Changed Summary
 
-| File | Change | Area |
-|------|--------|------|
-| `supabase/functions/drgreen-proxy/index.ts` | Fix cart payload (individual items with `clientId`), fix cart clear path (`/client/`), add shipping skip check, remove invalid direct-order fallback, add client-orders endpoint fallback | Order flow |
-| `src/components/NavigationMenu.tsx` | Glassmorphism hover, animated underline, persistent cart | Nav UX |
-| `src/layout/Header.tsx` | Warmer forest navbar, gradient separator, spring logo | Nav UX |
-| `src/components/NavigationOverlay.tsx` | Earthy gradient, staggered animations, glowing active | Nav UX |
-| `src/components/AnimatedMenuButton.tsx` | Forest palette, micro pulse | Nav UX |
-| `src/styles/theme.css` | Earthy sage-forest palette (light + dark) | Color |
-| `src/styles/navigation.css` | Nav tokens aligned to new palette | Color |
-| `src/pages/Shop.tsx` | Insert carousel, adjust hero padding | Shop hero |
-| `src/components/shop/StrainHeroCarousel.tsx` | **New** -- Animated strain marquee | Shop hero |
+| File | Change |
+|------|--------|
+| `supabase/functions/drgreen-proxy/index.ts` | Derive `countryCode` from shipping address in `get-client-by-auth-email` response |
+| `src/context/ShopContext.tsx` | Change `'PT'` fallback to `getCountryFromDomain()` on line 212 |
+| `src/hooks/useDrGreenClientSync.ts` | Change `'PT'` default to `'ZA'` |
+| `src/components/shop/ClientOnboarding.tsx` | Change `'PT'` defaults to `'ZA'` (2 locations) |
+| `src/components/admin/AdminClientManager.tsx` | Change `'PT'` default to `'ZA'` |
+| `src/pages/AdminDashboard.tsx` | Change `'PT'` default to `'ZA'` |
+| `src/hooks/useProducts.ts` | Change default param from `'PT'` to `'ZA'` |
+| `src/lib/drgreenApi.ts` | Change phone parsing defaults from `'PT'` to `'ZA'` |
+| `src/hooks/useClientResync.ts` | Change `'PT'` fallback to `'ZA'` |
+| Database migration | Fix Benjamin's `country_code` and existing order currencies |
 
-Total: 8 files modified, 1 new file created.
+Total: 9 files modified, 1 database migration.
 
