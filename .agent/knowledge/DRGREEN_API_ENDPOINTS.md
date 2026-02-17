@@ -120,9 +120,37 @@ POST /dapp/clients/{clientId}/verify
 
 ### Activate / Deactivate Client
 ```
-POST /dapp/clients/{clientId}/activate
-POST /dapp/clients/{clientId}/deactivate
+PATCH /dapp/clients/{clientId}/activate
+PATCH /dapp/clients/{clientId}/deactivate
 ```
+
+### Client Summary
+```
+GET /dapp/clients/summary
+```
+Returns aggregated client stats (total, verified, unverified counts).
+
+### Bulk Delete Clients
+```
+DELETE /dapp/clients/bulk
+```
+**Body:**
+```json
+{
+  "ids": ["clientId1", "clientId2"]
+}
+```
+
+> **⚠️ Proxy discrepancy:** The proxy currently sends `POST /dapp/clients/bulk-delete` with `{ "clientIds": [...] }`. Postman confirms the API expects `DELETE /dapp/clients/bulk` with `{ "ids": [...] }`. Needs testing to confirm which the live API accepts.
+
+### List Clients — Additional Query Parameters
+
+The `GET /dapp/clients` endpoint also supports:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `search` | string | — | Search term |
+| `searchBy` | string | `clientName` | Field to search by |
 
 ---
 
@@ -266,6 +294,12 @@ The `drgreen-proxy` edge function maps frontend actions to these API endpoints:
 | `dapp-nfts` | GET | `/dapp/nfts` |
 | `sales-summary` | GET | `/dapp/dashboard/sales` |
 | `dashboard-analytics` | GET | `/dapp/dashboard/analytics` |
+| `activate-client` | PATCH | `/dapp/clients/{id}/activate` |
+| `deactivate-client` | PATCH | `/dapp/clients/{id}/deactivate` |
+| `bulk-delete-clients` | DELETE | `/dapp/clients/bulk` |
+| `get-clients-summary` | GET | `/dapp/clients/summary` |
+| `patch-client` | PATCH | `/dapp/clients/{id}` |
+| `delete-client` | DELETE | `/dapp/clients/{id}` |
 
 ---
 

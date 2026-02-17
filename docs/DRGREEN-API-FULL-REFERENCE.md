@@ -413,13 +413,67 @@ Creates a new client (patient) in the DApp. Clients are created against the prim
 
 **Proxy Action:** `get-clients-summary`
 
+**Example Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalClients": 120,
+    "verifiedClients": 85,
+    "unverifiedClients": 35
+  }
+}
+```
+
 ### PATCH /dapp/clients/:clientId/activate — Activate Client
 
 **Proxy Action:** `activate-client`
 
+**Example Response (200):**
+
+```json
+{
+  "success": true,
+  "data": { "id": "client-uuid", "status": "active" }
+}
+```
+
 ### PATCH /dapp/clients/:clientId/deactivate — Deactivate Client
 
 **Proxy Action:** `deactivate-client`
+
+**Example Response (200):**
+
+```json
+{
+  "success": true,
+  "data": { "id": "client-uuid", "status": "deactivated" }
+}
+```
+
+### DELETE /dapp/clients/bulk — Bulk Delete Clients
+
+**Proxy Action:** `bulk-delete-clients`
+
+**Request Body:**
+
+```json
+{
+  "ids": ["client-id-1", "client-id-2"]
+}
+```
+
+**Example Response (200):**
+
+```json
+{
+  "success": true,
+  "data": { "deletedCount": 2 }
+}
+```
+
+> **⚠️ Known discrepancy:** The proxy currently sends `POST /dapp/clients/bulk-delete` with `{ "clientIds": [...] }`, but the Postman collection specifies `DELETE /dapp/clients/bulk` with `{ "ids": [...] }`. This needs live testing to confirm which format the API accepts.
 
 ---
 
