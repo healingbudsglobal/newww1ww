@@ -231,6 +231,20 @@ function getCountryCodeFromName(countryName: string | undefined): string {
 }
 
 /**
+ * Convert Alpha-3 country code to Alpha-2, or pass through if already Alpha-2
+ */
+function toAlpha2(code: string | undefined): string {
+  if (!code) return '';
+  const upper = code.toUpperCase().trim();
+  if (upper.length === 2) return upper;
+  const alpha3ToAlpha2: Record<string, string> = {
+    'ZAF': 'ZA', 'PRT': 'PT', 'GBR': 'GB', 'THA': 'TH', 'USA': 'US',
+    'DEU': 'DE', 'FRA': 'FR', 'ESP': 'ES', 'ITA': 'IT', 'NLD': 'NL', 'BEL': 'BE',
+  };
+  return alpha3ToAlpha2[upper] || upper;
+}
+
+/**
  * Verify user authentication and return user data
  * Uses getClaims() for Lovable Cloud ES256 signing-keys compatibility,
  * with getUser() fallback for full user data when needed.
