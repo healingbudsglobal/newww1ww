@@ -3143,7 +3143,21 @@ serve(async (req) => {
             
             if (response.ok) {
               logInfo(`[${requestId}] Step 3: Order created successfully via cart flow`);
-              // Let normal response handling continue
+              // Record api_key_scope on success so future operations skip scope checks
+              try {
+                const supabaseAdmin = createClient(
+                  Deno.env.get('SUPABASE_URL')!,
+                  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+                );
+                const apiKey = Deno.env.get(adminEnvConfig.apiKeyEnv) || '';
+                await supabaseAdmin
+                  .from('drgreen_clients')
+                  .update({ api_key_scope: apiKey.slice(0, 8), updated_at: new Date().toISOString() })
+                  .eq('drgreen_client_id', clientId);
+                logInfo(`[${requestId}] Recorded api_key_scope for client`);
+              } catch (scopeErr) {
+                logWarn(`[${requestId}] Failed to record api_key_scope`, { error: String(scopeErr).slice(0, 100) });
+              }
               break;
             } else {
               const orderError = await response.clone().text();
@@ -3216,6 +3230,20 @@ serve(async (req) => {
             
             if (response.ok) {
               logInfo(`[${requestId}] Step 3 (Fallback): Direct order created successfully`);
+              // Record api_key_scope on success
+              try {
+                const supabaseAdmin2 = createClient(
+                  Deno.env.get('SUPABASE_URL')!,
+                  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+                );
+                const apiKey2 = Deno.env.get(adminEnvConfig.apiKeyEnv) || '';
+                await supabaseAdmin2
+                  .from('drgreen_clients')
+                  .update({ api_key_scope: apiKey2.slice(0, 8), updated_at: new Date().toISOString() })
+                  .eq('drgreen_client_id', clientId);
+              } catch (scopeErr2) {
+                logWarn(`[${requestId}] Failed to record api_key_scope (fallback)`, { error: String(scopeErr2).slice(0, 100) });
+              }
               break; // Success - let normal response handling continue
             } else {
               const directError = await response.clone().text();
