@@ -6,7 +6,7 @@
  */
 
 import { Link, useLocation } from "react-router-dom";
-import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, Leaf, HeadphonesIcon, Home, Shield, Newspaper, Info } from "lucide-react";
+import { X, LogOut, LayoutDashboard, User, FileText, ClipboardCheck, Leaf, HeadphonesIcon, Home, Shield, Newspaper, Info, ShoppingCart } from "lucide-react";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -108,6 +108,13 @@ const NavigationOverlay = ({
     onClose();
   };
 
+  const { setIsCartOpen, cartCount } = useShop();
+
+  const handleOpenCart = () => {
+    setIsCartOpen(true);
+    onClose();
+  };
+
   const navItems = [
     { to: "/", label: "Home", icon: Home, active: isActive("/") },
     { to: "/about", label: "About Us", icon: Info, active: isActive("/about") },
@@ -115,7 +122,8 @@ const NavigationOverlay = ({
     { to: "/the-wire", label: "The Wire", icon: Newspaper, active: isActive("/the-wire") || location.pathname.startsWith("/the-wire/") },
     { to: "/eligibility", label: "Eligibility", icon: ClipboardCheck, active: isActive("/eligibility") },
     { to: "/shop", label: "Strains", icon: Leaf, active: isShopActive },
-    { to: "/support", label: "Support", icon: HeadphonesIcon, active: isActive("/support") }
+    { to: "/support", label: "Support", icon: HeadphonesIcon, active: isActive("/support") },
+    { to: "#cart", label: `Cart${cartCount > 0 ? ` (${cartCount})` : ''}`, icon: ShoppingCart, active: false, isCart: true }
   ];
 
   const navLinkStyles = (active: boolean) => cn(
@@ -232,17 +240,31 @@ const NavigationOverlay = ({
                         }
                       }}
                     >
-                      <Link 
-                        to={item.to} 
-                        className={navLinkStyles(item.active)}
-                        onClick={onClose}
-                      >
-                        <Icon className={cn(
-                          "w-5 h-5",
-                          item.active ? "text-[#EAB308]" : "text-white/60"
-                        )} />
-                        {item.label}
-                      </Link>
+                      {(item as any).isCart ? (
+                        <button
+                          type="button"
+                          className={navLinkStyles(item.active)}
+                          onClick={handleOpenCart}
+                        >
+                          <Icon className={cn(
+                            "w-5 h-5",
+                            item.active ? "text-[#EAB308]" : "text-white/60"
+                          )} />
+                          {item.label}
+                        </button>
+                      ) : (
+                        <Link 
+                          to={item.to} 
+                          className={navLinkStyles(item.active)}
+                          onClick={onClose}
+                        >
+                          <Icon className={cn(
+                            "w-5 h-5",
+                            item.active ? "text-[#EAB308]" : "text-white/60"
+                          )} />
+                          {item.label}
+                        </Link>
+                      )}
                     </motion.div>
                   );
                 })}
