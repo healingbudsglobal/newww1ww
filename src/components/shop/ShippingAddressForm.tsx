@@ -24,15 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { supabase } from '@/integrations/supabase/client';
-
-// Country code mapping for Dr. Green API (Alpha-2 to Alpha-3)
-const countryCodeMap: Record<string, string> = {
-  PT: 'PRT',
-  GB: 'GBR',
-  ZA: 'ZAF',
-  TH: 'THA',
-  US: 'USA',
-};
+import { toAlpha3, toAlpha2, DEFAULT_COUNTRY, getCountryConfig } from '@/lib/countries';
 
 // Country options for the dropdown
 const countries = [
@@ -50,10 +42,8 @@ const postalCodePatterns: Record<string, { pattern: RegExp; example: string }> =
   TH: { pattern: /^\d{5}$/, example: '10110' },
 };
 
-// Country name mapping
 const getCountryName = (code: string): string => {
-  const country = countries.find(c => c.code === code || c.alpha3 === code);
-  return country?.name || code;
+  return getCountryConfig(code).name || code;
 };
 
 // Create address schema with country-specific validation
@@ -108,7 +98,7 @@ interface ShippingAddressFormProps {
 export function ShippingAddressForm({
   clientId,
   initialAddress,
-  defaultCountry = 'PT',
+  defaultCountry = DEFAULT_COUNTRY,
   onSuccess,
   onCancel,
   variant = 'card',
@@ -121,8 +111,8 @@ export function ShippingAddressForm({
   const { updateShippingAddress, adminUpdateShippingAddress } = useDrGreenApi();
 
   // Determine initial country from address or default
-  const initialCountry = initialAddress?.countryCode
-    ? Object.entries(countryCodeMap).find(([, v]) => v === initialAddress.countryCode)?.[0] || defaultCountry
+    const initialCountry = initialAddress?.countryCode
+    ? toAlpha2(initialAddress.countryCode) || defaultCountry
     : defaultCountry;
 
   const form = useForm<AddressFormData>({
@@ -147,7 +137,7 @@ export function ShippingAddressForm({
 
     try {
       // Convert country code to Alpha-3 for API
-      const alpha3CountryCode = countryCodeMap[data.country] || data.country;
+      const alpha3CountryCode = toAlpha3(data.country);
       
       const shippingData: ShippingAddress = {
         address1: data.address1.trim(),

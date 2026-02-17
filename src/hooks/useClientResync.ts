@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
+import { toAlpha3, DEFAULT_COUNTRY } from '@/lib/countries';
 
 interface ResyncResult {
   success: boolean;
@@ -57,13 +58,8 @@ export function useClientResync() {
       const firstName = nameParts[0] || 'Patient';
       const lastName = nameParts.slice(1).join(' ') || 'User';
 
-      // Convert 2-letter country code to 3-letter ISO for API
-      const countryCodeMap: Record<string, string> = {
-        'ZA': 'ZAF', 'PT': 'PRT', 'GB': 'GBR', 'US': 'USA', 
-        'TH': 'THA', 'DE': 'DEU', 'FR': 'FRA', 'ES': 'ESP'
-      };
-      const alpha2Code = existingClientData.countryCode || 'ZA';
-      const alpha3Code = countryCodeMap[alpha2Code] || alpha2Code;
+      const alpha2Code = existingClientData.countryCode || DEFAULT_COUNTRY;
+      const alpha3Code = toAlpha3(alpha2Code);
 
       // Prepare the client creation payload - using 'payload' key as expected by proxy
       const clientPayload = {
@@ -141,7 +137,7 @@ export function useClientResync() {
           drgreen_client_id: newClientId,
           email: existingClientData.email,
           full_name: existingClientData.fullName,
-          country_code: existingClientData.countryCode || 'ZA',
+          country_code: existingClientData.countryCode || DEFAULT_COUNTRY,
           is_kyc_verified: false,
           admin_approval: 'PENDING',
           kyc_link: kycLink,

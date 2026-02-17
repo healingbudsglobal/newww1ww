@@ -114,7 +114,7 @@ export async function triggerStrainKnowledgeScrape(strainName: string, countryCo
     const { data, error } = await supabase.functions.invoke('strain-knowledge', {
       body: {
         strainName,
-        countryCode: countryCode || 'PT',
+        countryCode: countryCode || 'ZA',
         forceRefresh: false,
       },
     });

@@ -349,7 +349,7 @@ const PatientDashboard = () => {
                               </p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-medium">{formatPrice(order.total_amount, drGreenClient?.country_code || 'PT')}</span>
+                              <span className="font-medium">{formatPrice(order.total_amount, drGreenClient?.country_code || 'ZA')}</span>
                               <Badge variant={
                                 order.status === 'DELIVERED' ? 'default' :
                                 order.status === 'CANCELLED' ? 'destructive' : 'secondary'

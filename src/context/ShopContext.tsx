@@ -66,42 +66,7 @@ interface ShopContextType {
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
-// Currency mapping
-const COUNTRY_TO_CURRENCY: Record<string, keyof ExchangeRatesData> = {
-  PT: 'EUR',
-  ZA: 'ZAR',
-  GB: 'GBP',
-  TH: 'THB',
-  US: 'USD',
-};
-
-// Get country code from domain (URL-first strategy)
-function getCountryFromDomain(): string {
-  const hostname = window.location.hostname.toLowerCase();
-  
-  // Lovable preview URLs and .co.za domains → South Africa
-  if (hostname.includes('lovable.app') || hostname.includes('lovableproject.com') || hostname.endsWith('.co.za')) {
-    return 'ZA';
-  }
-  // Portugal domains
-  if (hostname.endsWith('.pt') || hostname.includes('healingbuds.pt')) {
-    return 'PT';
-  }
-  // UK domains
-  if (hostname.endsWith('.co.uk') || hostname.includes('healingbuds.co.uk')) {
-    return 'GB';
-  }
-  // Thailand domains
-  if (hostname.endsWith('.co.th') || hostname.endsWith('.th')) {
-    return 'TH';
-  }
-  // Global domains → South Africa (operational region)
-  if (hostname.endsWith('.global') || hostname.includes('healingbuds.global')) {
-    return 'ZA';
-  }
-  // Global/fallback to South Africa
-  return 'ZA';
-}
+import { getCountryFromDomain } from '@/lib/countries';
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const { rates, lastUpdated, convertPrice } = useExchangeRates();
