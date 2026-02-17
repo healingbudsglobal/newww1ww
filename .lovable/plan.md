@@ -1,47 +1,58 @@
 
 
-## Update API Documentation with Postman Client Endpoints
+## Fix Currency Conversion Bug
 
-### What needs updating
+### Root Cause
 
-The user has provided the complete Postman collection for Client endpoints. Two documentation files need updating to match, plus one discrepancy in the proxy needs flagging.
+The `convertPrice` function in `useExchangeRates.ts` passes its `fromCurrency` and `toCurrency` arguments through `getCurrency()`, which is designed for **country codes** (like 'ZA' to 'ZAR'), not currency codes. When `convertFromEUR` passes `'EUR'` as the source currency:
 
----
+1. `getCurrency('EUR')` looks up 'EUR' in the country registry
+2. 'EUR' is not a country code, so it falls back to the default country 'ZA'
+3. Returns 'ZAR' instead of 'EUR'
+4. Both `from` and `to` end up as 'ZAR', so the function returns the amount unchanged
+5. A price of EUR 10.00 displays as R 10,00 instead of approximately R 189
 
-### Changes to `DRGREEN_API_ENDPOINTS.md`
+### The Fix
 
-**Fix activate/deactivate HTTP method (line 121-125):**
-- Currently says `POST /dapp/clients/{clientId}/activate` and `POST /dapp/clients/{clientId}/deactivate`
-- Postman confirms these are **PATCH**, not POST (the proxy already uses PATCH correctly)
-- Change both to `PATCH`
+**File: `src/hooks/useExchangeRates.ts` (lines 75-77)**
 
-**Add missing endpoints:**
-- `GET /dapp/clients/summary` -- Client summary stats (total, verified, unverified counts)
-- `DELETE /dapp/clients/bulk` -- Bulk delete clients (body: `{ "ids": [...] }`)
-- `GET /dapp/clients` query parameters: `search`, `searchBy=clientName`
+The `convertPrice` function needs to check whether the input is already a valid currency code before passing it through `getCurrency()`. If the rates map already contains the input as a key (e.g. 'EUR', 'GBP', 'USD'), use it directly. Only call `getCurrency()` when the input looks like a country code.
 
-**Update proxy action mapping table (lines 249-268):**
-Add missing actions: `activate-client`, `deactivate-client`, `bulk-delete-clients`, `get-clients-summary`, `patch-client`, `delete-client`
+```
+Current (broken):
+  const from = getCurrency(fromCurrency) || fromCurrency;
+  const to = getCurrency(toCurrency) || toCurrency;
 
----
+Fixed:
+  const currentRates = rates || FALLBACK_RATES;
+  const from = currentRates[fromCurrency] !== undefined ? fromCurrency : (getCurrency(fromCurrency) || fromCurrency);
+  const to = currentRates[toCurrency] !== undefined ? toCurrency : (getCurrency(toCurrency) || toCurrency);
+```
 
-### Changes to `docs/DRGREEN-API-FULL-REFERENCE.md`
+This way:
+- `'EUR'` is found in the rates map, so it's used directly as a currency code
+- `'ZA'` is NOT in the rates map, so it goes through `getCurrency('ZA')` which correctly returns `'ZAR'`
 
-**Section 6 — Client Endpoints (lines 385-423):**
-- Add query parameters `search` and `searchBy` to the List Clients table (already partially there but missing from the compact endpoint docs)
-- Fix activate/deactivate: already correctly shows PATCH -- no change needed
-- Add response examples for Summary, Activate, Deactivate, Bulk Delete based on Postman
-- Add `DELETE /dapp/clients/bulk` with body format `{ "ids": ["id1", "id2"] }`
+**Same fix needed in `src/lib/currency.ts` (lines 28-33)** — the `convertPrice` function there has the same pattern and the same bug.
 
-**Flag discrepancy:** The Postman says bulk delete is `DELETE /dapp/clients/bulk` with body `{ "ids": [...] }`, but the proxy currently sends `POST /dapp/clients/bulk-delete` with `{ "clientIds": [...] }`. This will be documented as a known inconsistency requiring testing to determine which the live API actually accepts.
+### Impact
 
----
+This fix affects all price displays across the platform:
+- Shop product listings
+- Cart totals
+- Checkout summary
+- Order history
+- Order detail pages
+- Featured strains on the homepage
 
-### Files changed
+All prices currently show the raw EUR value with a ZAR symbol. After the fix, they will show the correctly converted ZAR amount (approximately 19x the current displayed values based on live exchange rates).
+
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `.agent/knowledge/DRGREEN_API_ENDPOINTS.md` | Fix PATCH methods, add summary/bulk-delete/search params, expand proxy mapping table |
-| `docs/DRGREEN-API-FULL-REFERENCE.md` | Add Postman-sourced response examples, bulk delete endpoint, flag proxy path discrepancy |
+| `src/hooks/useExchangeRates.ts` | Fix `convertPrice` to handle currency codes directly, not just country codes |
+| `src/lib/currency.ts` | Same fix for the standalone `convertPrice` function |
 
-Total: 2 files modified, documentation only, no code changes.
+Total: 2 files, minimal changes (2-3 lines each).
+
