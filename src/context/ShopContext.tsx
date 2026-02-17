@@ -209,7 +209,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
             full_name: data.firstName && data.lastName 
               ? `${data.firstName} ${data.lastName}`.trim() 
               : null,
-            country_code: data.countryCode || 'PT',
+            country_code: data.countryCode || 'ZA',
           }, {
             onConflict: 'user_id',
           });

@@ -112,7 +112,7 @@ const countryCodeMap: Record<string, string> = {
 // Supported countries for product display
 const SUPPORTED_COUNTRIES = ['PT', 'GB', 'ZA', 'TH'];
 
-export function useProducts(countryCode: string = 'PT') {
+export function useProducts(countryCode: string = 'ZA') {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

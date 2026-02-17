@@ -574,7 +574,7 @@ export function ClientOnboarding() {
           const { error: upsertError } = await supabase.from('drgreen_clients').upsert({
             user_id: user.id,
             drgreen_client_id: existingCheck.clientId,
-            country_code: formData.address?.country || 'PT',
+            country_code: formData.address?.country || 'ZA',
             is_kyc_verified: existingCheck.isKYCVerified ?? false,
             admin_approval: existingCheck.adminApproval || 'PENDING',
             kyc_link: existingCheck.kycLink || null,
@@ -814,7 +814,7 @@ export function ClientOnboarding() {
       const { error: dbError } = await supabase.from('drgreen_clients').upsert({
         user_id: user.id,
         drgreen_client_id: clientId,
-        country_code: formData.address?.country || 'PT',
+        country_code: formData.address?.country || 'ZA',
         is_kyc_verified: false,
         admin_approval: 'PENDING',
         kyc_link: kycLink,

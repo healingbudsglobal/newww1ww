@@ -361,15 +361,15 @@ export function parsePhoneNumber(fullNumber: string): {
     
     return {
       phoneCode: `+${prefix}`,
-      phoneCountryCode: prefixToCountry[prefix] || 'PT',
+      phoneCountryCode: prefixToCountry[prefix] || 'ZA',
       contactNumber: number,
     };
   }
   
   // Default fallback
   return {
-    phoneCode: '+351',
-    phoneCountryCode: 'PT',
+    phoneCode: '+27',
+    phoneCountryCode: 'ZA',
     contactNumber: cleaned.replace(/^\+/, ''),
   };
 }

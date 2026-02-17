@@ -62,7 +62,7 @@ export function useClientResync() {
         'ZA': 'ZAF', 'PT': 'PRT', 'GB': 'GBR', 'US': 'USA', 
         'TH': 'THA', 'DE': 'DEU', 'FR': 'FRA', 'ES': 'ESP'
       };
-      const alpha2Code = existingClientData.countryCode || 'PT';
+      const alpha2Code = existingClientData.countryCode || 'ZA';
       const alpha3Code = countryCodeMap[alpha2Code] || alpha2Code;
 
       // Prepare the client creation payload - using 'payload' key as expected by proxy
@@ -141,7 +141,7 @@ export function useClientResync() {
           drgreen_client_id: newClientId,
           email: existingClientData.email,
           full_name: existingClientData.fullName,
-          country_code: existingClientData.countryCode || 'PT',
+          country_code: existingClientData.countryCode || 'ZA',
           is_kyc_verified: false,
           admin_approval: 'PENDING',
           kyc_link: kycLink,
