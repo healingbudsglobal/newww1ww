@@ -137,7 +137,7 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
         isDark ? "bg-white/10" : "bg-black/10"
       )}>
         <motion.div
-          className="h-full bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500 origin-left"
+          className="h-full bg-gradient-to-r from-primary via-[hsl(155,35%,40%)] to-[hsl(158,40%,48%)] origin-left"
           style={{ scaleX }}
         />
       </div>
@@ -306,8 +306,8 @@ const Header = ({ onMenuStateChange }: HeaderProps) => {
           </div>
         </div>
         
-        {/* Separator Line - Consistent Gold Accent */}
-        <div className="h-[2px] shadow-sm bg-[hsl(var(--navbar-gold))]/60" />
+        {/* Separator Line - Gradient Gold Fade */}
+        <div className="h-[1px] bg-gradient-to-r from-transparent via-[#EAB308]/40 to-transparent" />
       </header>
 
       {/* Mobile Navigation Overlay */}

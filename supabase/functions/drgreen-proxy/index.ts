@@ -2993,135 +2993,145 @@ serve(async (req) => {
         let lastStepStatus = 0;
         
         // Step 1: Update client shipping address (if provided)
-        // This is required before adding items to cart
+        // First check if client already has shipping on the API - skip if so
         if (orderData.shippingAddress) {
-          const addr = orderData.shippingAddress;
-          const shippingPayload = {
-            shipping: {
-              address1: addr.street || addr.address1 || '',
-              address2: addr.address2 || '',
-              landmark: addr.landmark || '',
-              city: addr.city || '',
-              state: addr.state || addr.city || '', // Fallback to city if no state
-              country: addr.country || '',
-              countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
-              postalCode: addr.zipCode || addr.postalCode || '',
-            }
-          };
-          
-          logInfo(`[${requestId}] Step 1: Updating client shipping address`, { 
-            city: addr.city, 
-            country: addr.country 
-          });
-          
+          // Pre-check: fetch client to see if shipping already exists
+          let existingShipping = false;
           try {
-            const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
-            if (!shippingResponse.ok) {
-              const shippingError = await shippingResponse.clone().text();
-              logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
-                status: shippingResponse.status,
-                errorBody: shippingError.slice(0, 500),
-              });
-              
-              // PUT retry fallback
-              logInfo(`[${requestId}] Step 1: Retrying shipping update with PUT method`);
-              try {
-                const putResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PUT", shippingPayload, false, adminEnvConfig);
-                if (putResponse.ok) {
-                  const putData = await putResponse.clone().json();
-                  const putShipping = putData?.data?.shipping || putData?.shipping;
-                  if (putShipping && putShipping.address1) {
-                    logInfo(`[${requestId}] Step 1: Shipping verified via PUT fallback`, {
-                      address1: putShipping.address1,
-                      city: putShipping.city,
-                    });
-                    shippingVerified = true;
-                  } else {
-                    logWarn(`[${requestId}] Step 1: PUT succeeded but shipping not confirmed in response`);
-                  }
-                } else {
-                  const putError = await putResponse.clone().text();
-                  logWarn(`[${requestId}] Step 1: PUT fallback also failed`, {
-                    status: putResponse.status,
-                    errorBody: putError.slice(0, 500),
-                  });
-                }
-              } catch (putErr) {
-                logWarn(`[${requestId}] Step 1: PUT fallback exception`, { error: String(putErr).slice(0, 200) });
-              }
-            } else {
-              // Verify the response contains shipping data
-              const responseData = await shippingResponse.clone().json();
-              const returnedShipping = responseData?.data?.shipping || responseData?.shipping;
-              if (returnedShipping && returnedShipping.address1) {
-                logInfo(`[${requestId}] Step 1: Shipping verified in response`, { 
-                  address1: returnedShipping.address1,
-                  city: returnedShipping.city,
+            const clientCheckResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
+            if (clientCheckResponse.ok) {
+              const clientData = await clientCheckResponse.clone().json();
+              const shipping = clientData?.data?.shipping || clientData?.shipping;
+              if (shipping && shipping.address1) {
+                logInfo(`[${requestId}] Step 1: Client already has shipping address on API, skipping PATCH`, {
+                  address1: shipping.address1,
+                  city: shipping.city,
                 });
+                existingShipping = true;
                 shippingVerified = true;
-              } else {
-                logWarn(`[${requestId}] Step 1: Shipping NOT confirmed in response (credential scope)`, {
-                  responseStatus: shippingResponse.status,
-                });
               }
             }
-          } catch (shippingErr) {
-            logWarn(`[${requestId}] Step 1: Shipping PATCH exception`, { 
-              error: String(shippingErr).slice(0, 100),
+          } catch (checkErr) {
+            logWarn(`[${requestId}] Step 1: Client shipping check failed, will attempt PATCH`, { error: String(checkErr).slice(0, 100) });
+          }
+
+          if (!existingShipping) {
+            const addr = orderData.shippingAddress;
+            const shippingPayload = {
+              shipping: {
+                address1: addr.street || addr.address1 || '',
+                address2: addr.address2 || '',
+                landmark: addr.landmark || '',
+                city: addr.city || '',
+                state: addr.state || addr.city || '',
+                country: addr.country || '',
+                countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+                postalCode: addr.zipCode || addr.postalCode || '',
+              }
+            };
+            
+            logInfo(`[${requestId}] Step 1: Updating client shipping address`, { 
+              city: addr.city, 
+              country: addr.country 
             });
+            
+            try {
+              const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
+              if (!shippingResponse.ok) {
+                const shippingError = await shippingResponse.clone().text();
+                logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
+                  status: shippingResponse.status,
+                  errorBody: shippingError.slice(0, 500),
+                });
+                
+                // PUT retry fallback
+                logInfo(`[${requestId}] Step 1: Retrying shipping update with PUT method`);
+                try {
+                  const putResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PUT", shippingPayload, false, adminEnvConfig);
+                  if (putResponse.ok) {
+                    const putData = await putResponse.clone().json();
+                    const putShipping = putData?.data?.shipping || putData?.shipping;
+                    if (putShipping && putShipping.address1) {
+                      logInfo(`[${requestId}] Step 1: Shipping verified via PUT fallback`);
+                      shippingVerified = true;
+                    }
+                  } else {
+                    logWarn(`[${requestId}] Step 1: PUT fallback also failed`, { status: putResponse.status });
+                  }
+                } catch (putErr) {
+                  logWarn(`[${requestId}] Step 1: PUT fallback exception`, { error: String(putErr).slice(0, 200) });
+                }
+              } else {
+                const responseData = await shippingResponse.clone().json();
+                const returnedShipping = responseData?.data?.shipping || responseData?.shipping;
+                if (returnedShipping && returnedShipping.address1) {
+                  shippingVerified = true;
+                }
+              }
+            } catch (shippingErr) {
+              logWarn(`[${requestId}] Step 1: Shipping PATCH exception`, { error: String(shippingErr).slice(0, 100) });
+            }
           }
           
-          // Always save shipping locally as fallback (even if PATCH succeeded)
+          // Always save shipping locally as fallback
           try {
             const supabaseAdmin = createClient(
               Deno.env.get('SUPABASE_URL')!,
               Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
             );
+            const addr = orderData.shippingAddress;
             await supabaseAdmin
               .from('drgreen_clients')
               .update({ 
-                shipping_address: shippingPayload.shipping,
+                shipping_address: {
+                  address1: addr.street || addr.address1 || '',
+                  address2: addr.address2 || '',
+                  landmark: addr.landmark || '',
+                  city: addr.city || '',
+                  state: addr.state || addr.city || '',
+                  country: addr.country || '',
+                  countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+                  postalCode: addr.zipCode || addr.postalCode || '',
+                },
                 updated_at: new Date().toISOString(),
               })
               .eq('drgreen_client_id', clientId);
-            logInfo(`[${requestId}] Step 1: Shipping saved locally as fallback`);
           } catch (localSaveErr) {
             logWarn(`[${requestId}] Step 1: Local shipping save failed`, { error: String(localSaveErr).slice(0, 100) });
           }
 
-          // Always add a delay after PATCH to allow API propagation
-          logInfo(`[${requestId}] Step 1: Waiting 1500ms for propagation`);
-          await sleep(1500);
+          if (!existingShipping) {
+            logInfo(`[${requestId}] Step 1: Waiting 1500ms for propagation`);
+            await sleep(1500);
+          }
         }
         
         // Step 1.5: Clear any stale cart to prevent 409 conflicts
+        // Correct endpoint: DELETE /dapp/carts/client/{clientId}
         logInfo(`[${requestId}] Step 1.5: Clearing existing cart to prevent 409 conflict`);
         try {
-          const emptyCartResponse = await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
+          const emptyCartResponse = await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
           logInfo(`[${requestId}] Step 1.5: Cart clear result`, { status: emptyCartResponse.status });
+          if (emptyCartResponse.status === 404) {
+            logInfo(`[${requestId}] Step 1.5: No existing cart found (404), proceeding`);
+          }
         } catch (clearErr) {
           logWarn(`[${requestId}] Step 1.5: Cart clear failed (non-blocking)`, { error: String(clearErr).slice(0, 100) });
         }
         await sleep(500);
         
-        // Step 2: Add items to server-side cart
-        // API: POST /dapp/carts with { clientCartId, items: [{ strainId, quantity }] }
+        // Step 2: Add items to server-side cart INDIVIDUALLY
+        // API: POST /dapp/carts with { clientId, strainId, quantity } per item
         const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
           strainId: item.strainId || item.productId,
           quantity: item.quantity,
         }));
         
-        const cartPayload = {
-          clientCartId: clientId,
-          items: cartItems,
-        };
-        
-        logInfo(`[${requestId}] Step 2: Adding items to cart`, { 
-          itemCount: cartItems.length,
-          clientCartId: clientId.slice(0, 8) + '***',
+        logInfo(`[${requestId}] Step 2: Adding ${cartItems.length} items to cart individually`, { 
+          clientId: clientId.slice(0, 8) + '***',
         });
         
-        // Retry cart add with exponential backoff
+        // Add items individually with retry logic
         let cartSuccess = false;
         let cartAttempts = 0;
         const maxCartAttempts = 3;
@@ -3130,49 +3140,79 @@ serve(async (req) => {
         
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
-          try {
-            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, true, adminEnvConfig);
-            lastCartStatus = cartResponse.status;
-            if (cartResponse.ok) {
-              logInfo(`[${requestId}] Step 2: Cart add success`, { attempt: cartAttempts });
-              cartSuccess = true;
-            } else {
-              lastCartError = await cartResponse.clone().text();
-              logWarn(`[${requestId}] Step 2: Cart add failed`, { 
+          let allItemsAdded = true;
+          
+          for (let i = 0; i < cartItems.length; i++) {
+            const item = cartItems[i];
+            const itemPayload = {
+              clientId: clientId,
+              strainId: item.strainId,
+              quantity: item.quantity,
+            };
+            
+            try {
+              logInfo(`[${requestId}] Step 2: Adding item ${i + 1}/${cartItems.length}`, { 
+                strainId: item.strainId?.slice(0, 8) + '***',
+                quantity: item.quantity,
                 attempt: cartAttempts,
-                status: cartResponse.status,
-                error: lastCartError.slice(0, 200),
               });
               
-              // On 409 Conflict, clear the cart and retry
-              if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
-                logInfo(`[${requestId}] Step 2: 409 conflict - clearing cart and retrying`);
-                try {
-                  await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
-                } catch (clearErr) {
-                  logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
+              const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", itemPayload, true, adminEnvConfig);
+              lastCartStatus = cartResponse.status;
+              
+              if (!cartResponse.ok) {
+                lastCartError = await cartResponse.clone().text();
+                logWarn(`[${requestId}] Step 2: Cart item ${i + 1} failed`, { 
+                  status: cartResponse.status,
+                  error: lastCartError.slice(0, 200),
+                });
+                
+                // On 409 Conflict, clear cart and retry full sequence
+                if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
+                  logInfo(`[${requestId}] Step 2: 409 conflict on item ${i + 1} - clearing cart and retrying all`);
+                  try {
+                    await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
+                  } catch (clearErr) {
+                    logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
+                  }
+                  await sleep(1000);
+                  allItemsAdded = false;
+                  break; // Break inner loop, retry from outer while
+                } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
+                  const delay = cartAttempts * 1500;
+                  logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
+                  await sleep(delay);
+                  allItemsAdded = false;
+                  break;
+                } else if (lastCartStatus === 400 && !lastCartError.includes("shipping")) {
+                  logWarn(`[${requestId}] Step 2: Non-retryable 400 error, stopping`);
+                  allItemsAdded = false;
+                  break;
+                } else {
+                  allItemsAdded = false;
+                  break;
                 }
-                await sleep(1000);
-              } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1500;
-                logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
-                await sleep(delay);
-              } else if (lastCartStatus === 400 && !lastCartError.includes("shipping")) {
-                // Other 400 errors are non-retryable
-                logWarn(`[${requestId}] Step 2: Non-retryable 400 error, stopping retries`);
-                break;
-              } else if (cartAttempts >= maxCartAttempts) {
-                break;
               } else {
-                await sleep(1000);
+                logInfo(`[${requestId}] Step 2: Item ${i + 1} added successfully`);
               }
+              
+              // Small delay between items to avoid rate limiting
+              if (i < cartItems.length - 1) {
+                await sleep(300);
+              }
+            } catch (cartErr) {
+              logError(`[${requestId}] Step 2: Cart item ${i + 1} exception`, { error: String(cartErr).slice(0, 100) });
+              lastCartError = String(cartErr);
+              allItemsAdded = false;
+              break;
             }
-          } catch (cartErr) {
-            logError(`[${requestId}] Step 2: Cart exception`, { attempt: cartAttempts, error: String(cartErr).slice(0, 100) });
-            lastCartError = String(cartErr);
-            if (cartAttempts < maxCartAttempts) {
-              await sleep(1000);
-            }
+          }
+          
+          if (allItemsAdded) {
+            logInfo(`[${requestId}] Step 2: All ${cartItems.length} items added successfully`, { attempt: cartAttempts });
+            cartSuccess = true;
+          } else if (cartAttempts < maxCartAttempts) {
+            await sleep(1000);
           }
         }
         
@@ -3226,84 +3266,80 @@ serve(async (req) => {
           lastStepStatus = lastCartStatus;
         }
         
-        // FALLBACK: Try direct order creation with items + shippingAddress + price
-        // The POST /dapp/orders endpoint accepts items directly with shippingAddress
-        // This bypasses the cart flow entirely which requires shipping to be saved on the client
+        // FALLBACK: Retry the cart flow after clearing and a longer delay
+        // Per Postman spec, POST /dapp/orders only accepts { clientId } - items must be in cart
         if (!cartSuccess || stepFailed) {
-          logInfo(`[${requestId}] Step 3 (Fallback): Attempting direct order creation with full payload`, { 
+          logInfo(`[${requestId}] Step 3 (Fallback): Retrying cart flow after full clear`, { 
             cartFailed: !cartSuccess,
             previousStep: stepFailed,
-            hasShippingAddress: !!orderData.shippingAddress,
           });
           
-          // Build items with price from the original order data
-          const originalItems = orderData.items || [];
-          const directItems = originalItems.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
-            strainId: item.strainId || item.productId,
-            quantity: item.quantity,
-            ...(item.price !== undefined ? { price: item.price } : {}),
-          }));
+          // Clear cart completely
+          try {
+            await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
+          } catch (clearErr) {
+            logWarn(`[${requestId}] Fallback: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
+          }
+          await sleep(2000);
           
-          // Build full direct order payload per API spec
-          const directOrderPayload: Record<string, unknown> = {
-            clientId: clientId,
-            items: directItems,
-          };
-          
-          // Include shipping address in direct order payload
-          if (orderData.shippingAddress) {
-            const addr = orderData.shippingAddress;
-            directOrderPayload.shippingAddress = {
-              address1: addr.street || addr.address1 || '',
-              address2: addr.address2 || '',
-              city: addr.city || '',
-              state: addr.state || addr.city || '',
-              country: addr.country || '',
-              countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
-              postalCode: addr.zipCode || addr.postalCode || '',
-            };
+          // Re-add all items individually
+          let fallbackAllAdded = true;
+          for (let i = 0; i < cartItems.length; i++) {
+            const item = cartItems[i];
+            try {
+              const itemPayload = { clientId, strainId: item.strainId, quantity: item.quantity };
+              const resp = await drGreenRequestBody("/dapp/carts", "POST", itemPayload, true, adminEnvConfig);
+              if (!resp.ok) {
+                const errText = await resp.clone().text();
+                logWarn(`[${requestId}] Fallback: Item ${i + 1} failed`, { status: resp.status, error: errText.slice(0, 200) });
+                fallbackAllAdded = false;
+                lastCartError = errText;
+                lastCartStatus = resp.status;
+                break;
+              }
+              if (i < cartItems.length - 1) await sleep(300);
+            } catch (err) {
+              logError(`[${requestId}] Fallback: Item ${i + 1} exception`, { error: String(err).slice(0, 100) });
+              fallbackAllAdded = false;
+              lastCartError = String(err);
+              break;
+            }
           }
           
-          logInfo(`[${requestId}] Step 3 (Fallback): Direct order payload`, {
-            itemCount: directItems.length,
-            hasShipping: !!directOrderPayload.shippingAddress,
-          });
-          
-          try {
-            response = await drGreenRequestBody("/dapp/orders", "POST", directOrderPayload, false, adminEnvConfig);
-            
-            if (response.ok) {
-              logInfo(`[${requestId}] Step 3 (Fallback): Direct order created successfully`);
-              // Record api_key_scope on success
-              try {
-                const supabaseAdmin2 = createClient(
-                  Deno.env.get('SUPABASE_URL')!,
-                  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-                );
-                const apiKey2 = Deno.env.get(adminEnvConfig.apiKeyEnv) || '';
-                await supabaseAdmin2
-                  .from('drgreen_clients')
-                  .update({ api_key_scope: apiKey2.slice(0, 8), updated_at: new Date().toISOString() })
-                  .eq('drgreen_client_id', clientId);
-              } catch (scopeErr2) {
-                logWarn(`[${requestId}] Failed to record api_key_scope (fallback)`, { error: String(scopeErr2).slice(0, 100) });
+          if (fallbackAllAdded) {
+            await sleep(500);
+            try {
+              response = await drGreenRequestBody("/dapp/orders", "POST", { clientId }, false, adminEnvConfig);
+              if (response.ok) {
+                logInfo(`[${requestId}] Fallback: Order created successfully`);
+                try {
+                  const supabaseAdmin2 = createClient(
+                    Deno.env.get('SUPABASE_URL')!,
+                    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+                  );
+                  const apiKey2 = Deno.env.get(adminEnvConfig.apiKeyEnv) || '';
+                  await supabaseAdmin2
+                    .from('drgreen_clients')
+                    .update({ api_key_scope: apiKey2.slice(0, 8), updated_at: new Date().toISOString() })
+                    .eq('drgreen_client_id', clientId);
+                } catch (scopeErr2) {
+                  logWarn(`[${requestId}] Failed to record api_key_scope (fallback)`, { error: String(scopeErr2).slice(0, 100) });
+                }
+                break;
+              } else {
+                const directError = await response.clone().text();
+                lastStepError = directError;
+                lastStepStatus = response.status;
+                stepFailed = 'fallback-order';
+                logError(`[${requestId}] Fallback: Order creation failed`, { status: response.status, error: directError.slice(0, 200) });
               }
-              break; // Success - let normal response handling continue
-            } else {
-              const directError = await response.clone().text();
-              lastStepError = directError;
-              lastStepStatus = response.status;
-              stepFailed = 'direct-order';
-              logError(`[${requestId}] Step 3 (Fallback): Direct order failed`, { 
-                status: response.status,
-                error: directError.slice(0, 200),
-              });
+            } catch (orderErr) {
+              lastStepError = String(orderErr);
+              lastStepStatus = 500;
+              stepFailed = 'fallback-order-exception';
             }
-          } catch (directErr) {
-            lastStepError = String(directErr);
-            lastStepStatus = 500;
-            stepFailed = 'direct-order-exception';
-            logError(`[${requestId}] Step 3 (Fallback): Direct order exception`, { error: lastStepError.slice(0, 100) });
+          } else {
+            stepFailed = 'fallback-cart-add';
           }
         }
         
@@ -3371,13 +3407,34 @@ serve(async (req) => {
         if (!validateClientId(body.clientId)) {
           throw new Error("Invalid client ID format");
         }
-        // Use /dapp/orders with clientId as query param (fixes 404 from old /dapp/clients/{id}/orders path)
+        // Primary: Use /dapp/orders with clientId as query param
         response = await drGreenRequestQuery("/dapp/orders", {
           clientId: body.clientId,
           orderBy: 'desc',
           take: 50,
           page: 1,
         }, false, adminEnvConfig);
+        
+        // Fallback: If primary returns empty, try /dapp/client/{clientId}/orders
+        if (response.ok) {
+          try {
+            const ordersData = await response.clone().json();
+            const orders = ordersData?.data?.data || ordersData?.data || [];
+            if (Array.isArray(orders) && orders.length === 0) {
+              logInfo(`[get-orders] Primary returned empty, trying client-orders endpoint`);
+              const fallbackResp = await drGreenRequestQuery(`/dapp/client/${body.clientId}/orders`, {
+                orderBy: 'desc',
+                take: 50,
+                page: 1,
+              }, false, adminEnvConfig);
+              if (fallbackResp.ok) {
+                response = fallbackResp;
+              }
+            }
+          } catch (parseErr) {
+            logWarn(`[get-orders] Could not parse primary response for fallback check`);
+          }
+        }
         break;
       }
       
