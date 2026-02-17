@@ -3819,20 +3819,10 @@ serve(async (req) => {
           throw new Error("Invalid shipping address: address1, city, postalCode, and countryCode are required");
         }
         
-        // Country code conversion map (Alpha-2 to Alpha-3)
-        const countryCodeMap: Record<string, string> = {
-          PT: 'PRT',
-          GB: 'GBR',
-          ZA: 'ZAF',
-          TH: 'THA',
-          US: 'USA',
-        };
-        
-        // Ensure country code is Alpha-3
+        // Use top-level getCountryCodeFromName for Alpha-2 to Alpha-3 conversion
         let alpha3CountryCode = shipping.countryCode;
-        if (countryCodeMap[shipping.countryCode]) {
-          alpha3CountryCode = countryCodeMap[shipping.countryCode];
-        }
+        const converted = getCountryCodeFromName(shipping.countryCode);
+        if (converted) alpha3CountryCode = converted;
         
         // Build the shipping object per Dr. Green API spec
         const shippingPayload = {
@@ -3869,20 +3859,10 @@ serve(async (req) => {
           throw new Error("Invalid shipping address: address1, city, postalCode, and countryCode are required");
         }
         
-        // Country code conversion map (Alpha-2 to Alpha-3)
-        const countryCodeMap: Record<string, string> = {
-          PT: 'PRT',
-          GB: 'GBR',
-          ZA: 'ZAF',
-          TH: 'THA',
-          US: 'USA',
-        };
-        
-        // Ensure country code is Alpha-3
+        // Use top-level getCountryCodeFromName for Alpha-2 to Alpha-3 conversion
         let alpha3CountryCode = shipping.countryCode;
-        if (countryCodeMap[shipping.countryCode]) {
-          alpha3CountryCode = countryCodeMap[shipping.countryCode];
-        }
+        const converted = getCountryCodeFromName(shipping.countryCode);
+        if (converted) alpha3CountryCode = converted;
         
         // Build the shipping object per Dr. Green API spec
         const shippingPayload = {
@@ -3926,19 +3906,10 @@ serve(async (req) => {
           countryCode: countryCode || 'not provided',
         });
         
-        // Country code conversion map (Alpha-2 to Alpha-3)
-        const countryCodeMap: Record<string, string> = {
-          PT: 'PRT',
-          GB: 'GBR',
-          ZA: 'ZAF',
-          TH: 'THA',
-          US: 'USA',
-        };
-        
-        // Build minimal but valid client creation payload
+        // Use top-level getCountryCodeFromName for Alpha-2 to Alpha-3 conversion
         const shippingData = shipping || {};
         const shippingCountryCode = shippingData.countryCode || countryCode || 'ZAF';
-        const alpha3CountryCode = countryCodeMap[shippingCountryCode] || shippingCountryCode;
+        const alpha3CountryCode = getCountryCodeFromName(shippingCountryCode) || shippingCountryCode;
         
         const reregisterPayload: Record<string, unknown> = {
           firstName: String(firstName).trim(),
@@ -4119,11 +4090,9 @@ serve(async (req) => {
         const autoLastName = nameParts.slice(1).join(' ') || 'Patient';
         const autoShipping = clientRecord.shipping_address as Record<string, string> | null;
 
-        const autoCountryCodeMap: Record<string, string> = {
-          PT: 'PRT', GB: 'GBR', ZA: 'ZAF', TH: 'THA', US: 'USA',
-        };
+        // Use top-level getCountryCodeFromName
         const autoShippingCC = autoShipping?.countryCode || clientRecord.country_code || 'ZAF';
-        const autoAlpha3 = autoCountryCodeMap[autoShippingCC] || autoShippingCC;
+        const autoAlpha3 = getCountryCodeFromName(autoShippingCC) || autoShippingCC;
 
         const autoPayload: Record<string, unknown> = {
           firstName: autoFirstName,
@@ -4222,13 +4191,10 @@ serve(async (req) => {
         console.log("[bootstrap-test-client] Using environment:", bootstrapEnvConfig.name, `(${bootstrapEnvConfig.apiKeyEnv})`);
         console.log("[bootstrap-test-client] Creating client for:", String(email).slice(0, 5) + '***');
         
-        const countryCodeMap: Record<string, string> = {
-          PT: 'PRT', GB: 'GBR', ZA: 'ZAF', TH: 'THA', US: 'USA',
-        };
-        
+        // Use top-level getCountryCodeFromName
         const shippingData = shipping || {};
         const shippingCountryCode = shippingData.countryCode || countryCode || 'ZAF';
-        const alpha3CountryCode = countryCodeMap[shippingCountryCode] || shippingCountryCode;
+        const alpha3CountryCode = getCountryCodeFromName(shippingCountryCode) || shippingCountryCode;
         
         const bootstrapPayload: Record<string, unknown> = {
           firstName: String(firstName).trim(),

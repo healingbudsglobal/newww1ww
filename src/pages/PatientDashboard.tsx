@@ -13,7 +13,8 @@ import {
   ExternalLink,
   MapPin,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
 import PrescriptionManager from '@/components/dashboard/PrescriptionManager';
 import DosageTracker from '@/components/dashboard/DosageTracker';
@@ -42,6 +43,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { formatPrice } from '@/lib/currency';
+import { useToast } from '@/hooks/use-toast';
+import { COUNTRY_REGISTRY, DEFAULT_COUNTRY } from '@/lib/countries';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -49,7 +52,9 @@ const PatientDashboard = () => {
   const { orders, isLoading: ordersLoading } = useOrderTracking();
   const { getClientDetails } = useDrGreenApi();
   const { resyncClient, isResyncing } = useClientResync();
+  const { toast } = useToast();
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
@@ -77,6 +82,40 @@ const PatientDashboard = () => {
     setShowResyncDialog(false);
   };
 
+  const handleGdprExport = async () => {
+    setIsExporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: 'Error', description: 'You must be signed in to export data.', variant: 'destructive' });
+        return;
+      }
+
+      const res = await supabase.functions.invoke('gdpr-export', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw res.error;
+
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `healing-buds-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Export Complete', description: 'Your data has been downloaded.' });
+    } catch (err) {
+      console.error('GDPR export failed:', err);
+      toast({ title: 'Export Failed', description: 'Could not export your data. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -95,13 +134,10 @@ const PatientDashboard = () => {
     fetchUserData();
   }, []);
 
-  // Country code to name mapping
-  const countryNames: Record<string, string> = {
-    PT: 'Portugal', GB: 'United Kingdom', UK: 'United Kingdom',
-    ZA: 'South Africa', TH: 'Thailand', DE: 'Germany',
-    FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands',
-    BE: 'Belgium', US: 'United States',
-  };
+  // Country code to name mapping from registry
+  const countryNames: Record<string, string> = Object.fromEntries(
+    Object.entries(COUNTRY_REGISTRY).map(([code, config]) => [code, config.name])
+  );
 
   // Fetch shipping address
   useEffect(() => {
@@ -397,6 +433,15 @@ const PatientDashboard = () => {
                       <FileText className="mr-2 h-4 w-4" />
                       Help & FAQ
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={handleGdprExport}
+                      disabled={isExporting}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {isExporting ? 'Exporting...' : 'Export My Data'}
+                    </Button>
                     
                     {/* Re-Sync Account Button - for NFT-scoped credential issues */}
                     {drGreenClient && isEligible && (
@@ -475,7 +520,7 @@ const PatientDashboard = () => {
                       </div>
                       <div className="flex justify-between font-medium border-t pt-3">
                         <span>Total</span>
-                        <span className="text-primary">{formatPrice(cartTotal, drGreenClient?.country_code || 'PT')}</span>
+                        <span className="text-primary">{formatPrice(cartTotal, drGreenClient?.country_code || DEFAULT_COUNTRY)}</span>
                       </div>
                       <Button 
                         className="w-full" 
@@ -533,7 +578,7 @@ const PatientDashboard = () => {
                               <ShippingAddressForm
                                 clientId={drGreenClient.drgreen_client_id}
                                 initialAddress={shippingAddress}
-                                defaultCountry={drGreenClient.country_code || 'PT'}
+                                defaultCountry={drGreenClient.country_code || DEFAULT_COUNTRY}
                                 onSuccess={handleAddressSaved}
                                 onCancel={() => setIsAddressDialogOpen(false)}
                                 variant="inline"
