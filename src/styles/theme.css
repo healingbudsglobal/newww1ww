@@ -11,77 +11,78 @@
 
 /* ===== LIGHT MODE (DEFAULT) ===== */
 :root {
-  /* Brand Color Palette */
-  --primary-green: 178 48% 21%;       /* #1C4F4D - Primary Green */
-  --secondary-green: 178 48% 33%;     /* #2C7D7A - Secondary Green */
-  --accent-green: 164 48% 53%;        /* #4DBFA1 - Accent Light Green */
-  --lime-green: 84 81% 44%;           /* #84CC16 - Lime Green */
-  --deep-teal: 180 84% 32%;           /* #0D9488 - Deep Teal */
-  --text-light: 0 0% 98%;             /* #F9F9F9 - Text Color */
-  --light-gray: 171 12% 66%;          /* #A0B3B0 - Light Gray */
-  --subtle-dark: 176 39% 17%;         /* #1A3C3A - Subtle Dark */
+  /* Brand Color Palette - Earthy Forest */
+  --primary-green: 150 25% 18%;       /* Forest Green */
+  --secondary-green: 155 30% 30%;     /* Sage Forest */
+  --accent-green: 158 40% 48%;        /* Bright Sage */
+  --lime-green: 84 81% 44%;           /* Lime Green */
+  --deep-teal: 155 50% 28%;           /* Deep Forest */
+  --text-light: 0 0% 98%;             /* Text Color */
+  --light-gray: 150 10% 66%;          /* Warm Gray */
+  --subtle-dark: 150 25% 15%;         /* Subtle Dark */
 
-  /* Application Colors - Soft sage-cream undertones */
+  /* Application Colors - Warm parchment sage */
   --background: 150 12% 97%;
-  --foreground: 172 32% 20%;
-  --off-white: 155 18% 98%;
+  --foreground: 150 25% 18%;
+  --off-white: 145 15% 98%;
 
-  --card: 155 10% 99%;
-  --card-foreground: 172 32% 20%;
+  --card: 150 8% 99%;
+  --card-foreground: 150 25% 18%;
 
-  --popover: 155 10% 99%;
-  --popover-foreground: 172 32% 20%;
+  --popover: 150 8% 99%;
+  --popover-foreground: 150 25% 18%;
 
-  /* Primary & Secondary - sage teal matching nav */
-  --primary: 175 42% 35%;
+  /* Primary & Secondary - sage forest */
+  --primary: 160 38% 32%;
   --primary-foreground: 0 0% 98%;
 
-  --secondary: 178 48% 33%;
+  --secondary: 155 30% 30%;
   --secondary-foreground: 0 0% 98%;
 
-  --muted: 160 14% 93%;
-  --muted-foreground: 165 12% 42%;
+  --muted: 155 12% 93%;
+  --muted-foreground: 150 10% 42%;
 
-  /* Accent - soft sage-teal for hovers */
-  --accent: 165 35% 92%;
-  --accent-foreground: 176 39% 17%;
+  /* Accent - warm sage */
+  --accent: 158 30% 92%;
+  --accent-foreground: 150 25% 15%;
 
   /* Destructive - warmer amber-coral */
   --destructive: 15 65% 55%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 165 18% 86%;
-  --input: 165 16% 95%;
-  --ring: 172 42% 45%;
+  --border: 155 15% 86%;
+  --input: 155 14% 95%;
+  --ring: 160 38% 40%;
 
   --radius: 0.75rem;
 
   /* Semantic tokens */
-  --navbar-teal: 178 48% 21%;
-  --section-color: 178 48% 21%;
+  --navbar-teal: 150 25% 18%;
+  --navbar-forest: 150 25% 18%;
+  --section-color: 150 25% 18%;
   
-  /* Legacy teal tokens (mapped to palette) */
-  --teal-midnight: 178 48% 21%;
-  --teal-deep: 178 48% 33%;
-  --teal-deeper: 176 39% 17%;
-  --teal-primary: 164 48% 53%;
-  --teal-darker: 176 39% 17%;
+  /* Legacy teal tokens (mapped to forest palette) */
+  --teal-midnight: 150 25% 18%;
+  --teal-deep: 155 30% 30%;
+  --teal-deeper: 150 25% 15%;
+  --teal-primary: 158 40% 48%;
+  --teal-darker: 150 25% 15%;
   
   /* Sage tokens */
-  --sage-dark: 171 12% 66%;
-  --sage-deeper: 171 12% 60%;
-  --sage-medium: 171 12% 75%;
-  --sage-forest: 171 12% 50%;
+  --sage-dark: 150 10% 60%;
+  --sage-deeper: 150 12% 55%;
+  --sage-medium: 150 10% 72%;
+  --sage-forest: 150 15% 45%;
   
   /* Pharma colors */
-  --pharma-charcoal: 176 39% 25%;
-  --pharma-grey: 171 12% 60%;
-  --pharma-grey-light: 171 12% 92%;
-  --pharma-green: 164 48% 53%;
-  --pharma-green-dark: 178 48% 33%;
-  --pharma-blue: 178 48% 33%;
-  --pharma-blue-light: 171 12% 94%;
-  --pharma-teal-dark: 175 45% 22%;
+  --pharma-charcoal: 150 20% 22%;
+  --pharma-grey: 150 10% 58%;
+  --pharma-grey-light: 150 10% 92%;
+  --pharma-green: 158 40% 48%;
+  --pharma-green-dark: 155 30% 30%;
+  --pharma-blue: 155 30% 30%;
+  --pharma-blue-light: 150 10% 94%;
+  --pharma-teal-dark: 150 28% 20%;
   
   /* Map-specific sage colors */
   --map-sage: 79 51% 52%;
@@ -89,14 +90,14 @@
   --map-sage-dark: 79 45% 40%;
 
   /* Brand Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(164 48% 53%), hsl(178 48% 33%));
-  --gradient-sage-teal: linear-gradient(135deg, hsl(171 12% 75%), hsl(164 48% 53%));
-  --gradient-teal-midnight: linear-gradient(135deg, hsl(178 48% 33%), hsl(178 48% 21%));
-  --gradient-sage-forest: linear-gradient(135deg, hsl(171 12% 75%), hsl(171 12% 50%));
-  --gradient-hero: linear-gradient(180deg, rgba(77, 191, 161, 0.2), rgba(44, 125, 122, 0.15));
-  --gradient-accent: linear-gradient(135deg, hsl(164 48% 75%), hsl(178 48% 45%));
-  --gradient-warm: linear-gradient(135deg, hsl(164 48% 80%), hsl(171 12% 75%));
-  --gradient-sage-radial: radial-gradient(ellipse at center top, hsl(171 12% 92%) 0%, hsl(171 12% 85%) 25%, hsl(178 48% 40%) 60%, hsl(178 48% 33%) 100%);
+  --gradient-primary: linear-gradient(135deg, hsl(158 40% 48%), hsl(155 30% 30%));
+  --gradient-sage-teal: linear-gradient(135deg, hsl(150 10% 72%), hsl(158 40% 48%));
+  --gradient-teal-midnight: linear-gradient(135deg, hsl(155 30% 30%), hsl(150 25% 18%));
+  --gradient-sage-forest: linear-gradient(135deg, hsl(150 10% 72%), hsl(150 15% 45%));
+  --gradient-hero: linear-gradient(180deg, rgba(77, 161, 131, 0.2), rgba(44, 105, 82, 0.15));
+  --gradient-accent: linear-gradient(135deg, hsl(158 40% 72%), hsl(155 30% 42%));
+  --gradient-warm: linear-gradient(135deg, hsl(158 40% 78%), hsl(150 10% 72%));
+  --gradient-sage-radial: radial-gradient(ellipse at center top, hsl(150 10% 92%) 0%, hsl(150 10% 85%) 25%, hsl(155 30% 38%) 60%, hsl(155 30% 30%) 100%);
   
   /* Sage-tinted shadows */
   --shadow-xs: 0 1px 2px 0 hsla(165, 25%, 45%, 0.04);
@@ -174,54 +175,57 @@
 
 /* ===== DARK MODE ===== */
 .dark {
-  /* Base: warm charcoal with sage undertone */
-  --background: 180 8% 7%;
-  --foreground: 150 8% 95%;
+  /* Base: warm charcoal with forest undertone */
+  --background: 150 10% 6%;
+  --foreground: 145 8% 95%;
 
   /* Cards: clear elevation */
-  --card: 175 6% 11%;
-  --card-foreground: 150 8% 94%;
+  --card: 150 8% 10%;
+  --card-foreground: 145 8% 94%;
 
-  --popover: 175 6% 12%;
-  --popover-foreground: 150 8% 94%;
+  --popover: 150 8% 11%;
+  --popover-foreground: 145 8% 94%;
 
-  /* Primary - balanced sage-teal */
-  --primary: 168 38% 45%;
+  /* Primary - balanced forest sage */
+  --primary: 155 35% 40%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary - sage-tinted */
-  --secondary: 175 8% 18%;
-  --secondary-foreground: 150 10% 90%;
+  /* Secondary - forest-tinted */
+  --secondary: 150 10% 16%;
+  --secondary-foreground: 145 10% 90%;
 
   /* Muted surfaces */
-  --muted: 175 6% 14%;
-  --muted-foreground: 165 10% 60%;
+  --muted: 150 8% 13%;
+  --muted-foreground: 150 10% 58%;
 
   /* Accent - visible sage */
-  --accent: 168 20% 18%;
-  --accent-foreground: 165 30% 75%;
+  --accent: 155 18% 16%;
+  --accent-foreground: 150 28% 72%;
 
   /* Destructive - warm amber */
   --destructive: 18 60% 50%;
   --destructive-foreground: 0 0% 100%;
 
   /* Borders and inputs */
-  --border: 170 8% 20%;
-  --input: 175 6% 14%;
-  --ring: 168 38% 45%;
+  --border: 150 8% 18%;
+  --input: 150 8% 13%;
+  --ring: 155 35% 40%;
+  
+  /* Navbar forest */
+  --navbar-forest: 150 20% 12%;
   
   /* Status colors */
-  --success: 158 50% 42%;
+  --success: 150 45% 40%;
   --warning: 38 70% 50%;
   --info: 195 55% 48%;
   
   /* Dark mode shadows */
-  --shadow-xs: 0 1px 2px 0 hsla(175, 20%, 5%, 0.3);
-  --shadow-sm: 0 1px 3px 0 hsla(175, 20%, 5%, 0.4), 0 1px 2px -1px hsla(175, 20%, 5%, 0.2);
-  --shadow-md: 0 2px 4px -1px hsla(175, 20%, 5%, 0.5), 0 4px 6px -1px hsla(175, 20%, 5%, 0.3);
-  --shadow-lg: 0 4px 6px -2px hsla(175, 20%, 5%, 0.4), 0 10px 15px -3px hsla(175, 20%, 5%, 0.5);
-  --shadow-xl: 0 10px 25px -5px hsla(175, 18%, 5%, 0.6), 0 8px 10px -6px hsla(175, 18%, 5%, 0.4);
-  --shadow-2xl: 0 20px 40px -12px hsla(175, 15%, 5%, 0.7);
-  --shadow-card: 0 0 0 1px hsla(170, 15%, 30%, 0.15), 0 2px 4px hsla(175, 15%, 5%, 0.3), 0 12px 24px hsla(175, 15%, 5%, 0.4);
-  --shadow-elegant: 0 0 0 1px hsla(170, 15%, 30%, 0.12), 0 8px 24px -4px hsla(175, 18%, 5%, 0.5);
+  --shadow-xs: 0 1px 2px 0 hsla(150, 15%, 5%, 0.3);
+  --shadow-sm: 0 1px 3px 0 hsla(150, 15%, 5%, 0.4), 0 1px 2px -1px hsla(150, 15%, 5%, 0.2);
+  --shadow-md: 0 2px 4px -1px hsla(150, 15%, 5%, 0.5), 0 4px 6px -1px hsla(150, 15%, 5%, 0.3);
+  --shadow-lg: 0 4px 6px -2px hsla(150, 15%, 5%, 0.4), 0 10px 15px -3px hsla(150, 15%, 5%, 0.5);
+  --shadow-xl: 0 10px 25px -5px hsla(150, 12%, 5%, 0.6), 0 8px 10px -6px hsla(150, 12%, 5%, 0.4);
+  --shadow-2xl: 0 20px 40px -12px hsla(150, 10%, 5%, 0.7);
+  --shadow-card: 0 0 0 1px hsla(150, 12%, 28%, 0.15), 0 2px 4px hsla(150, 12%, 5%, 0.3), 0 12px 24px hsla(150, 12%, 5%, 0.4);
+  --shadow-elegant: 0 0 0 1px hsla(150, 12%, 28%, 0.12), 0 8px 24px -4px hsla(150, 12%, 5%, 0.5);
 }

@@ -9,6 +9,7 @@ import { Cart } from '@/components/shop/Cart';
 import { FloatingCartButton } from '@/components/shop/FloatingCartButton';
 import { RestrictedRegionGate } from '@/components/shop/RestrictedRegionGate';
 import { VerificationProgress } from '@/components/shop/VerificationProgress';
+import { StrainHeroCarousel } from '@/components/shop/StrainHeroCarousel';
 import strainsHeroBg from '@/assets/strains-hero-bg.jpg';
 
 import { useShop } from '@/context/ShopContext';
@@ -57,7 +58,7 @@ export default function Shop() {
         <Header />
 
         {/* Hero Section with background image */}
-        <section className="relative pt-24 sm:pt-28 pb-12 sm:pb-16 overflow-hidden">
+        <section className="relative pt-24 sm:pt-28 pb-6 sm:pb-8 overflow-hidden">
           {/* Background image with overlay */}
           <div className="absolute inset-0">
             <img
@@ -66,7 +67,7 @@ export default function Shop() {
               className="w-full h-full object-cover"
               loading="eager"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/75 to-background" />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/80 to-background" />
           </div>
 
           <div className="container mx-auto px-4 relative">
@@ -118,7 +119,8 @@ export default function Shop() {
           </div>
         </section>
 
-        {/* Products - gated by region restrictions */}
+        {/* Featured Strain Carousel */}
+        <StrainHeroCarousel />
 
         {/* Products - gated by region restrictions */}
         <section className="py-12">

@@ -14,10 +14,10 @@
 
 /* ===== NAVIGATION TOKENS - LIGHT MODE ===== */
 :root {
-  --nav-bg: 178 42% 21%;
-  --nav-bg-elevated: 178 44% 23%;
-  --nav-surface: 178 40% 24%;
-  --nav-surface-elevated: 178 38% 28%;
+  --nav-bg: 150 25% 18%;
+  --nav-bg-elevated: 150 28% 20%;
+  --nav-surface: 150 22% 22%;
+  --nav-surface-elevated: 150 20% 26%;
   --nav-item-active: 0 0% 100%;
   --nav-item-active-opacity: 0.25;
   --nav-item-hover: 0 0% 100%;
@@ -26,8 +26,8 @@
   --nav-text-muted: 0 0% 88%;
   --nav-border: 0 0% 100%;
   --nav-border-opacity: 0.2;
-  --nav-dropdown-bg: 210 12% 10%;
-  --nav-dropdown-border: 210 8% 25%;
+  --nav-dropdown-bg: 150 12% 10%;
+  --nav-dropdown-border: 150 8% 25%;
   --nav-dropdown-hover: 0 0% 100%;
   --nav-dropdown-hover-opacity: 0.12;
   
@@ -38,20 +38,20 @@
 
 /* ===== NAVIGATION TOKENS - DARK MODE ===== */
 .dark {
-  --nav-bg: 175 35% 16%;
-  --nav-bg-elevated: 175 38% 19%;
-  --nav-surface: 175 32% 20%;
-  --nav-surface-elevated: 175 30% 24%;
+  --nav-bg: 150 20% 14%;
+  --nav-bg-elevated: 150 22% 17%;
+  --nav-surface: 150 18% 18%;
+  --nav-surface-elevated: 150 16% 22%;
   --nav-item-active: 0 0% 100%;
   --nav-item-active-opacity: 0.18;
   --nav-item-hover: 0 0% 100%;
   --nav-item-hover-opacity: 0.10;
   --nav-text: 0 0% 100%;
-  --nav-text-muted: 150 8% 78%;
+  --nav-text-muted: 140 8% 78%;
   --nav-border: 0 0% 100%;
   --nav-border-opacity: 0.12;
-  --nav-dropdown-bg: 180 10% 9%;
-  --nav-dropdown-border: 175 8% 22%;
+  --nav-dropdown-bg: 150 10% 9%;
+  --nav-dropdown-border: 150 8% 22%;
   --nav-dropdown-hover: 0 0% 100%;
   --nav-dropdown-hover-opacity: 0.08;
 }
@@ -180,7 +180,7 @@
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  background-color: hsl(178 35% 22%);
+  background-color: hsl(150 25% 18%);
   height: 100dvh;
   min-height: 100vh;
 }
@@ -192,7 +192,7 @@
   justify-content: space-between;
   padding: 0 1.25rem;
   height: 72px;
-  background-color: hsl(178 35% 18%);
+  background-color: hsl(150 25% 15%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 

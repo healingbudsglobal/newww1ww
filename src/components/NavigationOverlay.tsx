@@ -131,7 +131,7 @@ const NavigationOverlay = ({
     "touch-manipulation min-h-[56px] flex items-center gap-4 active:scale-[0.98]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EAB308]/50",
     active
-      ? "text-white font-semibold bg-white/15 border-l-4 border-[#EAB308]"
+      ? "text-white font-semibold bg-white/15 border-l-2 border-[#EAB308] shadow-[inset_0_0_12px_rgba(234,179,8,0.1)]"
       : "text-white/90 hover:text-white hover:bg-white/10"
   );
 
@@ -163,7 +163,7 @@ const NavigationOverlay = ({
             }}
             className="xl:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-[380px] z-[9999] flex flex-col"
             style={{ 
-              background: 'linear-gradient(180deg, #1A2E2A 0%, #1E3632 100%)',
+              background: 'linear-gradient(180deg, hsl(150, 25%, 18%) 0%, hsl(150, 22%, 14%) 100%)',
               boxShadow: '-10px 0 50px rgba(0, 0, 0, 0.5)'
             }}
             role="dialog"
@@ -228,7 +228,7 @@ const NavigationOverlay = ({
                     <motion.div
                       key={item.to}
                       variants={{
-                        hidden: { opacity: 0, x: 30 },
+                        hidden: { opacity: 0, x: -20 },
                         visible: { 
                           opacity: 1, 
                           x: 0,
