@@ -1,54 +1,79 @@
 
-## Fix Order Creation: Wrong Cart Clear Endpoint Path
 
-### Root Cause
+## All Pending Fixes — Combined Implementation
 
-All order creation attempts are failing with **409 Conflict** (and one **400 Bad Request**) because the cart is never actually being cleared before adding new items.
+### 1. Header crash fix: Add `useShopSafe` hook
 
-Inside the `create-order` action in `drgreen-proxy`, the cart clear step uses the **wrong URL path**:
+**File: `src/context/ShopContext.tsx`** (after line 555)
 
+Add a non-throwing variant of `useShop`:
+
+```typescript
+export function useShopSafe() {
+  const context = useContext(ShopContext);
+  return context ?? null;
+}
 ```
-WRONG:  DELETE /dapp/carts/client/{clientId}
-RIGHT:  DELETE /dapp/carts/{clientId}
+
+**File: `src/layout/Header.tsx`** (line 49 area)
+
+Replace:
+```typescript
+import { useShop } from "@/context/ShopContext";
+// ...
+const { isEligible, drGreenClient, isLoading: shopLoading } = useShop();
 ```
 
-The extra `/client/` segment causes the Dr. Green API to either return a 404 (silently ignored) or not match the cart, so the old cart items persist. When new items are added, the API returns **409 Conflict**.
+With:
+```typescript
+import { useShopSafe } from "@/context/ShopContext";
+// ...
+const shop = useShopSafe();
+const isEligible = shop?.isEligible ?? false;
+const drGreenClient = shop?.drGreenClient ?? null;
+const shopLoading = shop?.isLoading ?? false;
+```
 
-Evidence from the database -- all 5 recent orders failed:
-- 4 orders: Status 409 (cart conflict due to stale cart)
-- 1 order: Status 400 (likely a different payload issue after a cart happened to be empty)
+This prevents the entire app from crashing if ShopProvider is temporarily unavailable during HMR or on non-shop pages.
 
-### The Fix
+---
 
-**File: `supabase/functions/drgreen-proxy/index.ts`**
+### 2. Fix `add-to-cart` payload format
 
-Three lines need to change -- all inside the `create-order` case. Replace `/dapp/carts/client/{clientId}` with `/dapp/carts/{clientId}` to match the correct Postman endpoint and the working `empty-cart` action:
+**File: `supabase/functions/drgreen-proxy/index.ts`** (lines 2862-2874)
 
-1. **Line 3127** (Step 1.5 -- pre-clear):
-   ```
-   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
-   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
-   ```
+Replace the legacy nested format:
+```typescript
+const cartPayload = {
+  clientCartId: clientId,
+  items: [{ strainId: cartData.strainId, quantity: cartData.quantity }]
+};
+```
 
-2. **Line 3188** (Step 2 -- 409 retry clear):
-   ```
-   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
-   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
-   ```
+With the flat format that matches the working `create-order` flow:
+```typescript
+const cartPayload = {
+  clientId: clientId,
+  strainId: cartData.strainId,
+  quantity: cartData.quantity,
+};
+```
 
-3. **Line 3293** (Fallback -- final retry clear):
-   ```
-   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
-   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
-   ```
+---
 
-### Why This Is The Issue
+### 3. Cart clear path fix
 
-The `empty-cart` standalone action (line 2909) already uses the correct path `DELETE /dapp/carts/{cartId}`. But whoever wrote the `create-order` flow used a different path with `/client/` in it. The Dr. Green API does not recognize this path, so the cart is never cleared, and every subsequent cart add gets a 409.
+Already applied in the last diff -- no further changes needed. The three instances of `/dapp/carts/client/${clientId}` have been corrected to `/dapp/carts/${clientId}`.
 
-### After the Fix
+---
 
-- Cart will be properly cleared before adding new items
-- Items will be added without 409 conflicts
-- Order creation from cart (`POST /dapp/orders`) will succeed
-- The edge function will be redeployed automatically
+### Summary
+
+| File | Change |
+|------|--------|
+| `src/context/ShopContext.tsx` | Add `useShopSafe` export |
+| `src/layout/Header.tsx` | Use `useShopSafe` instead of `useShop` |
+| `supabase/functions/drgreen-proxy/index.ts` | Fix `add-to-cart` payload to flat format |
+
+Edge function will be redeployed automatically after the proxy change.
+
