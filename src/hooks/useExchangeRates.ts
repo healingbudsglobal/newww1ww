@@ -72,8 +72,8 @@ export function useExchangeRates(): UseExchangeRatesReturn {
     (amount: number, fromCurrency: string = 'ZAR', toCurrency: string = 'ZAR'): number => {
       const currentRates = rates || FALLBACK_RATES;
 
-      const from = getCurrency(fromCurrency) || fromCurrency;
-      const to = getCurrency(toCurrency) || toCurrency;
+      const from = currentRates[fromCurrency] !== undefined ? fromCurrency : (getCurrency(fromCurrency) || fromCurrency);
+      const to = currentRates[toCurrency] !== undefined ? toCurrency : (getCurrency(toCurrency) || toCurrency);
 
       if (from === to) return amount;
 

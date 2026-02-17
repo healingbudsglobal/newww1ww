@@ -25,12 +25,12 @@ export function convertPrice(
 ): number {
   const ratesMap = rates || cachedRates;
 
-  const fromCurrency = COUNTRY_REGISTRY[fromCountryOrCurrency]
-    ? getCurrency(fromCountryOrCurrency)
-    : fromCountryOrCurrency;
-  const toCurrency = COUNTRY_REGISTRY[toCountryOrCurrency]
-    ? getCurrency(toCountryOrCurrency)
-    : toCountryOrCurrency;
+  const fromCurrency = ratesMap[fromCountryOrCurrency] !== undefined
+    ? fromCountryOrCurrency
+    : (COUNTRY_REGISTRY[fromCountryOrCurrency] ? getCurrency(fromCountryOrCurrency) : fromCountryOrCurrency);
+  const toCurrency = ratesMap[toCountryOrCurrency] !== undefined
+    ? toCountryOrCurrency
+    : (COUNTRY_REGISTRY[toCountryOrCurrency] ? getCurrency(toCountryOrCurrency) : toCountryOrCurrency);
 
   if (fromCurrency === toCurrency) return amount;
 
