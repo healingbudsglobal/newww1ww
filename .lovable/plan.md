@@ -1,58 +1,54 @@
 
-
-## Fix Currency Conversion Bug
+## Fix Order Creation: Wrong Cart Clear Endpoint Path
 
 ### Root Cause
 
-The `convertPrice` function in `useExchangeRates.ts` passes its `fromCurrency` and `toCurrency` arguments through `getCurrency()`, which is designed for **country codes** (like 'ZA' to 'ZAR'), not currency codes. When `convertFromEUR` passes `'EUR'` as the source currency:
+All order creation attempts are failing with **409 Conflict** (and one **400 Bad Request**) because the cart is never actually being cleared before adding new items.
 
-1. `getCurrency('EUR')` looks up 'EUR' in the country registry
-2. 'EUR' is not a country code, so it falls back to the default country 'ZA'
-3. Returns 'ZAR' instead of 'EUR'
-4. Both `from` and `to` end up as 'ZAR', so the function returns the amount unchanged
-5. A price of EUR 10.00 displays as R 10,00 instead of approximately R 189
+Inside the `create-order` action in `drgreen-proxy`, the cart clear step uses the **wrong URL path**:
+
+```
+WRONG:  DELETE /dapp/carts/client/{clientId}
+RIGHT:  DELETE /dapp/carts/{clientId}
+```
+
+The extra `/client/` segment causes the Dr. Green API to either return a 404 (silently ignored) or not match the cart, so the old cart items persist. When new items are added, the API returns **409 Conflict**.
+
+Evidence from the database -- all 5 recent orders failed:
+- 4 orders: Status 409 (cart conflict due to stale cart)
+- 1 order: Status 400 (likely a different payload issue after a cart happened to be empty)
 
 ### The Fix
 
-**File: `src/hooks/useExchangeRates.ts` (lines 75-77)**
+**File: `supabase/functions/drgreen-proxy/index.ts`**
 
-The `convertPrice` function needs to check whether the input is already a valid currency code before passing it through `getCurrency()`. If the rates map already contains the input as a key (e.g. 'EUR', 'GBP', 'USD'), use it directly. Only call `getCurrency()` when the input looks like a country code.
+Three lines need to change -- all inside the `create-order` case. Replace `/dapp/carts/client/{clientId}` with `/dapp/carts/{clientId}` to match the correct Postman endpoint and the working `empty-cart` action:
 
-```
-Current (broken):
-  const from = getCurrency(fromCurrency) || fromCurrency;
-  const to = getCurrency(toCurrency) || toCurrency;
+1. **Line 3127** (Step 1.5 -- pre-clear):
+   ```
+   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
+   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
+   ```
 
-Fixed:
-  const currentRates = rates || FALLBACK_RATES;
-  const from = currentRates[fromCurrency] !== undefined ? fromCurrency : (getCurrency(fromCurrency) || fromCurrency);
-  const to = currentRates[toCurrency] !== undefined ? toCurrency : (getCurrency(toCurrency) || toCurrency);
-```
+2. **Line 3188** (Step 2 -- 409 retry clear):
+   ```
+   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
+   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
+   ```
 
-This way:
-- `'EUR'` is found in the rates map, so it's used directly as a currency code
-- `'ZA'` is NOT in the rates map, so it goes through `getCurrency('ZA')` which correctly returns `'ZAR'`
+3. **Line 3293** (Fallback -- final retry clear):
+   ```
+   - await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", ...)
+   + await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", ...)
+   ```
 
-**Same fix needed in `src/lib/currency.ts` (lines 28-33)** — the `convertPrice` function there has the same pattern and the same bug.
+### Why This Is The Issue
 
-### Impact
+The `empty-cart` standalone action (line 2909) already uses the correct path `DELETE /dapp/carts/{cartId}`. But whoever wrote the `create-order` flow used a different path with `/client/` in it. The Dr. Green API does not recognize this path, so the cart is never cleared, and every subsequent cart add gets a 409.
 
-This fix affects all price displays across the platform:
-- Shop product listings
-- Cart totals
-- Checkout summary
-- Order history
-- Order detail pages
-- Featured strains on the homepage
+### After the Fix
 
-All prices currently show the raw EUR value with a ZAR symbol. After the fix, they will show the correctly converted ZAR amount (approximately 19x the current displayed values based on live exchange rates).
-
-### Files Changed
-
-| File | Change |
-|------|--------|
-| `src/hooks/useExchangeRates.ts` | Fix `convertPrice` to handle currency codes directly, not just country codes |
-| `src/lib/currency.ts` | Same fix for the standalone `convertPrice` function |
-
-Total: 2 files, minimal changes (2-3 lines each).
-
+- Cart will be properly cleared before adding new items
+- Items will be added without 409 conflicts
+- Order creation from cart (`POST /dapp/orders`) will succeed
+- The edge function will be redeployed automatically
