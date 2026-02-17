@@ -210,31 +210,38 @@ const Checkout = () => {
     setIsProcessing(true);
     setPaymentStatus('Verifying your profile...');
 
+    // Determine verification status outside try/catch so fallback can use it
+    const isFullyVerified = drGreenClient.is_kyc_verified === true && drGreenClient.admin_approval === 'VERIFIED';
+
     try {
       let clientId = drGreenClient.drgreen_client_id;
 
       // --- PRE-FLIGHT: Auto-rehome guard ---
-      // Check if the current client ID is valid on the Dr. Green API
-      // If it's broken (scope mismatch), auto-rehome before proceeding
-      try {
-        const { data: rehomeResult, error: rehomeError } = await supabase.functions.invoke('drgreen-proxy', {
-          body: { action: 'auto-rehome-client', clientId },
-        });
-
-        if (rehomeError) {
-          console.warn('[Checkout] Auto-rehome check failed:', rehomeError.message);
-          // Continue with existing clientId — may fall through to local order
-        } else if (rehomeResult?.rehomed && rehomeResult?.clientId) {
-          console.log('[Checkout] Client auto-rehomed:', clientId, '->', rehomeResult.clientId);
-          clientId = rehomeResult.clientId;
-          toast({
-            title: 'Profile Updated',
-            description: 'Your profile has been refreshed. Continuing with your order...',
+      // Skip rehome for fully verified clients to avoid destroying their KYC status.
+      // Rehoming re-registers the client which resets is_kyc_verified and admin_approval.
+      
+      if (isFullyVerified) {
+        console.log('[Checkout] Skipping auto-rehome — client is fully verified');
+      } else {
+        // Only attempt rehome for non-verified clients where scope mismatch matters less
+        try {
+          const { data: rehomeResult, error: rehomeError } = await supabase.functions.invoke('drgreen-proxy', {
+            body: { action: 'auto-rehome-client', clientId },
           });
+
+          if (rehomeError) {
+            console.warn('[Checkout] Auto-rehome check failed:', rehomeError.message);
+          } else if (rehomeResult?.rehomed && rehomeResult?.clientId) {
+            console.log('[Checkout] Client auto-rehomed:', clientId, '->', rehomeResult.clientId);
+            clientId = rehomeResult.clientId;
+            toast({
+              title: 'Profile Updated',
+              description: 'Your profile has been refreshed. Continuing with your order...',
+            });
+          }
+        } catch (rehomeErr) {
+          console.warn('[Checkout] Auto-rehome guard error:', rehomeErr);
         }
-      } catch (rehomeErr) {
-        console.warn('[Checkout] Auto-rehome guard error:', rehomeErr);
-        // Non-blocking — continue with original clientId
       }
 
       setPaymentStatus('Creating order...');
@@ -384,7 +391,7 @@ const Checkout = () => {
 
         await saveOrder({
           drgreen_order_id: localOrderId,
-          status: 'PENDING_SYNC',
+          status: isFullyVerified ? 'MANUAL_REVIEW' : 'PENDING_SYNC',
           payment_status: 'AWAITING_PROCESSING',
           total_amount: cartTotal,
           items: cart.map(item => ({
