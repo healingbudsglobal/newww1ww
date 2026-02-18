@@ -3253,6 +3253,37 @@ serve(async (req) => {
               } catch (scopeErr) {
                 logWarn(`[${requestId}] Failed to record api_key_scope`, { error: String(scopeErr).slice(0, 100) });
               }
+              // Extract orderId from response and return success
+              try {
+                const orderData = await response.clone().json();
+                // Handle multiple possible response formats from Dr. Green API
+                // Priority: nested data.data.id > data.id > response.id > response.data
+                const orderId = orderData?.data?.data?.id || orderData?.data?.id || orderData?.id || orderData?.data;
+                
+                if (!orderId) {
+                  logError(`[${requestId}] Step 3: No orderId found in response`, { response: JSON.stringify(orderData).slice(0, 200) });
+                  lastStepError = 'Order created but no ID in response';
+                  lastStepStatus = 500;
+                  stepFailed = 'order-id-missing';
+                  throw new Error('Order created but no ID in response');
+                }
+                
+                logInfo(`[${requestId}] Step 3: Extracted orderId from response`, { orderId: String(orderId).slice(0, 8) + '***' });
+                return new Response(JSON.stringify({
+                  success: true,
+                  data: {
+                    orderId: String(orderId),
+                    orderNumber: orderData?.data?.data?.orderNumber || orderData?.data?.orderNumber || orderData?.orderNumber,
+                    status: orderData?.data?.data?.status || orderData?.data?.status || orderData?.status || 'PENDING',
+                    totalAmount: orderData?.data?.data?.totalAmount || orderData?.data?.totalAmount || orderData?.totalAmount || 0,
+                  }
+                }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+              } catch (parseErr) {
+                logError(`[${requestId}] Step 3: Failed to parse order response`, { error: String(parseErr).slice(0, 100) });
+                lastStepError = String(parseErr);
+                lastStepStatus = 500;
+                stepFailed = 'order-parse';
+              }
               break;
             } else {
               const orderError = await response.clone().text();
@@ -3337,6 +3368,35 @@ serve(async (req) => {
                     .eq('drgreen_client_id', clientId);
                 } catch (scopeErr2) {
                   logWarn(`[${requestId}] Failed to record api_key_scope (fallback)`, { error: String(scopeErr2).slice(0, 100) });
+                }
+                
+                // Extract orderId from fallback response
+                try {
+                  const orderData = await response.clone().json();
+                  const orderId = orderData?.data?.data?.id || orderData?.data?.id || orderData?.id || orderData?.data;
+                  
+                  if (!orderId) {
+                    logError(`[${requestId}] Fallback: No orderId found in response`, { response: JSON.stringify(orderData).slice(0, 200) });
+                    lastStepError = 'Order created but no ID in response';
+                    lastStepStatus = 500;
+                    stepFailed = 'fallback-order-id-missing';
+                  } else {
+                    logInfo(`[${requestId}] Fallback: Extracted orderId from response`, { orderId: String(orderId).slice(0, 8) + '***' });
+                    return new Response(JSON.stringify({
+                      success: true,
+                      data: {
+                        orderId: String(orderId),
+                        orderNumber: orderData?.data?.data?.orderNumber || orderData?.data?.orderNumber || orderData?.orderNumber,
+                        status: orderData?.data?.data?.status || orderData?.data?.status || orderData?.status || 'PENDING',
+                        totalAmount: orderData?.data?.data?.totalAmount || orderData?.data?.totalAmount || orderData?.totalAmount || 0,
+                      }
+                    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+                  }
+                } catch (parseErr) {
+                  logError(`[${requestId}] Fallback: Failed to parse order response`, { error: String(parseErr).slice(0, 100) });
+                  lastStepError = String(parseErr);
+                  lastStepStatus = 500;
+                  stepFailed = 'fallback-order-parse';
                 }
                 break;
               } else {
