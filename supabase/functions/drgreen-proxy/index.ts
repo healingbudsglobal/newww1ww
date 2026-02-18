@@ -2876,18 +2876,20 @@ serve(async (req) => {
           throw new Error("quantity must be at least 1");
         }
         
-        // POST /dapp/carts - flat format matching create-order flow
+        // POST /dapp/carts - batch format with clientCartId + items[]
+        const clientCartId = crypto.randomUUID();
         const cartPayload = {
-          clientId: clientId,
-          strainId: cartData.strainId,
-          quantity: cartData.quantity,
+          clientCartId: clientCartId,
+          items: [{
+            strainId: cartData.strainId,
+            quantity: cartData.quantity,
+          }],
         };
         
-        logInfo("Adding to cart", { 
-          clientCartId: clientId, 
+        logInfo("Adding to cart (batch format)", { 
+          clientCartId: clientCartId.slice(0, 8) + '***', 
           strainId: cartData.strainId, 
           quantity: cartData.quantity,
-          payload: JSON.stringify(cartPayload),
         });
         
         response = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, false, adminEnvConfig);
@@ -2915,8 +2917,8 @@ serve(async (req) => {
         if (!validateStringLength(cartId, 100)) {
           throw new Error("Invalid cart ID format");
         }
-        // DELETE /dapp/carts/:clientId clears the cart
-        response = await drGreenRequest(`/dapp/carts/${cartId}`, "DELETE", undefined, adminEnvConfig);
+        // DELETE /dapp/carts/client/:clientId clears the cart
+        response = await drGreenRequest(`/dapp/carts/client/${cartId}`, "DELETE", undefined, adminEnvConfig);
         break;
       }
       
@@ -3134,10 +3136,10 @@ serve(async (req) => {
         }
         
         // Step 1.5: Clear any stale cart to prevent 409 conflicts
-        // Correct endpoint: DELETE /dapp/carts/{clientId} (NOT /dapp/carts/client/{clientId})
+        // Correct endpoint: DELETE /dapp/carts/client/{clientId}
         logInfo(`[${requestId}] Step 1.5: Clearing existing cart to prevent 409 conflict`);
         try {
-          const emptyCartResponse = await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
+          const emptyCartResponse = await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
           logInfo(`[${requestId}] Step 1.5: Cart clear result`, { status: emptyCartResponse.status });
           if (emptyCartResponse.status === 404) {
             logInfo(`[${requestId}] Step 1.5: No existing cart found (404), proceeding`);
@@ -3147,18 +3149,18 @@ serve(async (req) => {
         }
         await sleep(500);
         
-        // Step 2: Add items to server-side cart INDIVIDUALLY
-        // API: POST /dapp/carts with { clientId, strainId, quantity } per item
+        // Step 2: Add items to server-side cart as BATCH
+        // API: POST /dapp/carts with { clientCartId: uuid, items: [{ strainId, quantity }] }
         const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
           strainId: item.strainId || item.productId,
           quantity: item.quantity,
         }));
         
-        logInfo(`[${requestId}] Step 2: Adding ${cartItems.length} items to cart individually`, { 
+        logInfo(`[${requestId}] Step 2: Adding ${cartItems.length} items to cart (batch format)`, { 
           clientId: clientId.slice(0, 8) + '***',
         });
         
-        // Add items individually with retry logic
+        // Batch cart add with retry logic
         let cartSuccess = false;
         let cartAttempts = 0;
         const maxCartAttempts = 3;
@@ -3167,79 +3169,61 @@ serve(async (req) => {
         
         while (!cartSuccess && cartAttempts < maxCartAttempts) {
           cartAttempts++;
-          let allItemsAdded = true;
           
-          for (let i = 0; i < cartItems.length; i++) {
-            const item = cartItems[i];
-            const itemPayload = {
-              clientId: clientId,
+          // Generate a fresh UUID for this cart session
+          const clientCartId = crypto.randomUUID();
+          const cartPayload = {
+            clientCartId: clientCartId,
+            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
               strainId: item.strainId,
               quantity: item.quantity,
-            };
+            })),
+          };
+          
+          try {
+            logInfo(`[${requestId}] Step 2: Batch cart POST`, { 
+              clientCartId: clientCartId.slice(0, 8) + '***',
+              itemCount: cartItems.length,
+              attempt: cartAttempts,
+            });
             
-            try {
-              logInfo(`[${requestId}] Step 2: Adding item ${i + 1}/${cartItems.length}`, { 
-                strainId: item.strainId?.slice(0, 8) + '***',
-                quantity: item.quantity,
-                attempt: cartAttempts,
+            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, true, adminEnvConfig);
+            lastCartStatus = cartResponse.status;
+            
+            if (!cartResponse.ok) {
+              lastCartError = await cartResponse.clone().text();
+              logWarn(`[${requestId}] Step 2: Batch cart failed`, { 
+                status: cartResponse.status,
+                error: lastCartError.slice(0, 200),
               });
               
-              const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", itemPayload, true, adminEnvConfig);
-              lastCartStatus = cartResponse.status;
-              
-              if (!cartResponse.ok) {
-                lastCartError = await cartResponse.clone().text();
-                logWarn(`[${requestId}] Step 2: Cart item ${i + 1} failed`, { 
-                  status: cartResponse.status,
-                  error: lastCartError.slice(0, 200),
-                });
-                
-                // On 409 Conflict, clear cart and retry full sequence
-                if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
-                  logInfo(`[${requestId}] Step 2: 409 conflict on item ${i + 1} - clearing cart and retrying all`);
-                  try {
-                    await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
-                  } catch (clearErr) {
-                    logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
-                  }
-                  await sleep(1000);
-                  allItemsAdded = false;
-                  break; // Break inner loop, retry from outer while
-                } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                  const delay = cartAttempts * 1500;
-                  logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
-                  await sleep(delay);
-                  allItemsAdded = false;
-                  break;
-                } else if (lastCartStatus === 400 && !lastCartError.includes("shipping")) {
-                  logWarn(`[${requestId}] Step 2: Non-retryable 400 error, stopping`);
-                  allItemsAdded = false;
-                  break;
-                } else {
-                  allItemsAdded = false;
-                  break;
+              // On 409 Conflict, clear cart and retry
+              if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
+                logInfo(`[${requestId}] Step 2: 409 conflict - clearing cart and retrying`);
+                try {
+                  await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
+                } catch (clearErr) {
+                  logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
                 }
+                await sleep(1000);
+              } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
+                const delay = cartAttempts * 1500;
+                logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
+                await sleep(delay);
               } else {
-                logInfo(`[${requestId}] Step 2: Item ${i + 1} added successfully`);
+                logWarn(`[${requestId}] Step 2: Non-retryable error, stopping`);
+                break;
               }
-              
-              // Small delay between items to avoid rate limiting
-              if (i < cartItems.length - 1) {
-                await sleep(300);
-              }
-            } catch (cartErr) {
-              logError(`[${requestId}] Step 2: Cart item ${i + 1} exception`, { error: String(cartErr).slice(0, 100) });
-              lastCartError = String(cartErr);
-              allItemsAdded = false;
-              break;
+            } else {
+              logInfo(`[${requestId}] Step 2: All ${cartItems.length} items added successfully (batch)`, { attempt: cartAttempts });
+              cartSuccess = true;
             }
-          }
-          
-          if (allItemsAdded) {
-            logInfo(`[${requestId}] Step 2: All ${cartItems.length} items added successfully`, { attempt: cartAttempts });
-            cartSuccess = true;
-          } else if (cartAttempts < maxCartAttempts) {
-            await sleep(1000);
+          } catch (cartErr) {
+            logError(`[${requestId}] Step 2: Batch cart exception`, { error: String(cartErr).slice(0, 100) });
+            lastCartError = String(cartErr);
+            if (cartAttempts < maxCartAttempts) {
+              await sleep(1000);
+            }
           }
         }
         
@@ -3303,34 +3287,36 @@ serve(async (req) => {
           
           // Clear cart completely
           try {
-            await drGreenRequest(`/dapp/carts/${clientId}`, "DELETE", undefined, adminEnvConfig);
+            await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
           } catch (clearErr) {
             logWarn(`[${requestId}] Fallback: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
           }
           await sleep(2000);
           
-          // Re-add all items individually
+          // Re-add all items as batch
           let fallbackAllAdded = true;
-          for (let i = 0; i < cartItems.length; i++) {
-            const item = cartItems[i];
-            try {
-              const itemPayload = { clientId, strainId: item.strainId, quantity: item.quantity };
-              const resp = await drGreenRequestBody("/dapp/carts", "POST", itemPayload, true, adminEnvConfig);
-              if (!resp.ok) {
-                const errText = await resp.clone().text();
-                logWarn(`[${requestId}] Fallback: Item ${i + 1} failed`, { status: resp.status, error: errText.slice(0, 200) });
-                fallbackAllAdded = false;
-                lastCartError = errText;
-                lastCartStatus = resp.status;
-                break;
-              }
-              if (i < cartItems.length - 1) await sleep(300);
-            } catch (err) {
-              logError(`[${requestId}] Fallback: Item ${i + 1} exception`, { error: String(err).slice(0, 100) });
+          const fallbackCartId = crypto.randomUUID();
+          const fallbackPayload = {
+            clientCartId: fallbackCartId,
+            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
+              strainId: item.strainId,
+              quantity: item.quantity,
+            })),
+          };
+          try {
+            logInfo(`[${requestId}] Fallback: Batch cart POST`, { clientCartId: fallbackCartId.slice(0, 8) + '***', itemCount: cartItems.length });
+            const resp = await drGreenRequestBody("/dapp/carts", "POST", fallbackPayload, true, adminEnvConfig);
+            if (!resp.ok) {
+              const errText = await resp.clone().text();
+              logWarn(`[${requestId}] Fallback: Batch cart failed`, { status: resp.status, error: errText.slice(0, 200) });
               fallbackAllAdded = false;
-              lastCartError = String(err);
-              break;
+              lastCartError = errText;
+              lastCartStatus = resp.status;
             }
+          } catch (err) {
+            logError(`[${requestId}] Fallback: Batch cart exception`, { error: String(err).slice(0, 100) });
+            fallbackAllAdded = false;
+            lastCartError = String(err);
           }
           
           if (fallbackAllAdded) {
