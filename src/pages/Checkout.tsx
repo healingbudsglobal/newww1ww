@@ -14,6 +14,7 @@ import { useShop } from '@/context/ShopContext';
 import { EligibilityGate } from '@/components/shop/EligibilityGate';
 import { ShippingAddressForm, type ShippingAddress } from '@/components/shop/ShippingAddressForm';
 import { useTranslation } from 'react-i18next';
+import { toAlpha3 } from '@/lib/countries';
 import { useToast } from '@/hooks/use-toast';
 import { useDrGreenApi } from '@/hooks/useDrGreenApi';
 import { useOrderTracking } from '@/hooks/useOrderTracking';
@@ -268,7 +269,8 @@ const Checkout = () => {
             state: shippingAddress.state || shippingAddress.city,
             postalCode: shippingAddress.postalCode,
             country: shippingAddress.country,
-            countryCode: shippingAddress.countryCode,
+            // Always send Alpha-3 to the proxy — Dr. Green API rejects Alpha-2
+            countryCode: toAlpha3(shippingAddress.countryCode || shippingAddress.country || 'ZA'),
           },
         }),
         'Create order'
