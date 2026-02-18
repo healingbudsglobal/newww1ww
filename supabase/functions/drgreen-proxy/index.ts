@@ -231,6 +231,23 @@ function getCountryCodeFromName(countryName: string | undefined): string {
 }
 
 /**
+ * Convert Alpha-2 country code to Alpha-3, or pass through if already Alpha-3
+ * e.g. 'ZA' → 'ZAF', 'GB' → 'GBR', 'ZAF' → 'ZAF'
+ */
+function toAlpha3(code: string | undefined): string {
+  if (!code) return '';
+  const upper = code.toUpperCase().trim();
+  // Already Alpha-3?
+  if (upper.length === 3) return upper;
+  const alpha2ToAlpha3: Record<string, string> = {
+    'ZA': 'ZAF', 'PT': 'PRT', 'GB': 'GBR', 'UK': 'GBR',
+    'TH': 'THA', 'US': 'USA', 'DE': 'DEU', 'FR': 'FRA',
+    'ES': 'ESP', 'IT': 'ITA', 'NL': 'NLD', 'BE': 'BEL',
+  };
+  return alpha2ToAlpha3[upper] || upper;
+}
+
+/**
  * Convert Alpha-3 country code to Alpha-2, or pass through if already Alpha-2
  */
 function toAlpha2(code: string | undefined): string {
@@ -3024,6 +3041,8 @@ serve(async (req) => {
 
           if (!existingShipping) {
             const addr = orderData.shippingAddress;
+            // Fix 1: Always normalise countryCode to Alpha-3 before sending to Dr. Green API
+            const normalisedCountryCode = toAlpha3(addr.countryCode) || toAlpha3(addr.country) || 'ZAF';
             const shippingPayload = {
               shipping: {
                 address1: addr.street || addr.address1 || '',
@@ -3032,7 +3051,7 @@ serve(async (req) => {
                 city: addr.city || '',
                 state: addr.state || addr.city || '',
                 country: addr.country || '',
-                countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+                countryCode: normalisedCountryCode,
                 postalCode: addr.zipCode || addr.postalCode || '',
               }
             };
@@ -3097,7 +3116,8 @@ serve(async (req) => {
                   city: addr.city || '',
                   state: addr.state || addr.city || '',
                   country: addr.country || '',
-                  countryCode: addr.countryCode || getCountryCodeFromName(addr.country) || '',
+                  // Fix 3: Store Alpha-3 in local DB to keep consistent with API expectations
+                  countryCode: toAlpha3(addr.countryCode) || toAlpha3(addr.country) || getCountryCodeFromName(addr.country) || 'ZAF',
                   postalCode: addr.zipCode || addr.postalCode || '',
                 },
                 updated_at: new Date().toISOString(),
