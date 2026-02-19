@@ -3018,96 +3018,51 @@ serve(async (req) => {
         let lastStepError = '';
         let lastStepStatus = 0;
         
-        // Step 1: Update client shipping address (if provided)
-        // First check if client already has shipping on the API - skip if so
+        // Step 1: Update client shipping address (always — no pre-check, GET /dapp/clients/{id} returns 401)
+        // Use DRGREEN_API_KEY (single production key — no separate write key)
         if (orderData.shippingAddress) {
-          // Pre-check: fetch client to see if shipping already exists
-          let existingShipping = false;
-          try {
-            const clientCheckResponse = await drGreenRequestQuery(`/dapp/clients/${clientId}`, {}, false, adminEnvConfig);
-            if (clientCheckResponse.ok) {
-              const clientData = await clientCheckResponse.clone().json();
-              const shipping = clientData?.data?.shipping || clientData?.shipping;
-              if (shipping && shipping.address1) {
-                logInfo(`[${requestId}] Step 1: Client already has shipping address on API, skipping PATCH`, {
-                  address1: shipping.address1,
-                  city: shipping.city,
-                });
-                existingShipping = true;
-                shippingVerified = true;
-              }
+          const addr = orderData.shippingAddress;
+          const normalisedCountryCode = toAlpha3(addr.countryCode) || toAlpha3(addr.country) || 'ZAF';
+          const shippingPayload = {
+            shipping: {
+              address1: addr.street || addr.address1 || '',
+              address2: addr.address2 || '',
+              landmark: addr.landmark || '',
+              city: addr.city || '',
+              state: addr.state || addr.city || '',
+              country: addr.country || '',
+              countryCode: normalisedCountryCode,
+              postalCode: addr.zipCode || addr.postalCode || '',
             }
-          } catch (checkErr) {
-            logWarn(`[${requestId}] Step 1: Client shipping check failed, will attempt PATCH`, { error: String(checkErr).slice(0, 100) });
+          };
+
+          logInfo(`[${requestId}] Step 1: PATCH shipping address`, { 
+            city: addr.city,
+            countryCode: normalisedCountryCode,
+          });
+
+          try {
+            const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
+            const shippingResponseBody = await shippingResponse.clone().text();
+            logInfo(`[${requestId}] Step 1: PATCH response`, {
+              status: shippingResponse.status,
+              body: shippingResponseBody.slice(0, 400),
+            });
+            if (shippingResponse.ok) {
+              shippingVerified = true;
+            } else {
+              logWarn(`[${requestId}] Step 1: PATCH failed — proceeding anyway`, { status: shippingResponse.status });
+            }
+          } catch (shippingErr) {
+            logWarn(`[${requestId}] Step 1: PATCH exception — proceeding anyway`, { error: String(shippingErr).slice(0, 100) });
           }
 
-          if (!existingShipping) {
-            const addr = orderData.shippingAddress;
-            // Fix 1: Always normalise countryCode to Alpha-3 before sending to Dr. Green API
-            const normalisedCountryCode = toAlpha3(addr.countryCode) || toAlpha3(addr.country) || 'ZAF';
-            const shippingPayload = {
-              shipping: {
-                address1: addr.street || addr.address1 || '',
-                address2: addr.address2 || '',
-                landmark: addr.landmark || '',
-                city: addr.city || '',
-                state: addr.state || addr.city || '',
-                country: addr.country || '',
-                countryCode: normalisedCountryCode,
-                postalCode: addr.zipCode || addr.postalCode || '',
-              }
-            };
-            
-            logInfo(`[${requestId}] Step 1: Updating client shipping address`, { 
-              city: addr.city, 
-              country: addr.country 
-            });
-            
-            try {
-              const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
-              if (!shippingResponse.ok) {
-                const shippingError = await shippingResponse.clone().text();
-                logWarn(`[${requestId}] Step 1: Shipping PATCH failed`, { 
-                  status: shippingResponse.status,
-                  errorBody: shippingError.slice(0, 500),
-                });
-                
-                // PUT retry fallback
-                logInfo(`[${requestId}] Step 1: Retrying shipping update with PUT method`);
-                try {
-                  const putResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PUT", shippingPayload, false, adminEnvConfig);
-                  if (putResponse.ok) {
-                    const putData = await putResponse.clone().json();
-                    const putShipping = putData?.data?.shipping || putData?.shipping;
-                    if (putShipping && putShipping.address1) {
-                      logInfo(`[${requestId}] Step 1: Shipping verified via PUT fallback`);
-                      shippingVerified = true;
-                    }
-                  } else {
-                    logWarn(`[${requestId}] Step 1: PUT fallback also failed`, { status: putResponse.status });
-                  }
-                } catch (putErr) {
-                  logWarn(`[${requestId}] Step 1: PUT fallback exception`, { error: String(putErr).slice(0, 200) });
-                }
-              } else {
-                const responseData = await shippingResponse.clone().json();
-                const returnedShipping = responseData?.data?.shipping || responseData?.shipping;
-                if (returnedShipping && returnedShipping.address1) {
-                  shippingVerified = true;
-                }
-              }
-            } catch (shippingErr) {
-              logWarn(`[${requestId}] Step 1: Shipping PATCH exception`, { error: String(shippingErr).slice(0, 100) });
-            }
-          }
-          
-          // Always save shipping locally as fallback
+          // Save shipping locally
           try {
             const supabaseAdmin = createClient(
               Deno.env.get('SUPABASE_URL')!,
               Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
             );
-            const addr = orderData.shippingAddress;
             await supabaseAdmin
               .from('drgreen_clients')
               .update({ 
@@ -3118,8 +3073,7 @@ serve(async (req) => {
                   city: addr.city || '',
                   state: addr.state || addr.city || '',
                   country: addr.country || '',
-                  // Fix 3: Store Alpha-3 in local DB to keep consistent with API expectations
-                  countryCode: toAlpha3(addr.countryCode) || toAlpha3(addr.country) || getCountryCodeFromName(addr.country) || 'ZAF',
+                  countryCode: normalisedCountryCode,
                   postalCode: addr.zipCode || addr.postalCode || '',
                 },
                 updated_at: new Date().toISOString(),
@@ -3129,10 +3083,8 @@ serve(async (req) => {
             logWarn(`[${requestId}] Step 1: Local shipping save failed`, { error: String(localSaveErr).slice(0, 100) });
           }
 
-          if (!existingShipping) {
-            logInfo(`[${requestId}] Step 1: Waiting 1500ms for propagation`);
-            await sleep(1500);
-          }
+          logInfo(`[${requestId}] Step 1: Waiting 2500ms for API propagation`);
+          await sleep(2500);
         }
         
         // Step 1.5: Clear any stale cart to prevent 409 conflicts
@@ -3173,6 +3125,7 @@ serve(async (req) => {
           // Generate a fresh UUID for this cart session
           const clientCartId = crypto.randomUUID();
           const cartPayload = {
+            clientId: clientId,
             clientCartId: clientCartId,
             items: cartItems.map((item: { strainId: string; quantity: number }) => ({
               strainId: item.strainId,
@@ -3308,113 +3261,7 @@ serve(async (req) => {
           lastStepStatus = lastCartStatus;
         }
         
-        // FALLBACK: Retry the cart flow after clearing and a longer delay
-        // Per Postman spec, POST /dapp/orders only accepts { clientId } - items must be in cart
-        if (!cartSuccess || stepFailed) {
-          logInfo(`[${requestId}] Step 3 (Fallback): Retrying cart flow after full clear`, { 
-            cartFailed: !cartSuccess,
-            previousStep: stepFailed,
-          });
-          
-          // Clear cart completely
-          try {
-            await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
-          } catch (clearErr) {
-            logWarn(`[${requestId}] Fallback: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
-          }
-          await sleep(2000);
-          
-          // Re-add all items as batch
-          let fallbackAllAdded = true;
-          const fallbackCartId = crypto.randomUUID();
-          const fallbackPayload = {
-            clientCartId: fallbackCartId,
-            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
-              strainId: item.strainId,
-              quantity: item.quantity,
-            })),
-          };
-          try {
-            logInfo(`[${requestId}] Fallback: Batch cart POST`, { clientCartId: fallbackCartId.slice(0, 8) + '***', itemCount: cartItems.length });
-            const resp = await drGreenRequestBody("/dapp/carts", "POST", fallbackPayload, true, adminEnvConfig);
-            if (!resp.ok) {
-              const errText = await resp.clone().text();
-              logWarn(`[${requestId}] Fallback: Batch cart failed`, { status: resp.status, error: errText.slice(0, 200) });
-              fallbackAllAdded = false;
-              lastCartError = errText;
-              lastCartStatus = resp.status;
-            }
-          } catch (err) {
-            logError(`[${requestId}] Fallback: Batch cart exception`, { error: String(err).slice(0, 100) });
-            fallbackAllAdded = false;
-            lastCartError = String(err);
-          }
-          
-          if (fallbackAllAdded) {
-            await sleep(500);
-            try {
-              response = await drGreenRequestBody("/dapp/orders", "POST", { clientId }, false, adminEnvConfig);
-              if (response.ok) {
-                logInfo(`[${requestId}] Fallback: Order created successfully`);
-                try {
-                  const supabaseAdmin2 = createClient(
-                    Deno.env.get('SUPABASE_URL')!,
-                    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-                  );
-                  const apiKey2 = Deno.env.get(adminEnvConfig.apiKeyEnv) || '';
-                  await supabaseAdmin2
-                    .from('drgreen_clients')
-                    .update({ api_key_scope: apiKey2.slice(0, 8), updated_at: new Date().toISOString() })
-                    .eq('drgreen_client_id', clientId);
-                } catch (scopeErr2) {
-                  logWarn(`[${requestId}] Failed to record api_key_scope (fallback)`, { error: String(scopeErr2).slice(0, 100) });
-                }
-                
-                // Extract orderId from fallback response
-                try {
-                  const orderData = await response.clone().json();
-                  const orderId = orderData?.data?.data?.id || orderData?.data?.id || orderData?.id || orderData?.data;
-                  
-                  if (!orderId) {
-                    logError(`[${requestId}] Fallback: No orderId found in response`, { response: JSON.stringify(orderData).slice(0, 200) });
-                    lastStepError = 'Order created but no ID in response';
-                    lastStepStatus = 500;
-                    stepFailed = 'fallback-order-id-missing';
-                  } else {
-                    logInfo(`[${requestId}] Fallback: Extracted orderId from response`, { orderId: String(orderId).slice(0, 8) + '***' });
-                    return new Response(JSON.stringify({
-                      success: true,
-                      data: {
-                        orderId: String(orderId),
-                        orderNumber: orderData?.data?.data?.orderNumber || orderData?.data?.orderNumber || orderData?.orderNumber,
-                        status: orderData?.data?.data?.status || orderData?.data?.status || orderData?.status || 'PENDING',
-                        totalAmount: orderData?.data?.data?.totalAmount || orderData?.data?.totalAmount || orderData?.totalAmount || 0,
-                      }
-                    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
-                  }
-                } catch (parseErr) {
-                  logError(`[${requestId}] Fallback: Failed to parse order response`, { error: String(parseErr).slice(0, 100) });
-                  lastStepError = String(parseErr);
-                  lastStepStatus = 500;
-                  stepFailed = 'fallback-order-parse';
-                }
-                break;
-              } else {
-                const directError = await response.clone().text();
-                lastStepError = directError;
-                lastStepStatus = response.status;
-                stepFailed = 'fallback-order';
-                logError(`[${requestId}] Fallback: Order creation failed`, { status: response.status, error: directError.slice(0, 200) });
-              }
-            } catch (orderErr) {
-              lastStepError = String(orderErr);
-              lastStepStatus = 500;
-              stepFailed = 'fallback-order-exception';
-            }
-          } else {
-            stepFailed = 'fallback-cart-add';
-          }
-        }
+        // All 3 steps done — if we reach here with no early return, all attempts have failed
         
         // If we reach here, all attempts failed - return 200-wrapped error for observability
         const isShippingError = lastStepError.includes("shipping");
