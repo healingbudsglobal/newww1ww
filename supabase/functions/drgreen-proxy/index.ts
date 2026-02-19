@@ -3023,17 +3023,21 @@ serve(async (req) => {
         if (orderData.shippingAddress) {
           const addr = orderData.shippingAddress;
           const normalisedCountryCode = toAlpha3(addr.countryCode) || toAlpha3(addr.country) || 'ZAF';
+          const shippingObj = {
+            address1: addr.street || addr.address1 || '',
+            address2: addr.address2 || '',
+            landmark: addr.landmark || '',
+            city: addr.city || '',
+            state: addr.state || addr.city || '',
+            country: addr.country || '',
+            countryCode: normalisedCountryCode,
+            postalCode: addr.zipCode || addr.postalCode || '',
+          };
+          // Try both formats: shippings[] array (as stored by API) AND shipping object
+          // The get-client response shows "shippings":[{...}] array format
           const shippingPayload = {
-            shipping: {
-              address1: addr.street || addr.address1 || '',
-              address2: addr.address2 || '',
-              landmark: addr.landmark || '',
-              city: addr.city || '',
-              state: addr.state || addr.city || '',
-              country: addr.country || '',
-              countryCode: normalisedCountryCode,
-              postalCode: addr.zipCode || addr.postalCode || '',
-            }
+            shipping: shippingObj,
+            shippings: [shippingObj],
           };
 
           logInfo(`[${requestId}] Step 1: PATCH shipping address`, { 
@@ -3044,9 +3048,16 @@ serve(async (req) => {
           try {
             const shippingResponse = await drGreenRequestBody(`/dapp/clients/${clientId}`, "PATCH", shippingPayload, false, adminEnvConfig);
             const shippingResponseBody = await shippingResponse.clone().text();
+            // Log the full response but specifically extract the shipping field to confirm persistence
+            let shippingInResponse = 'not found in response';
+            try {
+              const parsed = JSON.parse(shippingResponseBody);
+              const clientData = parsed?.data || parsed;
+              shippingInResponse = JSON.stringify(clientData?.shipping || clientData?.shippings || 'missing');
+            } catch (_) { /* non-JSON */ }
             logInfo(`[${requestId}] Step 1: PATCH response`, {
               status: shippingResponse.status,
-              body: shippingResponseBody.slice(0, 400),
+              shippingInResponse: shippingInResponse.slice(0, 300),
             });
             if (shippingResponse.ok) {
               shippingVerified = true;
@@ -3101,29 +3112,26 @@ serve(async (req) => {
         }
         await sleep(500);
         
-        // Step 2: Add items to server-side cart as BATCH
-        // API: POST /dapp/carts with { clientCartId: uuid, items: [{ strainId, quantity }] }
+        // Step 2: Add items to cart using batch format
+        // API: POST /dapp/carts with { clientId, clientCartId (UUID), items: [{ strainId, quantity }] }
+        // The clientCartId is a required UUID that identifies this cart session
         const cartItems = orderData.items.map((item: { strainId?: string; productId?: string; quantity: number; price?: number }) => ({
           strainId: item.strainId || item.productId,
           quantity: item.quantity,
         }));
         
+        const clientCartId = crypto.randomUUID();
         logInfo(`[${requestId}] Step 2: Adding ${cartItems.length} items to cart (batch format)`, { 
           clientId: clientId.slice(0, 8) + '***',
+          itemCount: cartItems.length,
+          clientCartId: clientCartId.slice(0, 8) + '***',
         });
         
-        // Batch cart add with retry logic
         let cartSuccess = false;
-        let cartAttempts = 0;
-        const maxCartAttempts = 3;
         let lastCartError = "";
         let lastCartStatus = 0;
-        
-        while (!cartSuccess && cartAttempts < maxCartAttempts) {
-          cartAttempts++;
-          
-          // Generate a fresh UUID for this cart session
-          const clientCartId = crypto.randomUUID();
+
+        try {
           const cartPayload = {
             clientId: clientId,
             clientCartId: clientCartId,
@@ -3132,59 +3140,58 @@ serve(async (req) => {
               quantity: item.quantity,
             })),
           };
-          
-          try {
-            logInfo(`[${requestId}] Step 2: Batch cart POST`, { 
-              clientCartId: clientCartId.slice(0, 8) + '***',
-              itemCount: cartItems.length,
-              attempt: cartAttempts,
-            });
-            
-            const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, true, adminEnvConfig);
-            lastCartStatus = cartResponse.status;
-            
-            if (!cartResponse.ok) {
-              lastCartError = await cartResponse.clone().text();
-              logWarn(`[${requestId}] Step 2: Batch cart failed`, { 
-                status: cartResponse.status,
-                error: lastCartError.slice(0, 200),
-              });
-              
-              // On 409 Conflict, clear cart and retry
-              if (lastCartStatus === 409 && cartAttempts < maxCartAttempts) {
-                logInfo(`[${requestId}] Step 2: 409 conflict - clearing cart and retrying`);
-                try {
-                  await drGreenRequest(`/dapp/carts/client/${clientId}`, "DELETE", undefined, adminEnvConfig);
-                } catch (clearErr) {
-                  logWarn(`[${requestId}] Step 2: Cart clear failed`, { error: String(clearErr).slice(0, 100) });
-                }
-                await sleep(1000);
-              } else if (lastCartError.includes("shipping address not found") && cartAttempts < maxCartAttempts) {
-                const delay = cartAttempts * 1500;
-                logInfo(`[${requestId}] Step 2: Retry in ${delay}ms (shipping propagation)`);
-                await sleep(delay);
-              } else {
-                logWarn(`[${requestId}] Step 2: Non-retryable error, stopping`);
-                break;
-              }
-            } else {
-              logInfo(`[${requestId}] Step 2: All ${cartItems.length} items added successfully (batch)`, { attempt: cartAttempts });
-              cartSuccess = true;
-            }
-          } catch (cartErr) {
-            logError(`[${requestId}] Step 2: Batch cart exception`, { error: String(cartErr).slice(0, 100) });
-            lastCartError = String(cartErr);
-            if (cartAttempts < maxCartAttempts) {
-              await sleep(1000);
-            }
+          logInfo(`[${requestId}] Step 2: Cart batch POST`, { 
+            itemCount: cartItems.length,
+            payloadKeys: Object.keys(cartPayload).join(','),
+          });
+          const cartResponse = await drGreenRequestBody("/dapp/carts", "POST", cartPayload, false, adminEnvConfig);
+          lastCartStatus = cartResponse.status;
+          const cartResponseBody = await cartResponse.clone().text();
+          logInfo(`[${requestId}] Step 2: Cart response`, { 
+            status: cartResponse.status,
+            body: cartResponseBody.slice(0, 300),
+          });
+          if (!cartResponse.ok) {
+            lastCartError = cartResponseBody;
+            logWarn(`[${requestId}] Step 2: Cart add failed`, { status: cartResponse.status, error: cartResponseBody.slice(0, 200) });
+            throw new Error(`Cart add failed: ${cartResponseBody.slice(0, 150)}`);
           }
+          cartSuccess = true;
+          logInfo(`[${requestId}] Step 2: All ${cartItems.length} items added to cart`);
+        } catch (cartErr) {
+          logError(`[${requestId}] Step 2: Cart add exception`, { error: String(cartErr).slice(0, 150) });
+          lastCartError = String(cartErr);
         }
         
-        // If cart succeeded, create order from cart
+        // Step 3: Create order — pass shippingAddress directly in the POST body
+        // API: POST /dapp/orders with { clientId, items, shippingAddress, currency }
+        // This bypasses the client stored shipping issue entirely
         if (cartSuccess) {
-          logInfo(`[${requestId}] Step 3: Creating order from cart`);
+          logInfo(`[${requestId}] Step 3: Creating order with shipping in payload`);
           
-          const orderPayload = { clientId: clientId };
+          const addr = orderData.shippingAddress;
+          const normAddr = addr ? {
+            address1: addr.street || addr.address1 || '',
+            address2: addr.address2 || '',
+            landmark: addr.landmark || '',
+            city: addr.city || '',
+            state: addr.state || addr.city || '',
+            country: addr.country || '',
+            countryCode: toAlpha3(addr.countryCode) || toAlpha3(addr.country) || 'ZAF',
+            postalCode: addr.zipCode || addr.postalCode || '',
+          } : undefined;
+
+          const orderPayload: Record<string, unknown> = { 
+            clientId: clientId,
+            items: cartItems.map((item: { strainId: string; quantity: number }) => ({
+              strainId: item.strainId,
+              quantity: item.quantity,
+            })),
+            currency: orderData.currency || 'ZAR',
+          };
+          if (normAddr) {
+            orderPayload.shippingAddress = normAddr;
+          }
           
           try {
             response = await drGreenRequestBody("/dapp/orders", "POST", orderPayload, false, adminEnvConfig);
